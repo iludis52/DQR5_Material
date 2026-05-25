@@ -1,0 +1,68 @@
+﻿{
+  "name": "drehkreuz",
+  "description": "",
+  "type": "DEA",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": [
+      "bezahlen",
+      "durchgehen"
+    ],
+    "StackAlphabet": [
+      "|"
+    ],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "Zu",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 1,
+            "Target": 2,
+            "x": 50,
+            "y": 0,
+            "Labels": [
+              "bezahlen"
+            ]
+          }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 2,
+        "Name": "Offen",
+        "x": 410,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 2,
+            "Target": 1,
+            "x": 50,
+            "y": 0,
+            "Labels": [
+              "durchgehen"
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 2,
+            "x": 0,
+            "y": -150,
+            "Labels": [
+              "bezahlen"
+            ]
+          }
+        ],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

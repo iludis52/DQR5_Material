@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SARIMA Experten-Quiz</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; color: #333; }
+        .status-bar { position: sticky; top: 0; background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .status-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; }
+        .mistakes { color: #dc3545; }
+        .progress-container { width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
+        .quiz-container { max-width: 800px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
+        .quiz-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .question-text { font-size: 1.2rem; color: #2c3e50; margin-bottom: 20px; font-weight: 600; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px 15px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; text-align: left; }
+        button:hover:not([disabled]) { background-color: #f0f8ff; border-color: #3498db; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        button.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; text-decoration: line-through; }
+        .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .feedback.correct-feedback { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback.wrong-feedback { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .final-result { display: none; text-align: center; background: #e8f4fd; border: 2px solid #3498db; padding: 2rem; border-radius: 12px; margin-bottom: 40px; }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>SARIMA Experten-Quiz</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "In der Metapher der 'Zwei Uhren': Was erfasst der Stundenzeiger (die Großbuchstaben P, D, Q)?",
+            options: [
+                "Die rein kurzfristige, schrittweise Dynamik direkt von einem Monat zum nächsten Monat.",
+                "Die langfristige, periodisch wiederkehrende Dynamik explizit von Saison zu Saison.",
+                "Die rein zufälligen Schwankungen und das unerklärte weiße Rauschen in den Residuen.",
+                "Die absoluten Mittelwerte aller Beobachtungen ohne Berücksichtigung der Zeitachse."
+            ],
+            correct: 1,
+            explanation: "Der Stundenzeiger bewegt sich langsamer und schaut auf das große Ganze der Saisons."
+        },
+        {
+            text: "Was gibt der Parameter 'm' in der SARIMA-Notation an?",
+            options: [
+                "Die totale Anzahl der Jahre im gesamten Datensatz.",
+                "Die maximale Ordnung der reinen Autoregression.",
+                "Die exakte Länge eines Saisonzyklus (z.B. 12 Monate).",
+                "Die minimale Varianz der berechneten Residuenwerte."
+            ],
+            correct: 2,
+            explanation: "Der Index m definiert die Periode, nach der sich das Muster in den Daten wiederholt."
+        },
+        {
+            text: "Welches Modell ist das berühmte 'Airline Model'?",
+            options: [
+                "ARIMA(1,1,1)(1,1,1)12 — Ein Modell mit allen autoregressiven und gleitenden Termen.",
+                "ARIMA(0,1,1)(0,1,1)12 — Ein Modell mit einfachem MA-Term und saisonalem MA-Term.",
+                "ARIMA(0,1,0)(0,1,0)12 — Ein Modell, das ausschließlich auf zweifacher Differenzierung ruht.",
+                "ARIMA(2,0,2)(2,0,2)12 — Ein Modell, das komplett ohne jegliche Differenzierung auskommt."
+            ],
+            correct: 1,
+            explanation: "Dieses Modell wurde 1970 speziell für monatliche Daten mit Trend und Saison entwickelt."
+        },
+        {
+            text: "Warum ist die saisonale Differenzierung (D) wichtig?",
+            options: [
+                "Weil die Standard-Differenzierung zwar den Trend löscht, aber Saisoneffekte im ACF belässt.",
+                "Weil sie die Rechenzeit des Modells durch Weglassen der autoregressiven Terme drastisch kürzt.",
+                "Weil sie eine vorherige Log-Transformation zur Varianz-Stabilisierung komplett überflüssig macht.",
+                "Weil sie sicherstellt, dass die Zeitreihe exakt den statistischen Mittelwert von Null beibehält."
+            ],
+            correct: 0,
+            explanation: "Die gewöhnliche Differenzierung entfernt den Trend, aber nicht das saisonale Muster."
+        },
+        {
+            text: "Wo liest man im ACF-Plot saisonale MA-Effekte (Q) ab?",
+            options: [
+                "Ausschließlich an den allerersten Lags 1, 2 und 3 der Zeitreihe.",
+                "Exakt an den Vielfachen der Periode m (z.B. Lags 12, 24, 36).",
+                "Genau an der Nulllinie innerhalb des statistischen Konfidenzbands.",
+                "Nur an den negativen Ausschlägen, die den Trend repräsentieren."
+            ],
+            correct: 1,
+            explanation: "Saisonale Abhängigkeiten zeigen sich im ACF-Plot erst bei Vielfachen der Periode m."
+        },
+        {
+            text: "Was beschreibt ein saisonaler AR-Term (P)?",
+            options: [
+                "Die starke Abhängigkeit eines Wertes vom direkten Vormonat in der laufenden Zeitreihe.",
+                "Die klare Abhängigkeit eines Wertes vom exakt gleichen Monat des vergangenen Vorjahres.",
+                "Den massiven Einfluss eines rein zufälligen Schocks aus der direkt vorangegangenen Woche.",
+                "Die strukturelle Abhängigkeit der Varianz vom langfristigen, übergeordneten Gesamttrend."
+            ],
+            correct: 1,
+            explanation: "P nutzt Φ (großes Phi), um die Trägheit zwischen gleichen Saisonpunkten zu modellieren."
+        },
+        {
+            text: "Was muss bei der Diagnose eines SARIMA-Modells in Bezug auf Residuen geprüft werden?",
+            options: [
+                "Dass ausschließlich die kurzfristigen Autokorrelationen der ersten drei Lags signifikant sind.",
+                "Dass die Residuen weder eine kurzfristige noch eine saisonale Autokorrelation mehr aufweisen.",
+                "Dass der berechnete statistische Mittelwert der Modell-Residuen exakt beim Wert zwölf liegt.",
+                "Dass die Residuen im ACF-Plot ein klares, sinusförmig wiederkehrendes Muster hinterlassen."
+            ],
+            correct: 1,
+            explanation: "Ein gutes Modell muss Muster auf beiden Ebenen (Schritt für Schritt & Saison für Saison) eliminieren."
+        },
+        {
+            text: "Wie viele Parameter hat ein SARIMA(p,d,q)(P,D,Q)m Modell insgesamt?",
+            options: [
+                "Das Modell besitzt genau 3 Parameter (nur Autoregression, Differenzierung und Moving Average).",
+                "Das Modell besitzt exakt 5 Parameter (aufgrund der wegfallenden saisonalen Differenzierung).",
+                "Das Modell besitzt genau 7 Parameter (die Kombination aus p, d, q, P, D, Q und der Periode m).",
+                "Das Modell besitzt exakt 9 Parameter (zusätzlich noch den exakten Mittelwert und die Varianz)."
+            ],
+            correct: 2,
+            explanation: "Es kombiniert die drei Terme p, d, q mit den saisonalen Termen P, D, Q und der Periode m."
+        },
+        {
+            text: "Was ist der erste Schritt im Box-Jenkins-Workflow für SARIMA, wenn die Amplitude wächst?",
+            options: [
+                "Die sofortige Durchführung einer starken saisonalen Differenzierung.",
+                "Die klassische Log-Transformation zur Stabilisierung der Varianz.",
+                "Die umgehende mathematische Schätzung aller Modell-Koeffizienten.",
+                "Die direkte Glättung der Datenpunkte mit einem Moving Average."
+            ],
+            correct: 1,
+            explanation: "Wachsende Schwankungen (Amplituden) müssen vor der Differenzierung zwingend stabilisiert werden."
+        },
+        {
+            text: "Welches Symbol wird für den saisonalen Moving-Average-Koeffizienten verwendet?",
+            options: [
+                "Das Symbol φ (kleines Phi), zuständig für den kurzfristigen AR-Prozess.",
+                "Das Symbol Θ (großes Theta), zuständig für den saisonalen MA-Prozess.",
+                "Das Symbol μ (kleines My), zuständig für den globalen Trend-Mittelwert.",
+                "Das Symbol Φ (großes Phi), zuständig für den saisonalen AR-Prozess."
+            ],
+            correct: 1,
+            explanation: "Θ beschreibt, wie stark ein saisonaler Schock (z.B. vom letzten Juli) in der aktuellen Periode nachwirkt."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+</body>
+</html>

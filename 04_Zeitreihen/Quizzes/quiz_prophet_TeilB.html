@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prophet Theorie Quiz - Teil B</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; color: #333; }
+        .status-bar { position: sticky; top: 0; background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .status-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; }
+        .mistakes { color: #dc3545; }
+        .progress-container { width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
+        .quiz-container { max-width: 800px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
+        .quiz-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .question-text { font-size: 1.2rem; color: #2c3e50; margin-bottom: 20px; font-weight: 600; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px 15px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; text-align: left; }
+        button:hover:not([disabled]) { background-color: #f0f8ff; border-color: #3498db; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        button.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; text-decoration: line-through; }
+        .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .feedback.correct-feedback { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback.wrong-feedback { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .final-result { display: none; text-align: center; background: #e8f4fd; border: 2px solid #3498db; padding: 2rem; border-radius: 12px; margin-bottom: 40px; }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Prophet Theorie Quiz - Teil B</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was unterscheidet Prophet laut Skript primär von klassischen Verfahren wie SARIMA?",
+            options: [
+                "Prophet ist mathematisch hochkomplex und verlangt perfekte Datensätze.",
+                "SARIMA ist für fehlende Werte optimiert, Prophet für reine Zeitreihen.",
+                "Prophet verfolgt einen pragmatischen Ansatz für reale, unsaubere Daten.",
+                "Prophet benötigt im Gegensatz zu SARIMA zwingend absolute Stationarität."
+            ],
+            correct: 2,
+            explanation: "Während SARIMA strenge Voraussetzungen hat, ist Prophet auf Robustheit im Business-Alltag ausgelegt."
+        },
+        {
+            text: "Wie lautet die additive Grundgleichung von Prophet?",
+            options: [
+                "y(t) = g(t) * s(t) * h(t) * ε(t) (Multiplikativer Ansatz)",
+                "y(t) = p(t) + d(t) + q(t) + ε(t) (SARIMA-Standardansatz)",
+                "y(t) = g(t) + s(t) + ε(t) (Ansatz ohne Feiertagseffekte)",
+                "y(t) = g(t) + s(t) + h(t) + ε(t) (Vollständige Basisgleichung)"
+            ],
+            correct: 3,
+            explanation: "Die Zeitreihe wird als Summe aus Trend, Saisonalität, Feiertagen und Restfehler betrachtet."
+        },
+        {
+            text: "Wann sollte laut Handout das logistische Trendmodell gewählt werden?",
+            options: [
+                "Wenn eine natürliche Sättigungsgrenze (Kapazität) im System bekannt ist.",
+                "Wenn ein langfristig vollkommen geradliniger Verlauf in den Daten vorliegt.",
+                "Wenn die untersuchte Zeitreihe absolut keine saisonalen Schwankungen aufweist.",
+                "Wenn ausschließlich kurzfristige, zufällige Rausch-Effekte zu erwarten sind."
+            ],
+            correct: 0,
+            explanation: "Das logistische Modell bildet S-Kurven mit Ober- und Untergrenzen (cap/floor) ab."
+        },
+        {
+            text: "Was bewirkt ein niedriger Wert beim Hyperparameter 'changepoint_prior_scale'?",
+            options: [
+                "Der Trend wird insgesamt glatter, robuster und weniger flexibel.",
+                "Der Trend wird viel flexibler und folgt jedem kleinen Ausreißer.",
+                "Es werden wesentlich mehr Changepoints am Ende der Kurve gesetzt.",
+                "Die Saisonalität wird dadurch komplett aus der Berechnung entfernt."
+            ],
+            correct: 0,
+            explanation: "Niedrige Werte erzwingen einen steiferen, glatteren Trendverlauf."
+        },
+        {
+            text: "Welches mathematische Prinzip nutzt Prophet für die Saisonalität?",
+            options: [
+                "Die exponentielle Glättung und klassische gleitende Durchschnitte.",
+                "Die Fourier-Reihe (also eine gezielte Überlagerung von Sinuswellen).",
+                "Die klassische polynomielle Regression exakt vierten mathematischen Grades.",
+                "Die Autokorrelationsfunktion (ACF) zur Mustererkennung in den Daten."
+            ],
+            correct: 1,
+            explanation: "Wie ein musikalischer Akkord werden komplexe Muster aus Sinuswellen zusammengesetzt."
+        },
+        {
+            text: "Was passiert, wenn du für die Saisonalität ein sehr hohes N (z.B. 20) wählst?",
+            options: [
+                "Die Kurve wird künstlich stark geglättet und verliert so wichtige Details.",
+                "Die definierte Basis-Periode P der betrachteten Zeitreihe verkürzt sich automatisch.",
+                "Das Modell kann feine Zacken nachbilden, neigt aber stark zum Modell-Overfitting.",
+                "Der Basis-Trend der Zeitreihe wird dadurch komplett überschrieben und ignoriert."
+            ],
+            correct: 2,
+            explanation: "Hohe Ordnungen lassen schnelle Schwingungen zu, können aber Rauschen mitlernen."
+        },
+        {
+            text: "Wann ist laut Faustregel eine multiplikative Saisonalität sinnvoll?",
+            options: [
+                "Wenn die Schwankungsbreite der Daten über die Jahre strikt konstant bleibt.",
+                "Wenn die saisonalen Schwankungen proportional mit dem Trend-Niveau mitwachsen.",
+                "Wenn die untersuchte Zeitreihe bereits im Vorfeld vollständig stationär gemacht wurde.",
+                "Wenn ausschließlich negative numerische Werte im untersuchten Datensatz vorkommen."
+            ],
+            correct: 1,
+            explanation: "Wächst die Amplitude mit dem Niveau, ist das Modell multiplikativ zu wählen."
+        },
+        {
+            text: "Welche Besonderheit bietet Prophet bei der Feiertagskomponente?",
+            options: [
+                "Feiertage müssen stets komplett manuell als perfekte Sinuswellen berechnet werden.",
+                "Feiertage dürfen für das Modell ausschließlich an regulären Wochenenden stattfinden.",
+                "Prophet ignoriert kleine Feiertage standardmäßig, um das Rauschen zu reduzieren.",
+                "Prophet kann flexible Fenster (Zeiträume) rund um ein Feiertags-Ereignis definieren."
+            ],
+            correct: 3,
+            explanation: "Man kann Effekte für Tage vor oder nach dem eigentlichen Ereignis mitmodellieren."
+        },
+        {
+            text: "Was ist eine zwingende Voraussetzung für externe Regressoren (z.B. Werbebudget)?",
+            options: [
+                "Die Werte der externen Regressoren müssen zwingend streng periodisch aufgebaut sein.",
+                "Die verwendeten Daten dürfen unter gar keinen Umständen negative Zahlenwerte enthalten.",
+                "Die Werte müssen auch für den kompletten zukünftigen Prognosezeitraum vorliegen.",
+                "Die Regressoren müssen stets eine perfekte Normalverteilung (Gauß-Kurve) vorweisen."
+            ],
+            correct: 2,
+            explanation: "Da der Regressor die Prognose beeinflusst, muss sein zukünftiger Wert vorliegen."
+        },
+        {
+            text: "In welchem Fall ist Prophet laut Skript gegenüber SARIMA im Vorteil?",
+            options: [
+                "Bei extrem kurzen und sehr einfachen Zeitreihen, die keinerlei Saisonalität aufweisen.",
+                "Wenn starke Saisonalität, Feiertagseffekte und oft 'schmutzige' Echt-Daten vorliegen.",
+                "Wenn die Rohdaten bereits absolut perfekt stationär sind und keinerlei Lücken haben.",
+                "Wenn eine rein lineare und komplett deterministische Vorhersage ohne Schwankungen gesucht wird."
+            ],
+            correct: 1,
+            explanation: "Prophet glänzt vor allem im typischen Business-Alltag mit unvollständigen Daten."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+</body>
+</html>

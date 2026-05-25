@@ -1,0 +1,21 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	retrieve_node(retrieve_node)
+	rerank_node(rerank_node)
+	generate_node(generate_node)
+	reformulate_node(reformulate_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> retrieve_node;
+	reformulate_node --> retrieve_node;
+	rerank_node -. &nbsp;relevant&nbsp; .-> generate_node;
+	rerank_node -. &nbsp;not_relevant&nbsp; .-> reformulate_node;
+	retrieve_node --> rerank_node;
+	generate_node --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

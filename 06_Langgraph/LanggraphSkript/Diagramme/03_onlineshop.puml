@@ -1,0 +1,19 @@
+@startuml Onlineshop
+title Onlineshop (DEA)
+
+[*] --> Shop
+
+state Shop : entry/ zeige_waren()
+state Kasse : entry/ zeige_summe()
+state Deal : entry/ bestätigung()
+state Trap : entry/ zeige_fehler()
+
+Shop --> Kasse : checkout
+Kasse --> Shop : back
+Kasse --> Deal : pay / buche_zahlung()
+Shop --> Trap : error
+Kasse --> Trap : error
+Deal --> [*]
+Trap --> [*]
+
+@enduml

@@ -1,0 +1,44 @@
+flowchart TD
+    S1["<b>1 – Daten laden</b><br/><i>pd.Series mit Datumsindex</i>"]
+
+    subgraph Vorbereitung ["Vorbereitung"]
+        S2["<b>2 – Sichtprüfung</b><br/><i>Trend? Saisonalität?<br/>Wachsende Amplitude?</i>"]
+        S2a["<b>2a – Log-Transformation</b><br/><i>Stabilisiert Varianz (manuell)</i>"]
+    end
+
+    subgraph Stationarität ["Stationarität herstellen"]
+        S3{"<b>3 – ADF-Test</b><br/><i>p &lt; 0.05?</i>"}
+        S4["<b>4 – Differenzierung testen</b><br/><i>Saisonal (D=1) / Einfach (d=1)</i>"]
+    end
+
+    subgraph Modellierung ["Modellierung"]
+        S5["<b>5 – ACF / PACF ablesen</b><br/><i>p, q & P, Q bestimmen</i>"]
+        S6["<b>6 – Modell schätzen</b><br/><i>SARIMA(p,d,q)(P,D,Q)ₘ fitten<br/>AIC / BIC vergleichen</i>"]
+        S7{"<b>7 – Residuen-Diagnose</b><br/><i>Ljung-Box / Weißes Rauschen?</i>"}
+    end
+
+    S8["<b>8 – Prognose</b><br/><i>get_forecast + Rücktransformation<br/>Konfidenzintervall berechnen</i>"]
+
+    S1 --> S2
+    S2 -->|"Ja, Amplitude wächst"| S2a
+    S2 -->|"Nein, stabil"| S3
+    S2a --> S3
+
+    S3 -->|"Nicht stationär"| S4
+    S4 -->|"Erneut prüfen"| S3
+    S3 -->|"Stationär ✓<br/>(d, D bestimmt)"| S5
+
+    S5 --> S6
+    S6 --> S7
+    S7 -->|"✗ Muster → p, q anpassen"| S5
+    S7 -->|"✓ Residuen OK"| S8
+
+    style S1 fill:#e1f5ee,stroke:#0f6e56,color:#04342c
+    style S2 fill:#e1f5ee,stroke:#0f6e56,color:#04342c
+    style S2a fill:#e1f5fe,stroke:#01579b,color:#01579b
+    style S3 fill:#eeedfe,stroke:#534ab7,color:#26215c
+    style S4 fill:#eeedfe,stroke:#534ab7,color:#26215c
+    style S5 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S6 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S7 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S8 fill:#faeeda,stroke:#854f0b,color:#412402

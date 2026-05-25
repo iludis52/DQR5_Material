@@ -1,0 +1,39 @@
+{
+  "name": "paritaet_moore",
+  "description": "Moore-Automat: Gibt 'gerade' oder 'ungerade' basierend auf Anzahl der 1en.",
+  "type": "MOORE",
+  "automaton": {
+    "Alphabet": ["0", "1"],
+    "StackAlphabet": ["gerade", "ungerade"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "gerade",
+        "x": 200,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": true,
+        "Output": "gerade",
+        "Transitions": [
+          { "Source": 1, "Target": 1, "Labels": ["0"] },
+          { "Source": 1, "Target": 2, "Labels": ["1"] }
+        ]
+      },
+      {
+        "ID": 2,
+        "Name": "ungerade",
+        "x": 400,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Output": "ungerade",
+        "Transitions": [
+          { "Source": 2, "Target": 2, "Labels": ["0"] },
+          { "Source": 2, "Target": 1, "Labels": ["1"] }
+        ]
+      }
+    ]
+  }
+}

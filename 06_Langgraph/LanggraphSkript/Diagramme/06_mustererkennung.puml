@@ -1,0 +1,17 @@
+@startuml Mustererkennung101
+title Mustererkennung 101 (Mealy)
+
+[*] --> q0
+
+state q0 : Kein Präfix
+state q1 : Gelesen: "1"
+state q2 : Gelesen: "10"
+
+q0 --> q0 : 0 / nix
+q0 --> q1 : 1 / nix
+q1 --> q1 : 1 / nix
+q1 --> q2 : 0 / nix
+q2 --> q1 : 1 / **treffer**
+q2 --> q0 : 0 / nix
+
+@enduml

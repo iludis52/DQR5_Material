@@ -1,0 +1,56 @@
+{
+  "name": "parkscheinautomat",
+  "description": "Vereinfachter Parkscheinautomat: Akzeptiert 1€ und 2€, druckt bei 'drucken' einen Schein (ab 2€) ggf. mit Wechselgeld.",
+  "type": "MEALY",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": ["1€", "2€", "drucken"],
+    "StackAlphabet": ["nichts", "schein", "schein+1€"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "0€",
+        "x": 200,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 1, "Target": 2, "x": 50, "y": -50, "Labels": [["1€", "nichts"]] },
+          { "Source": 1, "Target": 3, "x": 50, "y": 50, "Labels": [["2€", "nichts"]] },
+          { "Source": 1, "Target": 1, "x": 0, "y": -100, "Labels": [["drucken", "nichts"]] }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 2,
+        "Name": "1€",
+        "x": 400,
+        "y": 100,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 2, "Target": 3, "x": 50, "y": 0, "Labels": [["1€", "nichts"]] },
+          { "Source": 2, "Target": 3, "x": 50, "y": 50, "Labels": [["2€", "nichts"]] },
+          { "Source": 2, "Target": 2, "x": 0, "y": -100, "Labels": [["drucken", "nichts"]] }
+        ],
+        "Start": false
+      },
+      {
+        "ID": 3,
+        "Name": "≥2€",
+        "x": 400,
+        "y": 250,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 3, "Target": 3, "x": 50, "y": 0, "Labels": [["1€", "nichts"]] },
+          { "Source": 3, "Target": 3, "x": 50, "y": 50, "Labels": [["2€", "nichts"]] },
+          { "Source": 3, "Target": 1, "x": -100, "y": 0, "Labels": [["drucken", "schein+1€"]] }
+        ],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

@@ -1,0 +1,108 @@
+﻿{
+  "name": "onlineshop",
+  "description": "",
+  "type": "DEA",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": [
+      "pay",
+      "error",
+      "back",
+      "checkout"
+    ],
+    "StackAlphabet": [
+      "|"
+    ],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "Shop",
+        "x": 180,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 1,
+            "Target": 2,
+            "x": 50,
+            "y": 0,
+            "Labels": [
+              "checkout"
+            ]
+          },
+          {
+            "Source": 1,
+            "Target": 4,
+            "x": -10,
+            "y": -80,
+            "Labels": [
+              "error"
+            ]
+          }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 2,
+        "Name": "Kasse",
+        "x": 350,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 2,
+            "Target": 3,
+            "x": -10,
+            "y": 10,
+            "Labels": [
+              "pay"
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 4,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "error"
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 1,
+            "x": 50,
+            "y": -10,
+            "Labels": [
+              "back"
+            ]
+          }
+        ],
+        "Start": false
+      },
+      {
+        "ID": 3,
+        "Name": "Deal",
+        "x": 450,
+        "y": 60,
+        "Final": true,
+        "Radius": 30,
+        "Transitions": [],
+        "Start": false
+      },
+      {
+        "ID": 4,
+        "Name": "Trap",
+        "x": 450,
+        "y": 250,
+        "Final": true,
+        "Radius": 30,
+        "Transitions": [],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

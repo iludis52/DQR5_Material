@@ -1,0 +1,119 @@
+﻿{
+  "name": "microwelle",
+  "description": "",
+  "type": "DEA",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": [
+      "schliessen",
+      "öffnen",
+      "starten",
+      "warten"
+    ],
+    "StackAlphabet": [
+      "|"
+    ],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "Offen",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 1,
+            "Target": 2,
+            "x": 50,
+            "y": -20,
+            "Labels": [
+              "schliessen"
+            ]
+          }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 4,
+        "Name": "OK",
+        "x": 150,
+        "y": 320,
+        "Final": true,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 4,
+            "Target": 1,
+            "x": 20,
+            "y": 0,
+            "Labels": [
+              "öffnen"
+            ]
+          }
+        ],
+        "Start": false
+      },
+      {
+        "ID": 3,
+        "Name": "Läuft",
+        "x": 300,
+        "y": 320,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 3,
+            "Target": 4,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "warten"
+            ]
+          },
+          {
+            "Source": 3,
+            "Target": 1,
+            "x": -50,
+            "y": 40,
+            "Labels": [
+              "öffnen"
+            ]
+          }
+        ],
+        "Start": false
+      },
+      {
+        "ID": 2,
+        "Name": "Zu",
+        "x": 430,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 2,
+            "Target": 1,
+            "x": 50,
+            "y": -40,
+            "Labels": [
+              "öffnen"
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 3,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "starten"
+            ]
+          }
+        ],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

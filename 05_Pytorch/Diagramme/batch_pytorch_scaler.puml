@@ -1,0 +1,64 @@
+@startuml
+skinparam style strictuml
+skinparam DefaultFontName Arial
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #FBC02D
+skinparam PartitionBorderColor #424242
+
+title PyTorch Pipeline: Iris Klassifikation (13-Schritte-Workflow)
+
+start
+
+partition "1. Datenaufbereitung & Splitting" #E3F2FD {
+    :1. Datensatz laden\n(pd.read_csv('Iris.csv'));
+    :2. Label-Encoding anwenden\n(Kategorien in 0, 1, 2 wandeln);
+    :3. Train-Test-Split\n(Separates Test-Set abspalten);
+    :4. Train-Validation-Split\n(Val-Set vom Train-Set abspalten);
+    :5. Feature-Skalierung (StandardScaler)\n**Wichtig:** fit_transform() nur auf Train-Daten,\ntransform() auf Val- und Test-Daten;
+}
+
+partition "2. PyTorch Setup" #F3E5F5 {
+    :6. In PyTorch-Tensoren umwandeln\n(X als float32, y als int64/LongTensor);
+    :7. TensorDataset & DataLoader instanziieren\n(Batching, Shuffle=True nur für Train);
+}
+
+partition "3. Modell-Setup" #E8F5E9 {
+    :8. Neuronales Netz definieren\n(nn.Module oder nn.Sequential);
+    note right
+      **Architektur (Beispiel):**
+      1. Linear(4, 5)
+      2. ReLU()
+      3. Linear(5, 3)
+    end note
+    :9. Loss-Funktion (CrossEntropyLoss) &\nOptimizer (Adam/SGD) festlegen;
+}
+
+partition "4. Trainingszyklus (z. B. 100 Epochen)" #FFF3E0 {
+    while (Epochen-Limit erreicht oder Early Stopping?) is (nein)
+        :Modell in Trainingsmodus versetzen\n(model.train());
+        
+        while (Weitere Batches im Train-DataLoader?) is (ja)
+            :Gradienten zurücksetzen\n(optimizer.zero_grad());
+            :Forward-Pass\n(outputs = model(batch_X));
+            :Verlust (Loss) berechnen;
+            :Backward-Pass\n(loss.backward());
+            :Gewichte aktualisieren\n(optimizer.step());
+        endwhile (nein)
+        
+        :Modell in Evaluationsmodus versetzen\n(model.eval());
+        :Validierung auf Val-Set\n(zwingend innerhalb **with torch.no_grad():**);
+        :Epoche, Train-Loss & Val-Loss ausgeben;
+    endwhile (ja)
+}
+
+partition "5. Evaluierung & Deployment" #EFEBE9 {
+    :11. Testdaten (X_test) final auswerten\n(model.eval(), in **with torch.no_grad():**);
+    :12. Metriken bestimmen & ausgeben\n(Accuracy, Confusion Matrix, etc.);
+    
+    :13. Artefakte für Inferenz abspeichern\n- Modellgewichte (state_dict)\n- LabelEncoder (.pkl)\n- **Feature-Scaler (.pkl)**;
+}
+
+stop
+@enduml
+
+@startuml

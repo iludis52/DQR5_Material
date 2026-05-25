@@ -1,0 +1,118 @@
+﻿{
+  "name": "Getränkeautomat",
+  "description": "",
+  "type": "MOORE",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": [
+      "1€ einwerfen",
+      "abbrechen",
+      "warten"
+    ],
+    "StackAlphabet": [
+      "\"2€\"",
+      "\"1€\"",
+      "Limo",
+      "-1€",
+      "-2€",
+      "2Euro"
+    ],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "hat0€",
+        "x": 210,
+        "y": 190,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 1,
+            "Target": 2,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "1€ einwerfen"
+            ]
+          }
+        ],
+        "Start": true,
+        "Output": "\"2€\""
+      },
+      {
+        "ID": 2,
+        "Name": "hat1€",
+        "x": 400,
+        "y": 190,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 2,
+            "Target": 4,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "abbrechen"
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 3,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              "1€ einwerfen"
+            ]
+          }
+        ],
+        "Start": false,
+        "Output": "\"1€\""
+      },
+      {
+        "ID": 3,
+        "Name": "OK",
+        "x": 590,
+        "y": 190,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 3,
+            "Target": 1,
+            "x": 0,
+            "y": -130,
+            "Labels": [
+              "warten"
+            ]
+          }
+        ],
+        "Start": false,
+        "Output": "Limo"
+      },
+      {
+        "ID": 4,
+        "Name": "back",
+        "x": 400,
+        "y": 310,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 4,
+            "Target": 1,
+            "x": -20,
+            "y": 50,
+            "Labels": [
+              "warten"
+            ]
+          }
+        ],
+        "Start": false,
+        "Output": "-1€"
+      }
+    ],
+    "lastInputs": []
+  }
+}

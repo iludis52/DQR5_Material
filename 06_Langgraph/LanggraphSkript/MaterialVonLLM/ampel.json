@@ -1,0 +1,63 @@
+{
+  "name": "ampel_moore",
+  "description": "Einfache Ampelsteuerung im Moore-Modell.",
+  "type": "MOORE",
+  "automaton": {
+    "Alphabet": ["takt"],
+    "StackAlphabet": ["rot", "rot/gelb", "gruen", "gelb"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "ROT",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": true,
+        "Output": "rot",
+        "Transitions": [
+          { "Source": 1, "Target": 2, "Labels": ["takt"] }
+        ]
+      },
+      {
+        "ID": 2,
+        "Name": "ROT_GELB",
+        "x": 300,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Output": "rot/gelb",
+        "Transitions": [
+          { "Source": 2, "Target": 3, "Labels": ["takt"] }
+        ]
+      },
+      {
+        "ID": 3,
+        "Name": "GRUEN",
+        "x": 450,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Output": "gruen",
+        "Transitions": [
+          { "Source": 3, "Target": 4, "Labels": ["takt"] }
+        ]
+      },
+      {
+        "ID": 4,
+        "Name": "GELB",
+        "x": 600,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Output": "gelb",
+        "Transitions": [
+          { "Source": 4, "Target": 1, "Labels": ["takt"] }
+        ]
+      }
+    ]
+  }
+}

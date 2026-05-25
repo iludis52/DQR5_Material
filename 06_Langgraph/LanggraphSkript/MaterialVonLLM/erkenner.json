@@ -1,0 +1,37 @@
+{
+  "name": "muster_ab_mealy",
+  "description": "Gibt '1' aus, sobald 'ab' gelesen wird (genau beim 'b').",
+  "type": "MEALY",
+  "automaton": {
+    "Alphabet": ["a", "b"],
+    "StackAlphabet": ["0", "1"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "start",
+        "x": 200,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": true,
+        "Transitions": [
+          { "Source": 1, "Target": 2, "Labels": [["a", "0"]] },
+          { "Source": 1, "Target": 1, "Labels": [["b", "0"]] }
+        ]
+      },
+      {
+        "ID": 2,
+        "Name": "nach_a",
+        "x": 400,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 2, "Target": 2, "Labels": [["a", "0"]] },
+          { "Source": 2, "Target": 1, "Labels": [["b", "1"]] }
+        ]
+      }
+    ]
+  }
+}

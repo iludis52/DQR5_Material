@@ -1,0 +1,80 @@
+{
+  "name": "reflection_agent",
+  "description": "Agent mit Reflexion: generate → critique → ggf. re-retrieve & regenerate.",
+  "type": "MEALY",
+  "automaton": {
+    "Alphabet": ["run", "auto"],
+    "StackAlphabet": ["not", "ok"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "idle",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": true,
+        "Transitions": [
+          { "Source": 1, "Target": 2, "Labels": [["run", "not"]] }
+        ]
+      },
+      {
+        "ID": 2,
+        "Name": "first_gen",
+        "x": 300,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 2, "Target": 3, "Labels": [["auto", "ok"]] },
+          { "Source": 2, "Target": 4, "Labels": [["auto", "not"]] }
+        ]
+      },
+      {
+        "ID": 3,
+        "Name": "accepted",
+        "x": 450,
+        "y": 100,
+        "Final": true,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": []
+      },
+      {
+        "ID": 4,
+        "Name": "critiqued",
+        "x": 450,
+        "y": 200,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 4, "Target": 5, "Labels": [["auto", "not"]] }
+        ]
+      },
+      {
+        "ID": 5,
+        "Name": "retrieved_2",
+        "x": 600,
+        "y": 200,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 5, "Target": 6, "Labels": [["auto", "ok"]] }
+        ]
+      },
+      {
+        "ID": 6,
+        "Name": "final_gen",
+        "x": 750,
+        "y": 150,
+        "Final": true,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": []
+      }
+    ]
+  }
+}

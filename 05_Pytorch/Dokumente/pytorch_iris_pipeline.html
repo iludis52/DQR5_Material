@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch Iris Pipeline Workflow</title>
+    <style>
+        :root {
+            --primary-color: #1e293b;
+            --text-color: #334155;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        h1 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-top: 0;
+            font-size: 26px;
+        }
+        .description {
+            font-size: 15px;
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        .pipeline {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        /* Partition Colors from PlantUML */
+        li[data-phase="1"] { background-color: #E3F2FD; border-left: 6px solid #64B5F6; } /* Datenaufbereitung */
+        li[data-phase="2"] { background-color: #F3E5F5; border-left: 6px solid #BA68C8; } /* PyTorch Setup */
+        li[data-phase="3"] { background-color: #E8F5E9; border-left: 6px solid #81C784; } /* Modell-Setup */
+        li[data-phase="4"] { background-color: #FFF3E0; border-left: 6px solid #FFB74D; } /* Trainingszyklus */
+        li[data-phase="5"] { background-color: #EFEBE9; border-left: 6px solid #A1887F; } /* Evaluierung */
+
+        .step-item {
+            position: relative;
+            padding: 20px 20px 20px 75px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .step-number {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            width: 36px;
+            height: 36px;
+            background-color: #ffffff;
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .step-title {
+            font-weight: 700;
+            color: var(--primary-color);
+            font-size: 17px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .phase-badge {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            font-weight: 600;
+            color: #555;
+        }
+        .step-text {
+            font-size: 14px;
+            margin: 0;
+            color: #475569;
+        }
+        /* Metadata for LLM/Agentic consumption */
+        meta[name="pipeline-type"] { content: "PyTorch-Classification"; }
+        meta[name="dataset"] { content: "Iris"; }
+    </style>
+</head>
+<body>
+
+<div class="container" role="main">
+    <header>
+        <h1>Standardisierter PyTorch-Pipeline-Workflow (Iris-Klassifikation)</h1>
+        <p class="description">
+            Diese strukturierte Abfolge ist farblich in fünf logische Phasen gegliedert und dient als didaktische Orientierung für Studierende sowie als semantischer Parsing-Input für agentische LLM-Systeme.
+        </p>
+    </header>
+
+    <ol class="pipeline" id="pytorch-pipeline">
+        <!-- Phase 1: Datenaufbereitung & Splitting -->
+        <li class="step-item" data-step="1" data-phase="1">
+            <div class="step-number">1</div>
+            <div class="step-title">Daten laden <span class="phase-badge">Phase 1: Datenaufbereitung</span></div>
+            <p class="step-text">Einlesen der Rohdaten (z. B. via Pandas) aus einer CSV-Datei, um Merkmale (Features) und Zielvariablen (Labels) in eine tabellarische Struktur zu überführen.</p>
+        </li>
+
+        <li class="step-item" data-step="2" data-phase="1">
+            <div class="step-number">2</div>
+            <div class="step-title">Label-Encoding anwenden</div>
+            <p class="step-text">Transformation der kategorialen Text-Labels in numerische Ganzzahlen (0, 1, 2), da PyTorch-Lossfunktionen numerische Zielvariablen erfordern.</p>
+        </li>
+
+        <li class="step-item" data-step="3" data-phase="1">
+            <div class="step-number">3</div>
+            <div class="step-title">Train-Test-Split durchführen</div>
+            <p class="step-text">Aufteilung des Gesamtdatensatzes in ein Trainings-Set und ein separates Test-Set, um eine vollkommen unberührte Datenbasis für die finale Evaluation zu sichern.</p>
+        </li>
+
+        <li class="step-item" data-step="4" data-phase="1">
+            <div class="step-number">4</div>
+            <div class="step-title">Train-Validation-Split durchführen</div>
+            <p class="step-text">Abspaltung eines Validierungs-Sets aus den Trainingsdaten zur Hyperparameter-Optimierung und Überwachung des Overfittings während des Trainingszyklus.</p>
+        </li>
+
+        <li class="step-item" data-step="5" data-phase="1">
+            <div class="step-number">5</div>
+            <div class="step-title">Feature-Skalierung (Data Leakage Vermeidung)</div>
+            <p class="step-text">Berechnung der Parameter (Mittelwert/Varianz) ausschließlich auf dem finalen Trainings-Set per <code>fit_transform</code>; anschließende reine Transformation (<code>transform</code>) von Validierungs- und Testdaten.</p>
+        </li>
+
+        <!-- Phase 2: PyTorch Setup -->
+        <li class="step-item" data-step="6" data-phase="2">
+            <div class="step-number">6</div>
+            <div class="step-title">Umwandlung in Tensoren <span class="phase-badge">Phase 2: PyTorch Setup</span></div>
+            <p class="step-text">Konvertierung der Arrays in PyTorch-Tensoren: Features als <code>float32</code> für die Gewichtsmatrizen, Labels als <code>int64 (LongTensor)</code> für die Klassifikations-Loss-Funktion.</p>
+        </li>
+
+        <li class="step-item" data-step="7" data-phase="2">
+            <div class="step-number">7</div>
+            <div class="step-title">DataLoader instanziieren</div>
+            <p class="step-text">Kombination der Tensoren in ein <code>TensorDataset</code> und Erstellung von <code>DataLoader</code>-Objekten für automatisches Batching, Shuffling (nur Training) und effizientes Iterieren.</p>
+        </li>
+
+        <!-- Phase 3: Modell-Setup -->
+        <li class="step-item" data-step="8" data-phase="3">
+            <div class="step-number">8</div>
+            <div class="step-title">Neuronales Netz definieren <span class="phase-badge">Phase 3: Modell-Setup</span></div>
+            <p class="step-text">Deklaration der Modellarchitektur durch Vererbung von <code>torch.nn.Module</code> sowie deren Instanziierung, um die lernbaren Parameter (Gewichte) im Speicher zu registrieren.</p>
+        </li>
+
+        <li class="step-item" data-step="9" data-phase="3">
+            <div class="step-number">9</div>
+            <div class="step-title">Loss-Funktion und Optimizer definieren</div>
+            <p class="step-text">Festlegung des Fehlermaßes (z. B. <code>CrossEntropyLoss</code>) und Instanziierung des Optimizers (z. B. Adam), welchem die zuvor generierten Modellparameter übergeben werden.</p>
+        </li>
+
+        <!-- Phase 4: Trainingszyklus -->
+        <li class="step-item" data-step="10" data-phase="4">
+            <div class="step-number">10</div>
+            <div class="step-title">Trainingszyklus & Validierung <span class="phase-badge">Phase 4: Training</span></div>
+            <p class="step-text">Äußere Epoch-Schleife mit innerer Batch-Iteration (<code>model.train()</code>, Backward-Pass, Gewichts-Update) gefolgt von einer Epochen-Validierung (<code>model.eval()</code>, <code>torch.no_grad()</code>).</p>
+        </li>
+
+        <!-- Phase 5: Evaluierung & Deployment -->
+        <li class="step-item" data-step="11" data-phase="5">
+            <div class="step-number">11</div>
+            <div class="step-title">Anwendung des Test-Datensatzes <span class="phase-badge">Phase 5: Evaluierung</span></div>
+            <p class="step-text">Finale Evaluierung des eingefrorenen Modells im Evaluationsmodus (<code>model.eval()</code>, <code>no_grad()</code>) auf den seit Schritt 3 isolierten Testdaten zur Simulation der Generalisierungsfähigkeit.</p>
+        </li>
+
+        <li class="step-item" data-step="12" data-phase="5">
+            <div class="step-number">12</div>
+            <div class="step-title">Metriken bestimmen und ausgeben</div>
+            <p class="step-text">Berechnung und übersichtliche Dokumentation globaler Gütekriterien wie Accuracy, F1-Score oder einer Confusion Matrix zur finalen Bewertung der Modellqualität.</p>
+        </li>
+
+        <li class="step-item" data-step="13" data-phase="5">
+            <div class="step-number">13</div>
+            <div class="step-title">Artefakte abspeichern</div>
+            <p class="step-text">Persistierung aller kritischen Pipeline-Komponenten: Der <code>state_dict</code> des PyTorch-Modells sowie der trainierte Label-Encoder und Feature-Scaler für konsistente spätere Inferenz.</p>
+        </li>
+    </ol>
+</div>
+
+</body>
+</html>

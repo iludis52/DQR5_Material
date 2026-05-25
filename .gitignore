@@ -1,0 +1,8 @@
+# .gitignore für Python-Projekte
+__pycache__/
+*.pyc
+.env
+.venv/
+.vscode/
+*.ipynb_checkpoints/
+.DS_Store

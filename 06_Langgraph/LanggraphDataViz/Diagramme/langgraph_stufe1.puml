@@ -1,0 +1,106 @@
+@startuml Datenanalyse-Agent Stufe 1
+
+skinparam backgroundColor #FEFEFE
+skinparam ActivityBackgroundColor #E8EAF6
+skinparam ActivityBorderColor #5C6BC0
+skinparam ActivityDiamondBackgroundColor #FFF3E0
+skinparam ActivityDiamondBorderColor #FF9800
+skinparam ArrowColor #37474F
+skinparam NoteBorderColor #90A4AE
+skinparam NoteBackgroundColor #F5F5F5
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+
+title **Datenanalyse-Agent – Stufe 1: Linearer Graph mit ReAct-Zyklus**
+
+|#E8EAF6| Analyse-Pipeline |
+
+start
+
+:""**Data Profiler**""
+  Datei einlesen: 
+  (CSV/Excel),
+  Datenprofil erstellen;
+
+note left
+  **Deterministisch** 
+  (kein LLM)
+  Ergebnis:
+  • Spaltenname
+  • Datentyp
+  • Fehlende Werte
+  • Grundstatistiken
+  • 5 Beispielzeilen
+end note
+
+|#f4afff| ReAct-Zyklus |
+
+:""**Analyst**""
+  System-Prompt mit 
+  Datenprofil erstellen,
+  Analyseplan aufstellen;
+
+note left
+  **LLM** 
+  (z.B. Qwen3.6)
+  temperature=0
+  bind_tools:
+  [execute_python]
+end note
+
+repeat
+
+  if (Tool-Call vorhanden?) then (ja)
+
+    :""**Tools**""
+      run Python-Code
+      pandas, seaborn, 
+      matplotlib, numpy;
+
+    note left
+      Sandbox mit
+      eingeschränktem
+      Namespace.
+      Fehlerrückgabe
+      als Text.
+    end note
+
+    :""**Analyst**""
+      Ergebnis generieren,
+      neue Analyse planen
+      Summary schreiben;
+
+  else (nein → Analyse fertig)
+  endif
+
+repeat while (should_use_tool()?) is (Tool-Calls) not (keine Tool-Calls)
+
+|#E8EAF6| Ausgabe |
+
+:""**Bericht generieren**""
+  Analyseverlauf 
+  + Erkenntnisse
+  als Markdown;
+
+note left
+  **run_analysis()** 
+  sammelt alle Steps
+  per app.stream():
+  • Code-Previews
+  • Ergebnisse
+  • Final Summary
+end note
+
+:""**Gradio-Interface**""
+  Markdown anzeigen;
+
+note left
+  gr.File: Upload
+  gr.Markdown: Output
+  Beispiel-CSV 
+  als Schnellstart
+end note
+
+stop
+
+@enduml

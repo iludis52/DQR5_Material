@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch Pipeline: Experten-Quiz</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            color: #334155;
+        }
+        
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #ef4444;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #3b82f6;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border-left: 5px solid #3b82f6;
+        }
+
+        h1 { text-align: center; color: #1e293b; margin-top: 40px; font-size: 28px; }
+        
+        .question-title {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .question-text {
+            font-size: 1.25rem;
+            color: #0f172a;
+            margin-bottom: 25px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.05rem;
+            transition: all 0.2s;
+            text-align: left;
+            line-height: 1.4;
+            color: #334155;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        button.correct {
+            background-color: #dcfce7 !important;
+            border-color: #22c55e !important;
+            color: #166534;
+        }
+
+        button.wrong {
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #eff6ff;
+            border: 2px solid #60a5fa;
+            padding: 2.5rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>PyTorch Pipeline: Experten-Quiz</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Experten-Quiz abgeschlossen!</h2>
+        <p>Du hast alle kniffligen Fragen gemeistert. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3b82f6; color: white; border: none; text-align: center; margin-top: 20px; padding: 12px 24px; font-weight: bold; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was passiert, wenn du die Feature-Skalierung (z. B. fit_transform) VOR dem Train-Test-Split auf den gesamten Datensatz anwendest?",
+            options: [
+                "Das Modell konvergiert deutlich schneller, da die PyTorch-Tensoren im Speicher nun völlig homogene Verteilungen ohne Ausreißer aufweisen.",
+                "Es entsteht 'Data Leakage': Informationen der Testdaten (Mittelwert/Varianz) fließen ins Training ein und verfälschen die spätere unabhängige Evaluierung.",
+                "Der PyTorch-DataLoader wird beim Starten abstürzen, weil er für das Batching zwingend unskalierte und rohe Integer-Tensoren als Input erwartet.",
+                "Die berechnete Loss-Funktion kann keine validen Gradienten mehr erzeugen, da die Varianz der Features künstlich auf exakt eins gesetzt wurde."
+            ],
+            correct: 1,
+            explanation: "Data Leakage ist ein schwerer methodischer Fehler. Das Modell hat so indirekt schon Wissen über die Testdaten, wodurch die Metriken am Ende oft viel besser aussehen, als das Modell in der Realität (bei wirklich neuen Daten) performen würde."
+        },
+        {
+            text: "Angenommen, du instanziierst den Optimizer (z.B. optim.Adam) BEVOR du das Neuronale Netz (nn.Module) definierst. Welcher Fehler tritt unweigerlich auf?",
+            options: [
+                "Der Optimizer überschreibt die initialen, zufälligen Gewichte des Modells sofort mit Nullen, was das anschließende Training unmöglich macht.",
+                "Das Skript wirft einen Fehler, da dem Optimizer bei der Instanziierung die lernbaren Parameter übergeben werden müssen, die noch fehlen.",
+                "Der Trainingszyklus läuft zwar ohne Fehler durch, aber die Loss-Kurve wird nicht sinken, da die Backpropagation intern blockiert wird.",
+                "Das PyTorch-Netz schaltet zur Sicherheit automatisch in den CPU-basierten Modus um, wodurch die Berechnung auf der Grafikkarte fehlschlägt."
+            ],
+            correct: 1,
+            explanation: "Der Optimizer ist der Mechaniker, der die Gewichte anpasst. Er muss bei seiner Erschaffung genau wissen, *welche* Parameter er optimieren soll. Das Modell muss also zwingend zuerst im Speicher existieren."
+        },
+        {
+            text: "Was wäre die direkte Konsequenz, wenn du während des Validierungs-Schritts NACH der Epoche vergisst, den Block 'with torch.no_grad():' zu verwenden?",
+            options: [
+                "Das Modell lernt die Validierungsdaten auswendig (Overfitting), da die Gewichte bei jedem Durchlauf unbemerkt an die Testdaten angepasst werden.",
+                "PyTorch berechnet und speichert weiterhin Backpropagation-Graphen im Hintergrund, was massiv unnötigen Arbeitsspeicher und wertvolle Rechenzeit während der Evaluierung verschwendet.",
+                "Die Accuracy der Validierung wird durch den fehlenden Gradientenfehler immer exakt 100% betragen, was die Modellauswertung komplett unbrauchbar macht.",
+                "Der Dropout-Layer wird während der Validierung fälschlicherweise aktiv bleiben, wodurch die Vorhersagen des Netzes stark schwanken und unzuverlässig werden."
+            ],
+            correct: 1,
+            explanation: "Das alleinige Weglassen von no_grad() ändert nicht die Vorhersage und trainiert das Modell auch nicht (das passiert erst bei optimizer.step()). Es zwingt PyTorch aber dazu, den riesigen mathematischen Graphen aufzubauen, obwohl du ihn bei der Validierung überhaupt nicht brauchst."
+        },
+        {
+            text: "Konzeptionelle Frage zur verschachtelten Schleife: Warum nutzen wir im PyTorch-Training eine äußere Epochen-Schleife UND eine innere Batch-Schleife?",
+            options: [
+                "Die Batch-Schleife schont den RAM und aktualisiert Gewichte häufig, während die Epochen-Schleife das mehrfache Sehen aller Daten zur Musterfestigung garantiert.",
+                "Die Epochen-Schleife ist ausschließlich für das Early Stopping zuständig, das eigentliche Lernen der Parameter passiert komplett in der Batch-Schleife.",
+                "Der interne DataLoader in PyTorch kann hardwarebedingt grundsätzlich nur maximal 32 Datensätze gleichzeitig in den Grafikspeicher der GPU laden.",
+                "Epochen sind im Framework zwingend für die Vorwärtsausbreitung reserviert, während Batches ausschließlich für die Rückwärtsausbreitung (Backpropagation) genutzt werden dürfen."
+            ],
+            correct: 0,
+            explanation: "Ein Batch verarbeitet nur einen kleinen Teil der Daten (schont RAM und erzeugt nützliches statistisches Rauschen für den Optimizer). Eine Epoche bedeutet, dass der gesamte Datensatz genau einmal gesehen wurde. Mehrere Epochen festigen das Gelernte."
+        },
+        {
+            text: "Was passiert, wenn du für den Test-Datensatz am Ende zwar brav torch.no_grad() nutzt, aber vergisst, model.eval() aufzurufen?",
+            options: [
+                "Das Modell trainiert unerwartet weiter und passt seine gelernten Gewichte während der Inferenz heimlich an die neuen Testdaten an.",
+                "Der finale PyTorch-Tensor der Modellvorhersagen kann danach nicht mehr mit der Funktion .numpy() in ein Standard-Array umgewandelt werden.",
+                "Die Loss-Berechnung wirft einen kritischen 'Division by Zero' Fehler, weil die Gradienten für die Testdaten manuell auf null gesetzt wurden.",
+                "Bestimmte Layer wie Dropout verhalten sich weiterhin wie im Trainingsmodus (stochastisch), was die Vorhersagen auf den Testdaten verfälscht und destabilisiert."
+            ],
+            correct: 3,
+            explanation: "Wichtig! model.eval() schaltet das zufällige Verhalten bestimmter Architektur-Schichten ab. Vergisst du es, schaltet Dropout auch bei deinen Test-Vorhersagen zufällig Neuronen ab, was deine finalen Evaluierungs-Ergebnisse ruiniert."
+        },
+        {
+            text: "Konzeptionelles Verständnis beim Deployment: Warum reicht es NICHT aus, am Ende nur das 'state_dict' (die Gewichte) des PyTorch-Modells abzuspeichern?",
+            options: [
+                "Das exportierte Modell benötigt zur Laufzeit in der Produktion zwingend noch die originale Loss-Funktion, um neue Daten vorhersagen zu können.",
+                "Die Datei state_dict enthält technisch gesehen nur die historische Gradienten-Entwicklung, nicht jedoch die tatsächlichen finalen Gewichte des trainierten Netzes.",
+                "PyTorch verlangt beim Laden des gespeicherten Modells für die Inferenz immer zwingend den originalen DataLoader aus der ursprünglichen Trainingsphase.",
+                "Das Netz erwartet skalierte Tensoren. Neue rohe Kundendaten müssen beim Deployment zwingend mit exakt denselben Skalierungsparametern des Scalers transformiert werden."
+            ],
+            correct: 3,
+            explanation: "Das Modell ist blind für den reellen Datenkontext. Wenn es einen Wert wie '1.5' bekommt, geht es davon aus, dass dieser bereits vom selben Scaler verarbeitet wurde. Deshalb müssen Scaler und Encoder zwingend mit dem Modell als Bundle exportiert werden."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Szenario ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+            
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Korrekt abgeleitet!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider nicht ganz.</strong> Denk noch einmal genau über die Mechanik dieses PyTorch-Schritts nach!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

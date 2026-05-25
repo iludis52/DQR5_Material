@@ -1,0 +1,71 @@
+@startuml Datenanalyse-Agent Stufe 2 (State)
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam StateBorderColor #5C6BC0
+skinparam StateBackgroundColor #E8EAF6
+skinparam ArrowColor #37474F
+
+title **Datenanalyse-Agent – Stufe 2**\n//Reflexionsschleife mit Skills//
+
+state "**data_profiler**\n//deterministisch//" as profiler #f4afff  {
+  state "Datei einlesen" as p1
+  state "Profil erstellen" as p2
+  state "Skills auswählen" as p3
+  p1 --> p2
+  p2 --> p3
+}
+
+state "**quality_checker**\n//LLM (günstig)//" as checker #8cfba8
+
+state "**increment_revision**\n//Zähler + 1//" as inc #FFF3E0
+
+state "ReAct-Zyklus" as react #f4afff {
+  state "**analyst**\n//LLM (leistungsfähig)//" as p4 #8cfba8
+  state "**tools**\n//Python-Sandbox//" as p5 #ffd5d5
+  p4 --> p5
+  p5 --> p4
+  'analyst --> tools : Tool-Call\nvorhanden
+  'tools --> analyst : Ergebnis\nzurück
+}
+
+[*] -down-> profiler
+
+profiler -down-> react : Profil +\naktive Skills
+
+react -down-> checker : kein Tool-Call\n→ Analyse fertig
+
+checker --> [*] : Score ≥ 70%\n**✅ Akzeptiert**
+checker --> [*] : revision ≥ 3\n**⚠️ Abbruch**
+
+checker --> inc : Score < 70%\n**🔄 Nachbesserung**
+inc -right-> react : Feedback als\nArbeitsanweisung
+
+note right of checker
+  **Bewertung:**
+  60% Vollständigkeit
+  40% Erkenntnistiefe
+
+  **Output:** JSON
+  { completeness, depth,
+    missing[], strengths[] }
+end note
+
+note right of profiler
+  Wählt Skills automatisch:
+  • _basis.md (immer)
+  • numerisch.md
+  • kategorisch.md
+  • zeitreihe.md
+  • fehlende_werte.md
+end note
+
+note right of react
+  Analyst baut System-Prompt
+  aus aktiven Skills zusammen.
+  Bei Retry: Checker-Feedback
+  wird injiziert.
+end note
+
+@enduml

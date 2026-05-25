@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1. und 2. Moment – Optimierer-Visualisierung</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #FAFAF8;
+    --card: #FFFFFF;
+    --text: #1A1A1A;
+    --text-mid: #555;
+    --text-muted: #888;
+    --border: #E2E0D8;
+    --accent: #2E5090;
+    --coral: #D85A30;
+    --purple: #534AB7;
+    --teal: #0F6E56;
+    --contour: rgba(0,0,0,0.06);
+    --axis: rgba(0,0,0,0.10);
+    --label: rgba(0,0,0,0.25);
+    --min-dot: #0F6E56;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18181A;
+      --card: #222224;
+      --text: #E8E6DE;
+      --text-mid: #AAA8A0;
+      --text-muted: #777570;
+      --border: #3A3A3C;
+      --accent: #7BA3D4;
+      --coral: #F0997B;
+      --purple: #AFA9EC;
+      --teal: #5DCAA5;
+      --contour: rgba(255,255,255,0.07);
+      --axis: rgba(255,255,255,0.12);
+      --label: rgba(255,255,255,0.3);
+      --min-dot: #5DCAA5;
+    }
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 780px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 1.5rem; font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; }
+  header p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+
+  .panels { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+  .panel {
+    flex: 1 1 340px; max-width: 380px;
+    background: var(--card); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 1.25rem 1rem 1rem; text-align: center;
+  }
+  .panel h2 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+  .panel .sub { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 0.75rem; }
+  .panel svg { display: block; margin: 0 auto; width: 100%; max-width: 360px; }
+
+  .legend { display: flex; gap: 18px; justify-content: center; margin-top: 0.6rem; font-size: 0.78rem; color: var(--text-mid); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; vertical-align: -1px; margin-right: 5px; }
+
+  .controls { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 1.5rem; }
+
+  button {
+    font-family: inherit; font-size: 0.85rem; font-weight: 500;
+    padding: 8px 18px; border: 0.5px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text); cursor: pointer; transition: background 0.15s;
+  }
+  button:hover { background: var(--bg); }
+  button:active { transform: scale(0.98); }
+
+  .step-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem; color: var(--text-muted); min-width: 110px; text-align: center;
+  }
+
+  .formula-note {
+    font-size: 0.8rem; color: var(--text-muted); text-align: center;
+    margin-top: 0.75rem; line-height: 1.6;
+  }
+
+  .explanation {
+    margin-top: 1.75rem; background: var(--card); border: 0.5px solid var(--border);
+    border-radius: 12px; padding: 1.25rem 1.5rem;
+  }
+  .explanation h3 { font-size: 0.9rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem; }
+  .explanation p { font-size: 0.85rem; color: var(--text-mid); line-height: 1.7; margin-bottom: 0.75rem; }
+  .explanation p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>1. und 2. Moment im Vergleich</h1>
+    <p>Wie Momentum und adaptive Lernrate den Gradientenabstieg verbessern</p>
+  </header>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>1. Moment: Momentum</h2>
+      <p class="sub">Beschleunigt die Konvergenz durch<br>gegl&auml;ttete Gradientenrichtung</p>
+      <svg id="sv1" viewBox="-5.5 -4 11 8" height="260"></svg>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:var(--coral)"></span>Ohne Momentum</span>
+        <span><span class="legend-dot" style="background:var(--purple)"></span>Mit Momentum</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>2. Moment: Adaptive Lernrate</h2>
+      <p class="sub">Eliminiert Schwingungen durch<br>pro-Parameter-Skalierung</p>
+      <svg id="sv2" viewBox="-5.5 -4 11 8" height="260"></svg>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:var(--coral)"></span>Feste Lernrate</span>
+        <span><span class="legend-dot" style="background:var(--teal)"></span>Adaptive Lernrate</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">&#9654; Abspielen</button>
+    <button id="resetBtn">&#8635; Zur&uuml;cksetzen</button>
+    <span class="step-label" id="stepLabel">Schritt 0 / 50</span>
+  </div>
+
+  <p class="formula-note">Loss-Funktion: f(w&#8321;, w&#8322;) = w&#8321;&sup2; + 8 &middot; w&#8322;&sup2; &mdash; Start oben rechts, Minimum in der Mitte</p>
+
+  <div class="explanation">
+    <h3>Was zeigt diese Grafik?</h3>
+    <p>Beide Seiten zeigen Gradientenabstieg auf derselben Loss-Landschaft. Die Konturen sind Linien gleichen Losses &ndash; das Minimum liegt in der Mitte. Die Landschaft ist gestreckt, weil w&#8322; den Loss st&auml;rker beeinflusst als w&#8321;.</p>
+    <p><strong>Links (1. Moment):</strong> Ohne Momentum schwingt der Pfad bei jedem Schritt hin und her &ndash; die typische Zickzack-Linie. Mit Momentum (&beta;&#8321; = 0.6) werden vergangene Gradienten aufaddiert. Die gegens&auml;tzlichen Schwingungen auf der w&#8322;-Achse heben sich dabei teilweise auf, w&auml;hrend sich die konsistente Richtung entlang w&#8321; verst&auml;rkt. Das Ergebnis: breite, sanfte B&ouml;gen statt rapidem Zickzack, und schnellere Konvergenz.</p>
+    <p><strong>Rechts (2. Moment):</strong> Mit fester Lernrate dasselbe Zickzack. Mit adaptiver Lernrate (RMSprop-Prinzip, &beta;&#8322; = 0.9) merkt sich der Optimierer, wie stark die Gradienten pro Parameter schwanken. Wo sie gro&szlig; und schwankend sind (w&#8322;), wird die Schrittweite automatisch verkleinert. Wo sie klein und stabil sind (w&#8321;), bleibt sie gro&szlig;. So verschwinden die Schwingungen fast vollst&auml;ndig.</p>
+    <p><strong>Adam</strong> kombiniert beide Effekte gleichzeitig: Er gl&auml;ttet die Richtung (1. Moment) <em>und</em> skaliert die Schrittweite (2. Moment) &ndash; schnell und schwingungsfrei.</p>
+  </div>
+</div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const cs = getComputedStyle(document.documentElement);
+const contourStroke = cs.getPropertyValue('--contour').trim();
+const axisStroke = cs.getPropertyValue('--axis').trim();
+const labelFill = cs.getPropertyValue('--label').trim();
+const minFill = cs.getPropertyValue('--min-dot').trim();
+const coralColor = cs.getPropertyValue('--coral').trim();
+const purpleColor = cs.getPropertyValue('--purple').trim();
+const tealColor = cs.getPropertyValue('--teal').trim();
+
+const STEPS = 50, x0 = 4.5, y0 = 2.5;
+
+function drawContours(svg) {
+  [0.5, 2, 5, 10, 18, 30, 45].forEach(c => {
+    const a = Math.sqrt(c), b = Math.sqrt(c / 8);
+    if (a > 5 || b > 3.8) return;
+    const el = document.createElementNS(NS, 'ellipse');
+    el.setAttribute('cx', 0); el.setAttribute('cy', 0);
+    el.setAttribute('rx', a); el.setAttribute('ry', b);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', contourStroke);
+    el.setAttribute('stroke-width', '0.04');
+    svg.appendChild(el);
+  });
+
+  [[['-5','0','5','0']], [['0','-3.8','0','3.8']]].flat().forEach(([x1,y1,x2,y2]) => {
+    const l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', axisStroke); l.setAttribute('stroke-width', '0.02');
+    svg.appendChild(l);
+  });
+
+  [['4.6','0.38','w\u2081'],['0.18','-3.4','w\u2082']].forEach(([x,y,t]) => {
+    const tx = document.createElementNS(NS, 'text');
+    tx.setAttribute('x', x); tx.setAttribute('y', y);
+    tx.setAttribute('font-size', '0.32'); tx.setAttribute('fill', labelFill);
+    tx.setAttribute('font-family', 'IBM Plex Sans, sans-serif');
+    tx.textContent = t; svg.appendChild(tx);
+  });
+
+  const mn = document.createElementNS(NS, 'circle');
+  mn.setAttribute('cx', 0); mn.setAttribute('cy', 0); mn.setAttribute('r', '0.1');
+  mn.setAttribute('fill', minFill); mn.setAttribute('opacity', '0.6');
+  svg.appendChild(mn);
+}
+
+function simSGD(lr) {
+  const p = [[x0, y0]]; let x = x0, y = y0;
+  for (let i = 0; i < STEPS; i++) { x -= lr*2*x; y -= lr*16*y; p.push([x, y]); }
+  return p;
+}
+
+function simMom(lr, beta) {
+  const p = [[x0, y0]]; let x = x0, y = y0, vx = 0, vy = 0;
+  for (let i = 0; i < STEPS; i++) {
+    const gx = 2*x, gy = 16*y;
+    vx = beta*vx + gx; vy = beta*vy + gy;
+    x -= lr*vx; y -= lr*vy;
+    p.push([x, y]);
+  }
+  return p;
+}
+
+function simRMS(lr, beta) {
+  const p = [[x0, y0]]; let x = x0, y = y0, sx = 1, sy = 1;
+  for (let i = 0; i < STEPS; i++) {
+    const gx = 2*x, gy = 16*y;
+    sx = beta*sx + (1-beta)*gx*gx;
+    sy = beta*sy + (1-beta)*gy*gy;
+    x -= lr*gx / (Math.sqrt(sx) + 1e-8);
+    y -= lr*gy / (Math.sqrt(sy) + 1e-8);
+    p.push([x, y]);
+  }
+  return p;
+}
+
+const sgd1 = simSGD(0.11);
+const mom  = simMom(0.04, 0.6);
+const sgd2 = simSGD(0.11);
+const rms  = simRMS(0.5, 0.9);
+
+const sv1 = document.getElementById('sv1');
+const sv2 = document.getElementById('sv2');
+drawContours(sv1); drawContours(sv2);
+
+function makePath(svg, color, sw) {
+  const p = document.createElementNS(NS, 'polyline');
+  p.setAttribute('fill', 'none'); p.setAttribute('stroke', color);
+  p.setAttribute('stroke-width', sw);
+  p.setAttribute('stroke-linecap', 'round');
+  p.setAttribute('stroke-linejoin', 'round');
+  p.setAttribute('points', '');
+  svg.appendChild(p); return p;
+}
+
+function makeDot(svg, color) {
+  const c = document.createElementNS(NS, 'circle');
+  c.setAttribute('r', '0.13'); c.setAttribute('fill', color);
+  c.setAttribute('cx', x0); c.setAttribute('cy', -y0);
+  svg.appendChild(c); return c;
+}
+
+function makeStart(svg) {
+  const d = document.createElementNS(NS, 'circle');
+  d.setAttribute('cx', x0); d.setAttribute('cy', -y0); d.setAttribute('r', '0.14');
+  d.setAttribute('fill', 'none'); d.setAttribute('stroke', labelFill);
+  d.setAttribute('stroke-width', '0.04'); svg.appendChild(d);
+  const t = document.createElementNS(NS, 'text');
+  t.setAttribute('x', x0); t.setAttribute('y', -y0 - 0.28);
+  t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '0.28');
+  t.setAttribute('fill', labelFill);
+  t.setAttribute('font-family', 'IBM Plex Sans, sans-serif');
+  t.textContent = 'Start'; svg.appendChild(t);
+}
+
+const p1a = makePath(sv1, coralColor, '0.055');
+const p1b = makePath(sv1, purpleColor, '0.065');
+const d1a = makeDot(sv1, coralColor);
+const d1b = makeDot(sv1, purpleColor);
+
+const p2a = makePath(sv2, coralColor, '0.055');
+const p2b = makePath(sv2, tealColor, '0.065');
+const d2a = makeDot(sv2, coralColor);
+const d2b = makeDot(sv2, tealColor);
+
+makeStart(sv1); makeStart(sv2);
+
+function toS(pt) { return pt[0] + ',' + (-pt[1]); }
+
+let cur = 0, playing = false, aid = null;
+
+function drawUpTo(n) {
+  p1a.setAttribute('points', sgd1.slice(0, n+1).map(toS).join(' '));
+  p1b.setAttribute('points', mom.slice(0, n+1).map(toS).join(' '));
+  p2a.setAttribute('points', sgd2.slice(0, n+1).map(toS).join(' '));
+  p2b.setAttribute('points', rms.slice(0, n+1).map(toS).join(' '));
+  [[d1a,sgd1],[d1b,mom],[d2a,sgd2],[d2b,rms]].forEach(([d,path]) => {
+    d.setAttribute('cx', path[n][0]); d.setAttribute('cy', -path[n][1]);
+  });
+  document.getElementById('stepLabel').textContent = 'Schritt ' + n + ' / ' + STEPS;
+}
+
+drawUpTo(0);
+
+const playBtn = document.getElementById('playBtn');
+
+function step() {
+  if (cur >= STEPS) {
+    playing = false;
+    playBtn.innerHTML = '&#9654; Abspielen';
+    return;
+  }
+  cur++; drawUpTo(cur);
+  if (playing) aid = setTimeout(step, 90);
+}
+
+playBtn.onclick = () => {
+  if (playing) {
+    playing = false; clearTimeout(aid);
+    playBtn.innerHTML = '&#9654; Weiter'; return;
+  }
+  if (cur >= STEPS) { cur = 0; drawUpTo(0); }
+  playing = true;
+  playBtn.innerHTML = '&#10074;&#10074; Pause';
+  step();
+};
+
+document.getElementById('resetBtn').onclick = () => {
+  playing = false; clearTimeout(aid);
+  cur = 0; drawUpTo(0);
+  playBtn.innerHTML = '&#9654; Abspielen';
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+@startuml
+skinparam style strictuml
+skinparam DefaultFontName Arial
+skinparam ActivityBackgroundColor #E8F5E9
+skinparam ActivityBorderColor #2E7D32
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #FBC02D
+
+title PyTorch Pipeline: Iris Klassifikation
+
+start
+
+partition "Datenaufbereitung" {
+    :Datensatz laden\n(pd.read_csv('Iris.csv'));
+    :Features (X) und Target (y) trennen;
+    :Kategorien kodieren\n(LabelEncoder);
+    
+    :Train-Test-Split (80% / 20%);
+    :Train-Val-Split (80% / 20% von Train);
+    
+    :In PyTorch-Tensoren umwandeln\n(torch.from_numpy);
+    
+    :TensorDataset & DataLoader erstellen\n(Batch-Größe: 12, Shuffle: True);
+}
+
+partition "Modell-Definition" {
+    :Neuronales Netz definieren\n(nn.Sequential);
+    note right
+      **Architektur:**
+      1. Linear(4, 5)
+      2. ReLU()
+      3. Linear(5, 3)
+    end note
+    :Verlustfunktion (CrossEntropyLoss) &\nOptimizer (AdamW, lr=0.01) festlegen;
+}
+
+partition "Trainingsschleife (100 Epochen)" {
+    while (Epoche < 100?) is (ja)
+        :net.train() aktivieren;
+        
+        while (Weitere Batches im DataLoader?) is (ja)
+            :Gradienten zurücksetzen\n(optimizer.zero_grad());
+            :Forward Pass\n(outputs = net(batch_X));
+            :Verlust berechnen\n(loss);
+            :Backward Pass\n(loss.backward());
+            :Gewichte aktualisieren\n(optimizer.step());
+        endwhile (nein)
+        
+        :net.eval() aktivieren;
+        :Validierung auf X_val\n(ohne Gradientenberechnung);
+        :net.train() wieder aktivieren;
+        :Epoche & Verlust ausgeben;
+    endwhile (nein)
+}
+
+partition "Evaluierung & Speicherung" {
+    :Testdaten (X_test) auswerten\n(net.eval(), ohne Gradienten);
+    :Klassen-Vorhersage\n(torch.max);
+    :Testgenauigkeit (Accuracy)\nberechnen & ausgeben;
+
+    :Modellgewichte speichern\n(iris_net.pth);
+    :LabelEncoder speichern\n(label_encoder.pkl);
+}
+
+stop
+@enduml

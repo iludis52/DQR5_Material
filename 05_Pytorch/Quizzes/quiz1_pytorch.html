@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch Pipeline Wissens-Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>PyTorch Pipeline Grundverständnis</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 24px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Fragen-Array mit Fokus auf Ablauf und Zweck der PyTorch-Pipeline
+    const questions = [
+        {
+            text: "Welcher Schritt erfolgt in der Datenaufbereitung typischerweise direkt nach dem Einlesen der CSV-Datei?",
+            options: [
+                "Die Feature-Skalierung (Standardisierung)",
+                "Das Label-Encoding der Zielvariable",
+                "Die Umwandlung der Daten in PyTorch-Tensoren",
+                "Das Definieren der Loss-Funktion"
+            ],
+            correct: 1,
+            explanation: "Korrekt! Bevor wir die Daten splitten oder skalieren, sollten Text-Labels (wie 'Iris-setosa') in numerische Werte übersetzt werden, da Machine-Learning-Modelle nur Zahlen verarbeiten."
+        },
+        {
+            text: "Warum wird die Feature-Skalierung (z.B. per StandardScaler) erst NACH dem Train-Test-Split durchgeführt?",
+            options: [
+                "Um Rechenleistung zu sparen, da Testdaten prinzipiell nicht skaliert werden.",
+                "Weil PyTorch-Tensoren sonst nicht erstellt werden können.",
+                "Um 'Data Leakage' zu vermeiden, sodass statistische Informationen der Testdaten nicht in das Training einfließen.",
+                "Die Reihenfolge ist egal, man kann auch vor dem Split skalieren."
+            ],
+            correct: 2,
+            explanation: "Richtig! Der Scaler darf seine Parameter (Mittelwert/Varianz) über fit_transform() nur auf den Trainingsdaten lernen. Auf Validierungs- und Testdaten darf danach stur nur noch transform() angewendet werden."
+        },
+        {
+            text: "Wozu dient das abgetrennte Validierungs-Set (Train-Validation-Split) im Gegensatz zum finalen Test-Set?",
+            options: [
+                "Es wird genutzt, um das Modell nach jeder Epoche zu bewerten und Overfitting frühzeitig zu erkennen (z. B. Early Stopping).",
+                "Es liefert die finalen Metriken, die später an den Kunden übergeben werden.",
+                "Darauf wird der Scaler kalibriert.",
+                "Es enthält die Backpropagation-Gradienten zur Modellanpassung."
+            ],
+            correct: 0,
+            explanation: "Genau. Das Validierungs-Set überwacht das Training kontinuierlich. Das Test-Set bleibt bis ganz zum Schluss (nachdem das Training komplett beendet ist) als ultimativer Realitätscheck völlig unberührt."
+        },
+        {
+            text: "Was muss bei der Reihenfolge von Modell, Loss-Funktion und Optimizer zwingend beachtet werden?",
+            options: [
+                "Der Optimizer muss zwingend vor dem Neuronalen Netz definiert werden.",
+                "Das Neuronale Netz muss vor dem Optimizer instanziiert werden, da der Optimizer die Modellparameter benötigt.",
+                "Beide müssen in der inneren Batch-Schleife in jedem Durchlauf neu definiert werden.",
+                "Die Reihenfolge spielt keine Rolle."
+            ],
+            correct: 1,
+            explanation: "Richtig! Ein Optimizer (wie Adam oder SGD) aktualisiert die Gewichte. Er wird z. B. mit optim.Adam(model.parameters(), lr=0.01) aufgerufen und braucht daher das bereits definierte Modell."
+        },
+        {
+            text: "Welche Abfolge der PyTorch-Befehle ist in der inneren Batch-Schleife (während des Trainings) die Richtige?",
+            options: [
+                "loss.backward() ➔ optimizer.step() ➔ optimizer.zero_grad() ➔ Forward-Pass",
+                "Forward-Pass ➔ loss.backward() ➔ optimizer.zero_grad() ➔ optimizer.step()",
+                "optimizer.zero_grad() ➔ Forward-Pass ➔ Loss berechnen ➔ loss.backward() ➔ optimizer.step()",
+                "optimizer.step() ➔ Forward-Pass ➔ Loss berechnen ➔ loss.backward()"
+            ],
+            correct: 2,
+            explanation: "Exakt! Erst alte Gradienten aus dem letzten Batch löschen (zero_grad), dann eine Vorhersage machen (Forward), den Fehler (Loss) berechnen, die neuen Gradienten ermitteln (backward) und schließlich die Gewichte anpassen (step)."
+        },
+        {
+            text: "Warum versetzen wir das Modell vor der Evaluierung (Validierung/Test) in den eval()-Modus und nutzen den Block 'with torch.no_grad():'?",
+            options: [
+                "Um die Daten automatisch auf die Grafikkarte (GPU) zu verschieben.",
+                "Um bestimmte Layer (wie Dropout) zu fixieren und die Gradientenberechnung auszuschalten, was massiv Speicher und Rechenzeit spart.",
+                "Um die Genauigkeit der Trainingsdaten künstlich zu erhöhen.",
+                "Damit der LabelEncoder richtig funktioniert."
+            ],
+            correct: 1,
+            explanation: "Korrekt! model.eval() fixiert das Verhalten von Layern wie Dropout/BatchNorm. no_grad() verhindert, dass PyTorch im Hintergrund unnötigerweise einen Berechnungsgraph für die Backpropagation aufbaut."
+        },
+        {
+            text: "Welche Artefakte müssen im letzten Schritt gespeichert werden, um das trainierte Modell später zuverlässig in Produktion (für neue Blumen) nutzen zu können?",
+            options: [
+                "Nur die Gewichte des Modells (state_dict).",
+                "Nur der Trainingsdatensatz und die Testdaten.",
+                "Modellgewichte (state_dict), der LabelEncoder UND der Feature-Scaler.",
+                "Der Quellcode der Loss-Funktion und der rohe CSV-Datensatz."
+            ],
+            correct: 2,
+            explanation: "Völlig richtig! Für neue Vorhersagen (Inferenz) müssen die neuen Daten exakt gleich vorverarbeitet (skaliert) und die Vorhersagen richtig übersetzt (encodiert) werden. Daher müssen Scaler und Encoder zusammen mit dem Modell gespeichert werden."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>

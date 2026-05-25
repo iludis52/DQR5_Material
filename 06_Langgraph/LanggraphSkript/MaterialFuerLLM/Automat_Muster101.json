@@ -1,0 +1,125 @@
+﻿{
+  "name": "Mustererkennung101",
+  "description": "",
+  "type": "MEALY",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": [
+      "1",
+      "0"
+    ],
+    "StackAlphabet": [
+      "nix",
+      "treffer"
+    ],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "q0",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 1,
+            "Target": 2,
+            "x": 0,
+            "y": 0,
+            "Labels": [
+              [
+                "1",
+                "nix"
+              ]
+            ]
+          },
+          {
+            "Source": 1,
+            "Target": 1,
+            "x": 0,
+            "y": -150,
+            "Labels": [
+              [
+                "0",
+                "nix"
+              ]
+            ]
+          }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 2,
+        "Name": "q1",
+        "x": 370,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 2,
+            "Target": 3,
+            "x": 50,
+            "y": 0,
+            "Labels": [
+              [
+                "0",
+                "nix"
+              ]
+            ]
+          },
+          {
+            "Source": 2,
+            "Target": 2,
+            "x": 0,
+            "y": -150,
+            "Labels": [
+              [
+                "1",
+                "nix"
+              ]
+            ]
+          }
+        ],
+        "Start": false
+      },
+      {
+        "ID": 3,
+        "Name": "q2",
+        "x": 370,
+        "y": 340,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          {
+            "Source": 3,
+            "Target": 2,
+            "x": 50,
+            "y": 0,
+            "Labels": [
+              [
+                "1",
+                "treffer"
+              ]
+            ]
+          },
+          {
+            "Source": 3,
+            "Target": 1,
+            "x": 50,
+            "y": 60,
+            "Labels": [
+              [
+                "0",
+                "nix"
+              ]
+            ]
+          }
+        ],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

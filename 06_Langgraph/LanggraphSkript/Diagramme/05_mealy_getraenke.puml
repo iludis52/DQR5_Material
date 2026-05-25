@@ -1,0 +1,14 @@
+@startuml Mealy-Getränkeautomat
+title Mealy-Getränkeautomat
+
+[*] --> hat0€
+
+state "hat0€" as hat0
+state "hat1€" as hat1
+
+hat0 --> hat1 : 1€ einwerfen / 'piep'
+hat0 --> hat0 : abbrechen / 'piep'
+hat1 --> hat0 : 1€ einwerfen / Limo
+hat1 --> hat0 : abbrechen / -1€
+
+@enduml

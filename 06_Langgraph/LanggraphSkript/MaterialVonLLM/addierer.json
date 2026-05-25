@@ -1,0 +1,44 @@
+{
+  "name": "binaerer_addierer",
+  "description": "Mealy-Automat: Addiert zwei binaere Zahlen bitweise (LSB zuerst). Eingabe kodiert als: 0=00, 1=01, 2=10, 3=11.",
+  "type": "MEALY",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": ["0", "1", "2", "3"],
+    "StackAlphabet": ["0", "1"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "carry_0",
+        "x": 200,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 1, "Target": 1, "x": 0, "y": -100, "Labels": [["0", "0"]] },
+          { "Source": 1, "Target": 1, "x": 50, "y": -80, "Labels": [["1", "1"]] },
+          { "Source": 1, "Target": 1, "x": 80, "y": 0, "Labels": [["2", "1"]] },
+          { "Source": 1, "Target": 2, "x": 50, "y": 80, "Labels": [["3", "0"]] }
+        ],
+        "Start": true
+      },
+      {
+        "ID": 2,
+        "Name": "carry_1",
+        "x": 400,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 2, "Target": 1, "x": -50, "y": -80, "Labels": [["0", "1"]] },
+          { "Source": 2, "Target": 2, "x": -80, "y": 0, "Labels": [["1", "0"]] },
+          { "Source": 2, "Target": 2, "x": -50, "y": 80, "Labels": [["2", "0"]] },
+          { "Source": 2, "Target": 2, "x": 0, "y": 100, "Labels": [["3", "1"]] }
+        ],
+        "Start": false
+      }
+    ],
+    "lastInputs": []
+  }
+}

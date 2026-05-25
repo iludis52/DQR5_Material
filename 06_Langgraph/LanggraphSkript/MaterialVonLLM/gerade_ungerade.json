@@ -1,0 +1,42 @@
+{
+  "name": "paritaetszaehler_moore",
+  "description": "Moore-Automat: Gibt 'gerade' oder 'ungerade' aus, je nach Anzahl der gelesenen 1en.",
+  "type": "MOORE",
+  "automaton": {
+    "acceptCache": [],
+    "simulationInput": [],
+    "Alphabet": ["0", "1"],
+    "StackAlphabet": ["gerade", "ungerade"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "gerade",
+        "x": 200,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 1, "Target": 1, "x": 0, "y": -100, "Labels": ["0"] },
+          { "Source": 1, "Target": 2, "x": 50, "y": 0, "Labels": ["1"] }
+        ],
+        "Start": true,
+        "Output": "gerade"
+      },
+      {
+        "ID": 2,
+        "Name": "ungerade",
+        "x": 400,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Transitions": [
+          { "Source": 2, "Target": 2, "x": 0, "y": -100, "Labels": ["0"] },
+          { "Source": 2, "Target": 1, "x": -50, "y": 0, "Labels": ["1"] }
+        ],
+        "Start": false,
+        "Output": "ungerade"
+      }
+    ],
+    "lastInputs": []
+  }
+}

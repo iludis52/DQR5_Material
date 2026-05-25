@@ -1,0 +1,68 @@
+{
+  "name": "rag_agent_simple",
+  "description": "Didaktisch reduzierter RAG-Agent: retrieve → validate → generate (nur bei 'ok').",
+  "type": "MEALY",
+  "automaton": {
+    "Alphabet": ["run", "auto"],
+    "StackAlphabet": ["not", "ok"],
+    "States": [
+      {
+        "ID": 1,
+        "Name": "idle",
+        "x": 150,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": true,
+        "Transitions": [
+          { "Source": 1, "Target": 2, "Labels": [["run", "not"]] }
+        ]
+      },
+      {
+        "ID": 2,
+        "Name": "retrieved",
+        "x": 300,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 2, "Target": 3, "Labels": [["auto", "ok"]] }
+        ]
+      },
+      {
+        "ID": 3,
+        "Name": "validated",
+        "x": 450,
+        "y": 150,
+        "Final": false,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": [
+          { "Source": 3, "Target": 4, "Labels": [["auto", "ok"]] },
+          { "Source": 3, "Target": 5, "Labels": [["auto", "not"]] }
+        ]
+      },
+      {
+        "ID": 4,
+        "Name": "generated",
+        "x": 600,
+        "y": 100,
+        "Final": true,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": []
+      },
+      {
+        "ID": 5,
+        "Name": "failed",
+        "x": 600,
+        "y": 200,
+        "Final": true,
+        "Radius": 30,
+        "Start": false,
+        "Transitions": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,58 @@
+@startuml Datenanalyse-Agent Stufe 1 (State)
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam StateBorderColor #5C6BC0
+skinparam StateBackgroundColor #E8EAF6
+skinparam ArrowColor #37474F
+
+title **Datenanalyse-Agent – Stufe 1**\n//Linearer Graph mit ReAct-Zyklus//
+
+state "**data_profiler**\n//deterministisch//" as profiler #f4afff {
+  state "Datei einlesen\n(CSV / Excel)" as p1
+  state "Profil erstellen\n(Statistiken, Typen)" as p2
+  p1 --> p2
+}
+
+state "ReAct-Zyklus" as react #f4afff {
+  state "**analyst**\n//LLM + Tool-Calling//" as p3 #8cfba8
+  state "**tools**\n//Python-Sandbox//" as p4 #ffd5d5
+  p3 --> p4 : Tool-Call\nvorhanden
+  p4 --> p3 : Ergebnis\nzurück
+}
+
+[*] -down-> profiler
+
+profiler -down-> react : Datenprofil als\nLLM-Kontext
+
+react -down-> [*] : kein Tool-Call\n→ **Analyse fertig**
+
+note right of profiler
+  **Kein LLM-Call!**
+  Reine Pandas-Statistiken:
+  • Spaltennamen & Datentypen
+  • Fehlende Werte
+  • Grundstatistik (describe)
+  • 5 Beispielzeilen
+end note
+
+note right of react
+  **ReAct-Zyklus:**
+  LLM entscheidet autonom,
+  ob Code ausgeführt wird.
+
+  **should_use_tool()** prüft
+  letzte Nachricht auf tool_calls.
+
+  Typisch 2–4 Durchläufe.
+end note
+
+note left of react
+  **Warum LangGraph statt LangChain?**
+  Der Zyklus analyst ⇄ tools ist eine
+  Rückwärtskante — LangChain (LCEL)
+  erlaubt nur DAGs, keine Zyklen.
+end note
+
+@enduml

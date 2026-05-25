@@ -1,0 +1,527 @@
+' ============================================================================
+' 1. DREHKREUZ (DEA)
+' ============================================================================
+
+@startuml Drehkreuz
+left to right direction
+title Drehkreuz (DEA)
+
+[*] --> Zu
+
+Zu --> Offen : bezahlen / gesperrt=False
+Offen --> Zu : durchgehen / gesperrt=True
+Offen --> Offen : bezahlen
+
+@enduml
+
+
+' ============================================================================
+' 2. MIKROWELLE (DEA)
+' ============================================================================
+
+@startuml Mikrowelle
+'left to right direction
+title Mikrowelle (DEA)
+
+[*] -right-> Offen
+
+Offen -right-> Zu : schliessen / tuerAuf=False
+Zu -left-> Offen : öffnen / tuerAuf=True
+Zu -down-> Läuft : starten / welleAn=True
+Läuft --> OK : warten / welleAn=False,\nfertig=True
+Läuft -up-> Offen : öffnen / welleAn=False,\ntuerAuf=True
+OK -up-> Offen : öffnen / tuerAuf=True,\nfertig=False
+OK -left-> [*]
+
+@enduml
+
+
+' ============================================================================
+' 3. ONLINESHOP (DEA)
+' ============================================================================
+
+@startuml Onlineshop
+'left to right direction
+title Onlineshop (DEA)
+
+[*] -right-> Shop
+
+Shop -right-> Kasse : checkout
+Kasse -left-> Shop : back
+Kasse --> Deal : pay /\nzahlung=True
+Shop --> Trap : error /\nfehler="TypA"
+Kasse --> Trap : error /\nfehler="TypB"
+Deal --> [*]
+Trap --> [*]
+
+@enduml
+
+
+' ============================================================================
+' 4. GETRÄNKEAUTOMAT (MOORE)
+' ============================================================================
+' Moore: Ausgabe hängt nur vom Zielzustand ab.
+' MOORE_OUTPUTS wird als Transition-Action geschrieben,
+' zeigt aber immer die Ausgabe des ZIELZUSTANDS.
+
+@startuml Moore-Getränkeautomat
+'left to right direction
+title Getränkeautomat (Moore)
+
+[*] -right-> hat0E
+
+hat0E -right-> hat1E : 1E einwerfen /\nout="hat1E"
+hat1E -right-> OK : 1E einwerfen /\nout="OK"
+hat1E -down-> back : abbrechen /\nout="back"
+OK -left-> hat0E : warten /\nout="hat0E"
+back -left-> hat0E : warten /\nout="hat0E"
+
+note bottom
+  MOORE_OUTPUTS = {
+    "hat0E": "2E",
+    "hat1E": "1E",
+    "OK":    "Limo",
+    "back":  "-1E"
+  }
+end note
+
+@enduml
+
+
+' ============================================================================
+' 5. MEALY-GETRÄNKEAUTOMAT
+' ============================================================================
+' Mealy: Ausgabe hängt von Zustand UND Eingabe ab.
+
+@startuml Mealy-Getränkeautomat
+left to right direction
+title Mealy-Getränkeautomat
+
+[*] --> hat0E
+
+hat0E --> hat1E : 1E einwerfen / 'piep'
+hat0E --> hat0E : abbrechen / 'piep'
+hat1E --> hat0E : 1E einwerfen / Limo
+hat1E --> hat0E : abbrechen / -1€
+
+@enduml
+
+
+' ============================================================================
+' 6. MUSTERERKENNUNG 101 (MEALY)
+' ============================================================================
+
+@startuml Mustererkennung101
+'left to right direction
+title Mustererkennung 101 (Mealy)
+
+[*] -right-> q0
+
+q0 --> q0 : 0 / nix
+q0 -right-> q1 : 1 / nix
+q1 --> q1 : 1 / nix
+q1 -down-> q2 : 0 / nix
+q2 -[#red,bold]-> q1 : 1 / **treffer**
+q2 --> q0 : 0 / nix
+
+note bottom
+  Erkennt das Muster "101"
+  im Bitstrom.
+end note
+
+@enduml
+
+' ============================================================================
+' 7. EFSM
+' ============================================================================
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Konzept 1: Linearer Graph
+
+[*] --> empfangen
+empfangen --> verarbeiten
+verarbeiten --> ausgeben
+ausgeben --> [*]
+
+empfangen : nachricht lesen
+verarbeiten : nachricht.upper()
+ausgeben : "Ergebnis: ..."
+@enduml
+
+
+' ============================================================================
+' Kapitel 5. EFSM
+' ============================================================================
+
+@startuml EFSM
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Vom DEA zum erweiterten Zustandsautomaten (EFSM)
+
+state "Klassischer DEA" as dea {
+  state "recherchieren" as d1
+  state "antworten" as d2
+  d1 --> d2 : eingabe
+  note bottom of d1
+    Zustand = nur der Knoten
+    (""recherchieren"" oder ""antworten"")
+  end note
+}
+
+state "Erweiterter Automat (EFSM)" as efsm {
+  
+  state "recherchieren" as e1
+  e1 : ---
+  e1 : zähler = 2
+  e1 : ergebnis = "..."
+  e1 : quellen = [web, db]
+  
+  state "antworten" as e2
+  e2 : ---
+  e2 : zähler = 2
+  e2 : ergebnis = "finale Antwort"
+  e2 : quellen = [web, db]
+
+  e1 --> e2 : [zähler >= 3] / ergebnis aktualisieren
+  e1 --> e1 : [zähler < 3] / zähler++
+
+  note bottom of e1
+    Zustand = Knoten + Daten
+    δ(q, **D**) → (q', **D'**)
+  end note
+}
+
+dea -[hidden]down-> efsm
+@enduml
+
+
+' ============================================================================
+' Kapitel 6. Linearer Graph
+' ============================================================================
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Konzept 1: Der Graph als Kontrollfluss (linearer Graph)
+
+[*] --> empfangen
+empfangen --> verarbeiten
+verarbeiten --> ausgeben
+ausgeben --> [*]
+
+empfangen : nachricht lesen
+verarbeiten : nachricht.upper()
+ausgeben : "Ergebnis: ..."
+@enduml
+
+
+' ============================================================================
+' Kapitel 7. Bedingte Übergänge
+' ============================================================================
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Konzept 2: Bedingter Übergang
+
+[*] -right-> klassifizieren
+
+state routing <<choice>>
+
+klassifizieren -right-> routing : routing(state)
+
+routing --> recherchieren : "recherche"
+routing --> antworten : "direkt"
+
+recherchieren --> ausgeben
+antworten --> ausgeben
+
+ausgeben --> [*]
+
+note bottom of routing
+  add_conditional_edges(
+    "klassifizieren", routing,
+    {"recherchieren": ...,
+     "antworten": ...}
+  )
+end note
+@enduml
+
+' ============================================================================
+' Kapitel 8. Datenrucksack
+' ============================================================================
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+}
+
+title Konzept 3: Der Datenzustand als Rucksack
+
+[*] --> klassifizieren
+klassifizieren -right-> recherchieren
+recherchieren --> ausgeben
+ausgeben -right-> [*]
+
+state klassifizieren {
+  klassifizieren : liest: nachrichten
+  klassifizieren : schreibt: route
+}
+
+state recherchieren {
+  recherchieren : liest: nachrichten
+  recherchieren : schreibt: ergebnis, route
+}
+
+state ausgeben {
+  ausgeben : liest: ergebnis
+}
+
+note top of klassifizieren
+  **Der Rucksack (State)**
+  ━━━━━━━━━━━━━━━━━━━
+  nachrichten: [msg1, msg2]
+  route: ""
+  ergebnis: ""
+  fehler_zaehler: 0
+  ─────────────────
+  Jeder Knoten empfängt
+  den gesamten Rucksack.
+  Zurück kommt nur ein
+  **partielles Update**:
+  {"route": "recherche"}
+end note
+@enduml
+
+
+' ============================================================================
+' Kapitel 9. Zyklen
+' ============================================================================
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+}
+
+title Konzept 4: Zyklen — vom Workflow zum Agenten
+
+[*] --> planen
+
+planen -right-> tool_aufrufen
+tool_aufrufen -right-> pruefen
+
+state nach_pruefung <<choice>>
+pruefen --> nach_pruefung : nach_pruefung(state)
+
+nach_pruefung -right-> antworten : "fertig"
+nach_pruefung -[#CC0000,bold]-> planen : "nochmal"
+
+antworten -right-> [*]
+
+note top of nach_pruefung
+  **Abbruchbedingungen:**
+  1. ergebnis_ok == True
+  2. fehler_zaehler >= 3
+  Ohne Abbruchbedingung
+  → **Endlosschleife!**
+end note
+
+note top of planen
+  <color:#CC0000>━━ Rückkante</color>
+  Diese Kante macht
+  aus dem Workflow
+  einen **Agenten**.
+end note
+@enduml
+
+' ============================================================================
+' Kapitel 11. Code lesen
+' ============================================================================
+
+
+@startuml
+left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+}
+
+title Anwendungsbeispiel: LangGraph-Code als Zustandsdiagramm lesen
+
+[*] --> analysieren
+
+analysieren -right-> generieren
+generieren -right-> bewerten
+
+state qualitaets_routing <<choice>>
+bewerten -right-> qualitaets_routing : qualitaets_routing(state)
+
+qualitaets_routing -right-> ausgeben : "ausgeben"
+qualitaets_routing -[#CC0000,bold]-> verbessern : "verbessern"
+
+verbessern -[#CC0000,bold]-> generieren
+
+ausgeben -right-> [*]
+
+note right of qualitaets_routing
+  Routing-Funktion prüft
+  state["qualitaet"]
+end note
+
+note top of verbessern
+  <color:#CC0000>━━ Zyklus</color>
+  verbessern → generieren
+  → bewerten → ...
+end note
+
+note top of analysieren
+  **Rucksack (State)**
+  ━━━━━━━━━━━━━━━
+  frage: str
+  antwort: str
+  qualitaet: str
+end note
+@enduml
+
+
+' -------- Aufgabe 1
+@startuml
+'left to right direction
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Aufgabe B1: Linearer Graph
+
+[*] -right-> einlesen
+einlesen -right-> validieren
+validieren -down-> transformieren
+transformieren -left-> exportieren
+exportieren -left-> [*]
+@enduml
+
+' ------- Aufgabe 2
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Aufgabe B2: Einfache Verzweigung
+
+[*] -right-> eingang
+
+state routing <<choice>>
+eingang -right-> routing : prioritaet?
+
+routing --> email_senden : "dringend"
+routing --> ticket_erstellen : "normal"
+
+email_senden --> protokollieren
+ticket_erstellen --> protokollieren
+
+protokollieren --> [*]
+@enduml
+
+' ------- Aufgabe 3
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Aufgabe B3: Verzweigung mit drei Zielen
+
+[*] -right-> sensor_lesen
+
+state routing <<choice>>
+sensor_lesen -right-> routing : temperatur?
+
+routing --> heizen : "zu_kalt"
+routing --> nichts_tun : "ok"
+routing --> kuehlen : "zu_warm"
+
+heizen --> [*]
+nichts_tun --> [*]
+kuehlen --> [*]
+@enduml
+
+
+' ------- Aufgabe 4
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Aufgabe B4: Graph mit Zyklus
+
+[*] -right-> sammeln
+
+sammeln -right-> bewerten
+
+state routing <<choice>>
+bewerten -right-> routing : ergebnis?
+
+routing --> bericht : "ausreichend"
+routing -[#CC0000,bold]-> nachfragen : "unzureichend"
+
+nachfragen -[#CC0000,bold]-> sammeln
+
+bericht --> [*]
+
+note top of routing
+  Abbruchbedingung:
+  max. 4 Durchläufe
+end note
+@enduml
+
+' ------- Aufgabe 5
+
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+
+title Aufgabe B5: Verzweigung + Zyklus
+
+[*] --> eingabe
+
+eingabe -right-> planen
+
+state quelle <<choice>>
+planen -right-> quelle : quelle?
+
+quelle -down-> web_suche : "web"
+quelle -down-> db_abfrage : "db"
+
+web_suche -down-> zusammenfassen
+db_abfrage -down-> zusammenfassen
+
+zusammenfassen -right-> qualitaet_pruefen
+
+state qualitaet <<choice>>
+qualitaet_pruefen -down-> qualitaet : qualität?
+
+qualitaet -right-> ausgabe : "gut"
+qualitaet -[#CC0000,bold]-> planen : "schlecht"
+
+ausgabe --> [*]
+
+note top of qualitaet
+  Zyklus zurück
+  zu "planen"
+end note
+@enduml

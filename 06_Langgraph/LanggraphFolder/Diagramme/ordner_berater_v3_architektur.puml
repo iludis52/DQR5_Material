@@ -1,0 +1,531 @@
+@startuml ordner_berater_architektur
+!theme plain
+title **Ordner-Berater v3 — Modulare Architektur**\n//Einzeldatei-Verarbeitung mit Skills-System//
+
+skinparam {
+  PackageBackgroundColor #F8FAFC
+  PackageBorderColor #94A3B8
+  PackageFontSize 13
+  PackageFontStyle bold
+  ComponentBackgroundColor #FFFFFF
+  ComponentBorderColor #64748B
+  ComponentFontSize 11
+  ArrowColor #475569
+  ArrowFontSize 10
+  NoteFontSize 10
+  NoteBackgroundColor #FFFDE7
+  NoteBorderColor #F9A825
+  RectangleBackgroundColor #EFF6FF
+  RectangleBorderColor #3B82F6
+  DatabaseBackgroundColor #F0FDF4
+  DatabaseBorderColor #22C55E
+  CloudBackgroundColor #FEF3C7
+  CloudBorderColor #F59E0B
+}
+
+' ══════════════════════════════════════
+' EXTERNE SYSTEME
+' ══════════════════════════════════════
+
+cloud "LM Studio" as lms #FEF3C7 {
+  component "Qwen3-27B\n(multimodal)" as qwen
+  component "OpenAI-kompatible\nAPI :1234/v1" as api
+  qwen -down-> api
+}
+
+actor "Benutzer" as user
+
+rectangle "**Gradio Web-Interface** (Zelle 8)" as gui #EFF6FF {
+  component "Schritt 1:\nScannen" as gui_scan
+  component "Schritt 2:\nVerarbeiten" as gui_proc
+  component "Schritt 3:\nÜbriggebliebene" as gui_lefto
+  component "Profil-\nDropdown" as gui_profil
+
+  gui_scan -right-> gui_proc
+  gui_proc -right-> gui_lefto
+  gui_profil -down-> gui_proc
+}
+
+' ══════════════════════════════════════
+' SKILLS (externe Dateien)
+' ══════════════════════════════════════
+
+database "ordner_berater_skills/" as skills #F0FDF4 {
+  component "prompts/\ntext_benennung.md\nhybrid_benennung.md\nvision_benennung.md" as prompts
+  component "profile/\nlehramt.md\nallgemein.md\nforschung.md" as profile
+}
+
+' ══════════════════════════════════════
+' PERSISTENZ
+' ══════════════════════════════════════
+
+database "Dateisystem" as persist #F0FDF4 {
+  component "checkpoint.json" as cp
+  component "undo_log.json" as undo
+  component "Zielordner\n(Dateien)" as files
+}
+
+' ══════════════════════════════════════
+' KERNMODULE
+' ══════════════════════════════════════
+
+package "Zelle 3: Scanner + Extraktion" as pkg_scan {
+  component "ordner_scannen()" as fn_scan
+  component "inhalte_extrahieren()" as fn_extract
+
+  rectangle "_EXTRAKTOR\n(49 Dateitypen)" as extractors {
+    component "_ex_pdf, _ex_docx,\n_ex_pptx, _ex_xlsx,\n_ex_text, _ex_py,\n_ex_ipynb, ..." as ex_fns
+  }
+
+  rectangle "_BILDER_ZÄHLER\n_BILDER_EXTRAKTOR" as img_tools {
+    component "bilder_zaehlen_pdf/docx/pptx()\nbilder_extrahieren_pdf/docx/pptx()\npdf_seite_rendern()" as img_fns
+  }
+
+  fn_scan -down-> fn_extract
+  fn_extract -down-> extractors
+  fn_extract -down-> img_tools
+}
+
+package "Zelle 4: LLM-Infrastruktur" as pkg_llm {
+  component "_llm_client_erstellen()\n_llm_client_reset_wenn_noetig()" as fn_client
+  component "_llm_json_extrahieren()" as fn_json
+  component "_skill_laden()\n_prompt_zusammenbauen()\n_prompts_laden()" as fn_skills
+  component "_checkpoint_laden()\n_checkpoint_speichern()" as fn_checkpoint
+  component "_undo_log_schreiben()" as fn_undo
+}
+
+package "Zelle 5: Metadaten-Schreiber" as pkg_meta {
+  component "metadaten_schreiben()\n//Dispatcher//" as fn_meta_dispatch
+
+  rectangle "_METADATEN_SCHREIBER" as meta_map {
+    component "metadaten_schreiben_docx()\nmetadaten_schreiben_pptx()\nmetadaten_schreiben_xlsx()" as meta_office
+    component "metadaten_schreiben_pdf()" as meta_pdf
+    component "metadaten_schreiben_jpeg()\nmetadaten_schreiben_png()" as meta_img
+  }
+
+  fn_meta_dispatch -down-> meta_map
+}
+
+package "Zelle 6: Drei-Kanal-Verarbeitung" as pkg_proc {
+  component "**einzeldatei_verarbeiten()**\n//Dispatcher//" as fn_dispatch
+
+  rectangle "Kanal 1: Text-only" as ch_text #E0F2FE {
+    component "_einzeldatei_text_\nverarbeiten()" as fn_text
+  }
+
+  rectangle "Kanal 2: Hybrid" as ch_hybrid #F0FDF4 {
+    component "_einzeldatei_hybrid_\nverarbeiten()" as fn_hybrid
+  }
+
+  rectangle "Kanal 3: Vision" as ch_vision #FEF3C7 {
+    component "_einzeldatei_bild_\nverarbeiten()" as fn_vision
+    component "_einzeldatei_pdf_\nvision_fallback()" as fn_pdf_vis
+  }
+
+  component "_bild_zu_base64()\n_bild_bytes_zu_base64()" as fn_b64
+  component "_prompts_laden()" as fn_load_prompts
+
+  fn_dispatch -down-> ch_text
+  fn_dispatch -down-> ch_hybrid
+  fn_dispatch -down-> ch_vision
+  fn_hybrid -right-> fn_b64
+  fn_vision -left-> fn_b64
+  fn_pdf_vis -left-> fn_b64
+}
+
+package "Zelle 7: Übriggebliebene" as pkg_lefto {
+  component "uebriggebliebene_\nanalysieren()" as fn_lefto
+  component "uebriggebliebene_\nmarkieren()" as fn_mark
+}
+
+package "Zelle 8: Workflow-Steuerung" as pkg_wf {
+  component "schritt1_scannen()" as wf_s1
+  component "schritt2_verarbeiten()" as wf_s2
+  component "schritt3_uebrige_\nanalysieren()" as wf_s3
+}
+
+' ══════════════════════════════════════
+' VERBINDUNGEN
+' ══════════════════════════════════════
+
+' Benutzer → GUI
+user -down-> gui
+
+' GUI → Workflow
+gui_scan ..> wf_s1
+gui_proc ..> wf_s2
+gui_lefto ..> wf_s3
+gui_profil ..> wf_s2
+
+' Workflow → Module
+wf_s1 -down-> fn_scan : "Ordnerpfad"
+wf_s1 -down-> fn_extract : "Scan-Ergebnis"
+
+wf_s2 -down-> fn_dispatch : "je Datei"
+wf_s2 -down-> fn_checkpoint : "nach jeder Datei"
+wf_s2 -down-> fn_undo : "bei Umbenennung"
+wf_s2 --> fn_meta_dispatch : "Stichwörter\nschreiben"
+wf_s2 --> fn_load_prompts : "Profil laden"
+
+wf_s3 -down-> fn_lefto
+wf_s3 -down-> fn_mark
+
+' Kanal-Funktionen → LLM
+fn_text -right-> fn_client : "API-Call"
+fn_hybrid -right-> fn_client
+fn_vision --> fn_client
+fn_pdf_vis --> fn_client
+fn_client -right-> api : "HTTP POST\n/v1/chat/completions"
+
+' LLM → JSON-Parsing
+api -left-> fn_json : "Rohe Antwort"
+
+' Skills → Prompts
+fn_skills -up-> prompts : "Template laden"
+fn_skills -up-> profile : "Profil laden"
+fn_load_prompts --> fn_skills
+
+' Bildextraktion → Kanal 2/3
+img_fns --> fn_hybrid : "Bild-Bytes"
+img_fns --> fn_pdf_vis : "Gerenderte Seite"
+
+' Persistenz
+fn_checkpoint --> cp
+fn_undo --> undo
+fn_meta_dispatch --> files : "Keywords in\nDatei schreiben"
+fn_mark --> files : "Präfix\numbenennen"
+
+' ══════════════════════════════════════
+' LEGENDE
+' ══════════════════════════════════════
+
+legend bottom left
+  |= Farbe |= Bedeutung |
+  | <#E0F2FE> | Text-only Kanal |
+  | <#F0FDF4> | Hybrid Kanal / Datenbank |
+  | <#FEF3C7> | Vision Kanal / LM Studio |
+  | <#EFF6FF> | Gradio-Interface |
+  | <#FFFDE7> | Hinweis |
+endlegend
+
+@enduml
+
+
+' ══════════════════════════════════════════════════════════════
+' ZWEITES DIAGRAMM: Verarbeitungs-Aktivitätsdiagramm
+' ══════════════════════════════════════════════════════════════
+
+@startuml ordner_berater_verarbeitungsfluss
+!theme plain
+title **Ordner-Berater v3 — Verarbeitungsfluss pro Datei**\n//Aktivitätsdiagramm: einzeldatei_verarbeiten() → Umbenennung → Metadaten//
+
+skinparam {
+  ActivityBackgroundColor #FFFFFF
+  ActivityBorderColor #64748B
+  ActivityFontSize 11
+  ActivityDiamondBackgroundColor #FEF3C7
+  ActivityDiamondBorderColor #F59E0B
+  ArrowColor #475569
+  PartitionBackgroundColor #F8FAFC
+  PartitionBorderColor #94A3B8
+}
+
+start
+
+:schritt2_verarbeiten(profil_wahl);
+
+partition "Initialisierung" {
+  :_prompts_laden(profil_wahl)
+  Lädt Prompts + Profil aus Skills-Dateien;
+  :_llm_call_zaehler = 0;
+  :checkpoint = _checkpoint_laden();
+}
+
+:Kandidaten filtern:
+extrakt_status == 'ok'
+ODER Bilddatei
+ODER PDF;
+
+while (Nächste Datei?) is (ja)
+
+  if (Im Checkpoint\nbereits verarbeitet?) then (ja)
+    :⏭️ Überspringen;
+  else (nein)
+
+    partition "Kanal-Auswahl: einzeldatei_verarbeiten()" #F1F5F9 {
+
+      if (Bilddatei?\n.png .jpg ...) then (ja)
+        #FEF3C7:_einzeldatei_bild_verarbeiten()
+        Bild → base64 → Vision-LLM;
+      elseif (Hat Text\nUND Bilder?) then (ja)
+        #F0FDF4:_einzeldatei_hybrid_verarbeiten()
+        Text + max. 3 Bilder → LLM;
+      elseif (Hat Text?) then (ja)
+        #E0F2FE:_einzeldatei_text_verarbeiten()
+        Dateiname + Titel + Extrakt → LLM;
+      elseif (PDF ohne Text?) then (ja)
+        #FEF3C7:_einzeldatei_pdf_vision_fallback()
+        Seite 1 rendern → Vision-LLM;
+      else (kein Extrakt)
+        :⏭️ Nicht verarbeitbar;
+        note right: Status: 'uebersprungen'
+      endif
+
+    }
+
+    partition "LLM-Call (innerhalb Kanal)" #F8FAFC {
+      :_llm_client_reset_wenn_noetig()
+      Zähler++ → bei N: Client neu erstellen;
+      :llm_client.chat.completions.create()
+      System-Prompt + User-Content → Qwen3;
+      :_llm_json_extrahieren(roh)
+      Thinking-Blöcke + Fencing entfernen
+      JSON parsen (mit Fallback);
+    }
+
+    partition "Umbenennung" #EFF6FF {
+      if (neuer_name != alter_name\nUND Status ok?) then (ja)
+        if (Zieldatei existiert\nnicht?) then (ja)
+          :pfad.rename(ziel)
+          ✅ Umbenannt;
+          :undo_eintraege.append(...)
+          Im Undo-Log protokolliert;
+        else (Konflikt)
+          :⚠️ Umbenennung\nübersprungen;
+        endif
+      else (Name ok)
+        :— Name beibehalten;
+      endif
+    }
+
+    partition "Metadaten schreiben" #F0FDF4 {
+      if (Stichwörter\nvorhanden?) then (ja)
+        :metadaten_schreiben(pfad, stichworte)
+        Dispatcher wählt Format-Handler:
+        .docx/.pptx/.xlsx → core_properties
+        .pdf → PyMuPDF metadata
+        .jpg/.jpeg → EXIF Tag 270 + 40092
+        .png → tEXt-Chunks;
+      else (keine)
+        :⏭️ Keine Metadaten;
+      endif
+    }
+
+    :_checkpoint_speichern()
+    Status + Ergebnis nach jeder Datei;
+
+  endif
+
+endwhile (alle verarbeitet)
+
+:_undo_log_schreiben(undo_eintraege)
+Gesammelte Umbenennungen ins Log;
+
+:Abschlussbericht anzeigen
+✅ Verarbeitet | Umbenannt |
+Metadaten | Übersprungen;
+
+stop
+
+@enduml
+
+
+' ══════════════════════════════════════════════════════════════
+' DRITTES DIAGRAMM: Skills-System
+' ══════════════════════════════════════════════════════════════
+
+@startuml ordner_berater_skills_system
+!theme plain
+title **Ordner-Berater v3 — Skills-System**\n//Prompt-Zusammenbau zur Laufzeit//
+
+skinparam {
+  ComponentBackgroundColor #FFFFFF
+  ComponentBorderColor #64748B
+  ComponentFontSize 11
+  RectangleBackgroundColor #F8FAFC
+  RectangleBorderColor #94A3B8
+  NoteBackgroundColor #FFFDE7
+  NoteBorderColor #F9A825
+  ArrowColor #475569
+}
+
+rectangle "Gradio-Interface" as gui {
+  component "Profil-Dropdown\n[lehramt | allgemein | forschung]" as dropdown
+}
+
+rectangle "_prompt_zusammenbauen(prompt_name, profil_name)" as builder #EFF6FF {
+  component "1. Prompt-Template\n   laden" as step1
+  component "2. Profil-Datei\n   laden" as step2
+  component "3. {PROFIL}-Platzhalter\n   ersetzen" as step3
+  step1 -right-> step3
+  step2 -right-> step3
+}
+
+rectangle "ordner_berater_skills/" as skills {
+
+  rectangle "prompts/" as prompts_dir {
+    component "text_benennung.md" as p_text
+    component "hybrid_benennung.md" as p_hybrid
+    component "vision_benennung.md" as p_vision
+    note bottom of p_text
+      Du bist ein Dateibenennungs-
+      Experte...
+      AUFGABE 1 — DATEINAME:
+      1. Format: {Typ}_{Thema}.ext
+      ...
+      **{PROFIL}**     ← Platzhalter
+      ...
+      AUSGABE: Nur JSON...
+    end note
+  }
+
+  rectangle "profile/" as profile_dir {
+    component "**lehramt.md**" as pr_lehr #E0F2FE
+    component "allgemein.md" as pr_allg
+    component "forschung.md" as pr_forsch
+    note bottom of pr_lehr
+      TYP-PRÄFIXE:
+        AB = Arbeitsblatt
+        KA = Klassenarbeit
+        EWH = Erwartungshorizont
+        Praes = Präsentation ...
+      FACHKÜRZEL:
+        INF, CH, PH, NWT
+      STICHWORT-KATEGORIEN:
+        Klassenstufe, Fachbegriffe,
+        Methodik, Bildungsplan ...
+    end note
+  }
+}
+
+rectangle "Fertiger System-Prompt" as result #F0FDF4 {
+  component "TEXT_EINZEL_PROMPT\nHYBRID_EINZEL_PROMPT\nVISION_EINZEL_PROMPT" as final_prompts
+}
+
+rectangle "LLM-Call" as llm_call {
+  component "llm_client.chat.\ncompletions.create(\n  system: fertiger_prompt,\n  user: dateiinhalt\n)" as call
+}
+
+' Verbindungen
+dropdown -down-> builder : "profil_name"
+step1 -up-> prompts_dir : "laden"
+step2 -up-> profile_dir : "laden"
+step3 -down-> result : "3 fertige Prompts"
+result -down-> llm_call
+
+note right of builder
+  Wird bei **jedem** Klick auf
+  "Verarbeitung starten" aufgerufen.
+  → Prompt-Änderungen sofort wirksam,
+     kein Notebook-Neustart nötig.
+end note
+
+@enduml
+
+
+' ══════════════════════════════════════════════════════════════
+' VIERTES DIAGRAMM: Gesamtworkflow (Sequenz)
+' ══════════════════════════════════════════════════════════════
+
+@startuml ordner_berater_sequenz
+!theme plain
+title **Ordner-Berater v3 — Gesamtworkflow**
+
+skinparam {
+  SequenceParticipantBackgroundColor #F8FAFC
+  SequenceParticipantBorderColor #64748B
+  SequenceLifeLineBorderColor #94A3B8
+  SequenceArrowColor #475569
+  SequenceGroupBackgroundColor #F1F5F9
+  SequenceGroupBorderColor #94A3B8
+  SequenceDividerBackgroundColor #EFF6FF
+  SequenceBoxBackgroundColor #FAFAFA
+}
+
+actor Benutzer as U
+participant "Gradio\nInterface" as G
+participant "Scanner\n+ Extraktion" as S
+participant "Skill-\nLoader" as SK
+participant "Drei-Kanal-\nDispatcher" as D
+participant "LLM-Client\n+ Reset" as L
+participant "LM Studio\n(Qwen3)" as Q
+participant "Metadaten-\nSchreiber" as M
+participant "Checkpoint\n+ Undo" as C
+database "Dateien\nauf Disk" as F
+
+== Schritt 1: Scannen ==
+
+U -> G : Ordnerpfad eingeben + "Scannen"
+G -> S : schritt1_scannen(pfad)
+S -> F : os.walk() — rekursiv scannen
+F --> S : Dateiliste + Metadaten
+S -> S : inhalte_extrahieren()\n49 Extraktoren + Bilderzählung
+S --> G : Scan-Zusammenfassung (Markdown)
+G --> U : Dateitypen, Ordnerstruktur,\nauffällige Dateien anzeigen
+
+== Schritt 2: Einzeldatei-Verarbeitung ==
+
+U -> G : Profil wählen + "Verarbeitung starten"
+G -> SK : _prompts_laden(profil_wahl)
+SK -> SK : Template + Profil → {PROFIL} ersetzen
+SK --> G : 3 fertige System-Prompts
+
+loop Für jede Datei
+
+  G -> C : Checkpoint prüfen
+  alt Bereits verarbeitet
+    C --> G : ⏭️ Überspringen
+  else Neu
+    G -> D : einzeldatei_verarbeiten(datei)
+
+    alt Text-only
+      D -> L : _einzeldatei_text_verarbeiten()
+    else Hybrid (Text + Bilder)
+      D -> D : Bilder aus PDF/DOCX/PPTX extrahieren
+      D -> L : _einzeldatei_hybrid_verarbeiten()
+    else Vision-only
+      D -> L : _einzeldatei_bild_verarbeiten()
+    else PDF ohne Text
+      D -> D : pdf_seite_rendern() → base64
+      D -> L : _einzeldatei_pdf_vision_fallback()
+    end
+
+    L -> L : _llm_client_reset_wenn_noetig()\nZähler prüfen, ggf. Client neu
+    L -> Q : POST /v1/chat/completions\n{system: prompt, user: inhalt}
+    Q --> L : JSON-Antwort (ggf. mit Thinking)
+    L -> L : _llm_json_extrahieren()\nThinking + Fencing entfernen
+    L --> D : {neuer_name, stichworte, grund}
+    D --> G : Ergebnis-Dict
+
+    opt Umbenennung nötig
+      G -> F : pfad.rename(neuer_name)
+      G -> C : Undo-Eintrag speichern
+    end
+
+    opt Stichwörter vorhanden
+      G -> M : metadaten_schreiben(pfad, stichworte)
+      M -> F : Keywords in Datei schreiben\n(Office/PDF/EXIF/PNG)
+    end
+
+    G -> C : _checkpoint_speichern()\nStatus nach jeder Datei
+  end
+
+  G --> U : Fortschrittsanzeige aktualisieren
+
+end
+
+G -> C : _undo_log_schreiben()
+G --> U : ✅ Abschlussbericht
+
+== Schritt 3: Übriggebliebene ==
+
+U -> G : "Übriggebliebene identifizieren"
+G -> G : uebriggebliebene_analysieren()\nNicht-verarbeitete kategorisieren
+G --> U : Liste: _binaer_, _bild_fehler_,\n_text_fehler_, _manuell_
+
+U -> G : Auswahl bestätigen
+G -> F : Präfix-Umbenennung
+G -> C : Undo-Log ergänzen
+G --> U : ✅ Markierung abgeschlossen
+
+@enduml

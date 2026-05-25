@@ -1,0 +1,140 @@
+@startuml Datenanalyse-Agent Stufe 2
+
+skinparam backgroundColor #FEFEFE
+skinparam ActivityBackgroundColor #b5ff74
+skinparam ActivityBorderColor #5C6BC0
+skinparam ActivityDiamondBackgroundColor #fddeac
+skinparam ActivityDiamondBorderColor #ff9900f9
+skinparam ArrowColor #37474F
+skinparam NoteBorderColor #adc7d4
+skinparam NoteBackgroundColor #fffab3
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+
+title **Datenanalyse-Agent – Stufe 2: Reflexionsschleife**
+
+|#EEFEFF| Analyse-Pipeline |
+start
+
+:""**Data Profiler**""
+  Datei einlesen, Profil erstellen,
+  Analyst-Skills auswählen;
+
+note right
+  **Deterministisch** (kein LLM)
+  Erkennt Spaltentypen und wählt
+  passende Skills aus:
+  • numerisch.md
+  • kategorisch.md
+  • zeitreihe.md
+  • fehlende_werte.md
+end note
+
+:""**Analyst**""
+  System-Prompt aus Skills, Analyse planen;
+
+note right
+  **LLM** 
+  (leistungsfähiges Modell)
+  Prompt = basis.md+Skills
+end note
+
+repeat
+
+  if (Tool-Call vorhanden?) then (ja)
+
+    :""**Tools**""
+      run Python-Code (pandas/matplotlib...);
+
+    note right
+      Sandbox mit
+      eingeschränktem
+      Namespace
+    end note
+
+    :""**Analyst**""
+      Ergebnis/ nächste Analyse/ Summary;
+
+  else (nein → Analyse abgeschlossen)
+  endif
+
+repeat while (weitere Tool-Calls?) is (ja) not (nein)
+
+|#FFF3E0| Qualitätssicherung |
+
+:""**Quality Checker**""
+  Bewertung gegen aktive Skills
+  Score = 60% Vollständigkeit
+        + 40% Erkenntnistiefe;
+
+note right
+  **LLM** 
+  (günstiges Modell)
+  Gibt JSON zurück:
+  {completeness, depth,
+    missing[], strengths[]}
+end note
+
+if (Score ≥ **70%** ?) then (""✅ Akzeptiert"")
+
+  stop
+
+else (""🔄 Nachbesserung"")
+
+  if (revision_count ≥ **3** ?) then (""⚠️ Abbruch"")
+
+
+    stop
+
+  else (Revision möglich)
+
+    :""**Increment Revision**""
+      revision_count + 1;
+
+|#EEFEFF| Analyse-Pipeline |
+
+    :""**Analyst** (Retry)""
+      Checker-Feedback als
+      Arbeitsanweisung injizieren;
+
+    note right
+      ""Nur fehlende Analysen
+      durchführen, Bisheriges
+      nicht wiederholen.""
+    end note
+
+    -> zurück zum ReAct-Zyklus;
+
+    ' Rücksprung zum Tool-Calling-Loop
+    repeat
+
+      if (Tool-Call?) then (ja)
+        :""**Tools**"";
+        :""**Analyst**"";
+      else (nein)
+      endif
+
+    repeat while (weitere Tool-Calls?) is (ja) not (nein)
+
+    |#FFF3E0| Qualitätssicherung |
+
+    :""**Quality Checker**""
+      erneute Bewertung;
+    note right
+      Max. Revisionen:
+      Analyse mit bestem
+      Score akzeptiert
+    end note
+
+    if (Score ≥ 70% oder\nmax. Revisionen?) then (Ende)
+      stop
+    else (weitere Nachbesserung)
+      -> nächste Revision\n(max. 3×);
+      stop
+    endif
+
+  endif
+
+endif
+
+@enduml
