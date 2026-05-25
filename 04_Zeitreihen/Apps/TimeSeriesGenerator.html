@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeitreihen-Labor: Perioden-Modellierung</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --color-vibe: #f0f4ff;
+            --border-vibe: #3b82f6;
+            --color-trend: #fffbeb;
+            --border-trend: #f59e0b;
+            --color-arma: #f0fdf4;
+            --border-arma: #22c55e;
+            --color-noise: #fef2f2;
+            --border-noise: #ef4444;
+            --primary: #2563eb;
+            --success: #16a34a;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        }
+
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .row-bottom {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .section {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 0;
+            border-left: 6px solid;
+        }
+
+        .section-vibrations {
+            background-color: var(--color-vibe);
+            border-left-color: var(--border-vibe);
+        }
+
+        .section-trend {
+            background-color: var(--color-trend);
+            border-left-color: var(--border-trend);
+        }
+
+        .section-arma {
+            background-color: var(--color-arma);
+            border-left-color: var(--border-arma);
+        }
+
+        .section-noise {
+            background-color: var(--color-noise);
+            border-left-color: var(--border-noise);
+        }
+
+        h3 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vibe-card {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #d1d5db;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .slider-row label {
+            flex: 0 0 105px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+        }
+
+        .val-badge {
+            flex: 0 0 50px;
+            font-family: monospace;
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        #vibe-container {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        #vibe-container .vibe-card {
+            flex: 1 1 220px;
+            min-width: 220px;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+            line-height: 1.4;
+            font-style: italic;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-add {
+            background: var(--border-vibe);
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .btn-export {
+            background: var(--success);
+            color: white;
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+        }
+
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+        }
+
+        .seed-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .seed-row label {
+            font-size: 0.8rem;
+            font-weight: bold;
+            flex: 0 0 105px;
+        }
+
+        .seed-row input[type="number"] {
+            width: 100px;
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .seed-row button {
+            background: #94a3b8;
+            color: white;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+        }
+
+        #chart-wrapper {
+            height: 350px;
+            margin-top: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Zeitreihen-Labor: Periodendauer & Saisonalität</h1>
+
+        <div class="layout-grid">
+            <div class="section section-vibrations">
+                <h3>1. Saisonale Komponenten
+                    <button class="btn-add" onclick="addComponent()">+ Schwingung hinzufügen</button>
+                </h3>
+                <div id="vibe-container"></div>
+            </div>
+
+            <div class="row-bottom">
+                <div class="section section-trend">
+                    <h3>2. Trend & Umfang</h3>
+                    <div class="radio-group">
+                        Modell:
+                        <label><input type="radio" name="modelMode" value="add" checked onchange="regenerate()">
+                            Additiv</label>
+                        <label><input type="radio" name="modelMode" value="mul" onchange="regenerate()">
+                            Multiplikativ</label>
+                    </div>
+                    <div class="slider-row">
+                        <label>Datenpunkte</label>
+                        <input type="range" id="pts-slider" min="100" max="300" step="1" value="150"
+                            oninput="regenerate()">
+                        <span id="pts-val" class="val-badge">150</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>Steigung</label>
+                        <input type="range" id="trend-slope" min="-2" max="5" step="0.1" value="1.5"
+                            oninput="regenerate()">
+                        <span id="slope-val" class="val-badge">1.5</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>Trend-Exponent</label>
+                        <input type="range" id="trend-exp" min="1" max="2" step="0.05" value="1.0"
+                            oninput="regenerate()">
+                        <span id="exp-val" class="val-badge">1.00</span>
+                    </div>
+                </div>
+
+                <div class="section section-arma">
+                    <h3>3. ARMA-Struktur</h3>
+                    <div class="slider-row">
+                        <label>AR(1) φ₁</label>
+                        <input type="range" id="ar1-slider" min="-0.95" max="0.95" step="0.05" value="0.0"
+                            oninput="regenerate()">
+                        <span id="ar1-val" class="val-badge">0.00</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>AR(2) φ₂</label>
+                        <input type="range" id="ar2-slider" min="-0.95" max="0.95" step="0.05" value="0.0"
+                            oninput="regenerate()">
+                        <span id="ar2-val" class="val-badge">0.00</span>
+                    </div>
+                    <p class="hint">Autoregression: φ₁ steuert Trägheit (Lag 1), φ₂ den Einfluss von Lag 2.</p>
+                    <div class="slider-row">
+                        <label>MA(1) θ₁</label>
+                        <input type="range" id="ma1-slider" min="-0.95" max="0.95" step="0.05" value="0.0"
+                            oninput="regenerate()">
+                        <span id="ma1-val" class="val-badge">0.00</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>MA(2) θ₂</label>
+                        <input type="range" id="ma2-slider" min="-0.95" max="0.95" step="0.05" value="0.0"
+                            oninput="regenerate()">
+                        <span id="ma2-val" class="val-badge">0.00</span>
+                    </div>
+                    <p class="hint">Moving Average: θ₁ = Nachwirkung des letzten Schocks, θ₂ = des vorletzten.</p>
+                </div>
+
+                <div class="section section-noise">
+                    <h3>4. Rauschen (ε)</h3>
+                    <div class="slider-row">
+                        <label>Standardabw. σ</label>
+                        <input type="range" id="noise-slider" min="0" max="80" value="15" oninput="regenerate()">
+                        <span id="noise-val" class="val-badge">15</span>
+                    </div>
+                    <p class="hint">Normalverteiltes Rauschen (Box-Muller). Innovation ε des ARMA-Prozesses.</p>
+
+                    <div style="display:flex; align-items:center; gap:8px; margin:10px 0 4px;">
+                        <input type="checkbox" id="unit-root" onchange="regenerate()">
+                        <label for="unit-root" style="font-size:0.8rem; font-weight:bold; cursor:pointer;">
+                            Residuen integrieren (Einheitswurzel)
+                        </label>
+                    </div>
+                    <p class="hint">Macht aus dem stationären ARMA-Rest einen Random Walk. Der ADF sollte H₀ dann NICHT mehr ablehnen.</p>
+
+                    <div class="seed-row">
+                        <label>Seed</label>
+                        <input type="number" id="seed-input" value="42">
+                        <button onclick="randomizeSeed()">Zufall</button>
+                    </div>
+                    <p class="hint">Gleicher Seed = reproduzierbare Zeitreihe.</p>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 20px;">
+                <button class="btn-export" onclick="exportCSV()"
+                    style="width: calc(50% - 5px); padding: 10px; font-size: 0.95rem;">CSV EXPORTIEREN</button>
+                <div
+                    style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 0.9rem;">
+                    ADF-Statistik: <span id="adf-value">–</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="chart-wrapper">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let components = [{ id: 1, type: 'sin', amp: 50, period: 12 }];
+        let nextId = 2;
+        let chart;
+        let cachedData = []; // Chart und Export nutzen dieselben Daten
+
+        // ── Seeded PRNG (Mulberry32) ──────────────────────────────
+        function mulberry32(seed) {
+            return function () {
+                seed |= 0;
+                seed = seed + 0x6D2B79F5 | 0;
+                let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+
+        // ── Box-Muller: Normalverteilte Zufallszahlen ─────────────
+        function gaussianRandom(rng) {
+            let u1 = rng();
+            let u2 = rng();
+            // Schutz vor log(0)
+            while (u1 === 0) u1 = rng();
+            return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        // ── Komponenten-Verwaltung ─────────────────────────────────
+        function addComponent() {
+            components.push({ id: nextId++, type: 'sin', amp: 30, period: 6 });
+            renderComponents();
+            regenerate();
+        }
+
+        function removeComponent(id) {
+            components = components.filter(c => c.id !== id);
+            renderComponents();
+            regenerate();
+        }
+
+        function renderComponents() {
+            const container = document.getElementById('vibe-container');
+            container.innerHTML = '';
+            components.forEach((c, i) => {
+                const div = document.createElement('div');
+                div.className = 'vibe-card';
+                div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="font-size:0.8rem; font-weight:bold; color:#64748b;">KOMPONENTE #${i + 1}</span>
+                    <button class="btn-remove" onclick="removeComponent(${c.id})">Entfernen</button>
+                </div>
+                <div class="slider-row">
+                    <label>Amplitude</label>
+                    <input type="range" min="0" max="200" value="${c.amp}" oninput="updateComp(${c.id}, 'amp', this.value)">
+                    <span class="val-badge">${c.amp}</span>
+                </div>
+                <div class="slider-row">
+                    <label>Periode (Punkte)</label>
+                    <input type="range" min="2" max="60" step="1" value="${c.period}" oninput="updateComp(${c.id}, 'period', this.value)">
+                    <span class="val-badge">${c.period}</span>
+                </div>
+            `;
+                container.appendChild(div);
+            });
+        }
+
+        function updateComp(id, prop, val) {
+            const c = components.find(comp => comp.id === id);
+            if (c) c[prop] = parseFloat(val);
+            regenerate();
+            renderComponents();
+        }
+
+        function randomizeSeed() {
+            document.getElementById('seed-input').value = Math.floor(Math.random() * 100000);
+            regenerate();
+        }
+
+        // ── Datengenerierung ───────────────────────────────────────
+        function generateData() {
+            const count = parseInt(document.getElementById('pts-slider').value);
+            const slope = parseFloat(document.getElementById('trend-slope').value);
+            const exponent = parseFloat(document.getElementById('trend-exp').value);
+            const sigma = parseFloat(document.getElementById('noise-slider').value);
+            const phi1 = parseFloat(document.getElementById('ar1-slider').value);
+            const phi2 = parseFloat(document.getElementById('ar2-slider').value);
+            const theta1 = parseFloat(document.getElementById('ma1-slider').value);
+            const theta2 = parseFloat(document.getElementById('ma2-slider').value);
+            const seed = parseInt(document.getElementById('seed-input').value) || 42;
+            const isMul = document.querySelector('input[name="modelMode"]:checked').value === 'mul';
+            const integrate = document.getElementById('unit-root').checked;
+
+            // Badge-Updates
+            document.getElementById('pts-val').innerText = count;
+            document.getElementById('slope-val').innerText = slope.toFixed(1);
+            document.getElementById('exp-val').innerText = exponent.toFixed(2);
+            document.getElementById('noise-val').innerText = sigma;
+            document.getElementById('ar1-val').innerText = phi1.toFixed(2);
+            document.getElementById('ar2-val').innerText = phi2.toFixed(2);
+            document.getElementById('ma1-val').innerText = theta1.toFixed(2);
+            document.getElementById('ma2-val').innerText = theta2.toFixed(2);
+
+            const rng = mulberry32(seed);
+            const baseValue = 150;
+            const startDate = new Date(2015, 0, 1);
+
+            // ── 1) Weißes Rauschen ε_t (normalverteilt) ──────────
+            const epsilon = [];
+            for (let t = 0; t < count; t++) {
+                epsilon.push(gaussianRandom(rng) * sigma);
+            }
+
+            // ── 2) ARMA(2,2)-Residuen ────────────────────────────
+            //    r_t = φ₁·r_{t-1} + φ₂·r_{t-2} + ε_t + θ₁·ε_{t-1} + θ₂·ε_{t-2}
+            const residuals = [];
+            for (let t = 0; t < count; t++) {
+                let ar = (t >= 1 ? phi1 * residuals[t - 1] : 0)
+                    + (t >= 2 ? phi2 * residuals[t - 2] : 0);
+                let ma = (t >= 1 ? theta1 * epsilon[t - 1] : 0)
+                    + (t >= 2 ? theta2 * epsilon[t - 2] : 0);
+                residuals.push(ar + epsilon[t] + ma);
+            }
+
+            // ── 2b) Optional: Residuen integrieren (Einheitswurzel) ─
+            //    r*_t = Σ_{k≤t} r_k  → ARIMA(2,1,2) statt ARMA(2,2)
+            //    Schocks werden dadurch permanent, H₀ des ADF gilt.
+            if (integrate) {
+                let cum = 0;
+                for (let t = 0; t < count; t++) {
+                    cum += residuals[t];
+                    residuals[t] = cum;
+                }
+            }
+
+            // ── 3) Zeitreihe zusammensetzen ──────────────────────
+            const data = [];
+            for (let t = 0; t < count; t++) {
+                // Trend
+                let trend = slope * Math.pow(t, exponent);
+                let trendBase = baseValue + trend;
+
+                // Saisonale Komponente
+                let seasonal = 0;
+                components.forEach(c => {
+                    let freq = (2 * Math.PI) / c.period;
+                    seasonal += c.amp * Math.sin(freq * t);
+                });
+
+                // Zusammensetzung
+                let y;
+                if (isMul) {
+                    // Multiplikativ: Saisonalität und Residuen skalieren proportional zum Trend
+                    y = trendBase * (1 + seasonal / trendBase) * (1 + residuals[t] / trendBase);
+                } else {
+                    // Additiv
+                    y = trendBase + seasonal + residuals[t];
+                }
+
+                let d = new Date(startDate);
+                d.setMonth(startDate.getMonth() + t);
+                data.push({
+                    x: d.toISOString().split('T')[0],
+                    y: Math.max(0, y).toFixed(1)
+                });
+            }
+            return data;
+        }
+
+        function regenerate() {
+            cachedData = generateData();
+            chart.data.labels = cachedData.map(p => p.x);
+            chart.data.datasets[0].data = cachedData.map(p => p.y);
+            chart.update('none');
+        }
+
+        // ── Chart ──────────────────────────────────────────────────
+        function initChart() {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Simulierte Zeitreihe',
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.05)',
+                        borderWidth: 2, pointRadius: 2, fill: true, data: []
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+            regenerate();
+        }
+
+        // ── CSV-Export (nutzt gecachte Daten) ──────────────────────
+        function exportCSV() {
+            let csv = '"Period","Value"\r\n';
+            cachedData.forEach(p => { csv += `${p.x},${p.y}\r\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `zeitreihe_n${cachedData.length}.csv`;
+            a.click();
+        }
+        // ── Augmented Dickey-Fuller Test ──────────────────────────────────────────
+        //
+        //   Regressionsmodell (regression = 'ct'):
+        //     Δy_t = β·y_{t-1} + α + δ·t + Σ_{k=1..p} ρ_k·Δy_{t-k} + ε_t
+        //
+        //   Teststatistik: t = β̂ / SE(β̂)
+        //   H0: β = 0 (Einheitswurzel, also nicht-stationär)
+        //   H1: β < 0 (stationär)
+        //
+        //   WICHTIG: Da dieser Generator Daten mit deterministischem Trend
+        //   erzeugt (slope·t^exponent), muss 'ct' (Konstante + Trend) genutzt
+        //   werden. Mit nur Konstante ('c') wäre der Test fehlspezifiziert.
+        //
+        // regression: 'c' = nur Konstante, 'ct' = Konstante + linearer Trend
+        // ─────────────────────────────────────────────────────────────────────────
+        function adfTest(series, regression = 'ct', lag = null) {
+            const y = series.map(v => parseFloat(v.y));
+            const n = y.length;
+            if (n < 15) return { stat: NaN, lag: 0, crit: null, reject5: null };
+
+            // Automatische Lag-Wahl (Schwert's Obergrenze, gedeckelt auf n^(1/3))
+            if (lag === null) {
+                const schwert = Math.floor(12 * Math.pow(n / 100, 0.25));
+                lag = Math.max(1, Math.min(schwert, Math.floor(Math.pow(n, 1 / 3))));
+            }
+
+            // Erste Differenzen: dy[i] = y[i+1] - y[i]  (Länge n-1)
+            const dy = new Array(n - 1);
+            for (let i = 1; i < n; i++) dy[i - 1] = y[i] - y[i - 1];
+
+            // Designmatrix aufbauen. Wir starten bei i = lag, damit dy[i-k]
+            // für k = 1..lag alle definiert sind.
+            // Konvention:  X[.][0] = y_{t-1}  (Koeffizient = β, das ist das, was wir testen)
+            const Y = [];
+            const X = [];
+            for (let i = lag; i < dy.length; i++) {
+                // dy[i] entspricht Δy_{i+1}, also y_{t-1} = y[i]
+                const row = [y[i]];
+                if (regression === 'c' || regression === 'ct') row.push(1);          // Konstante
+                if (regression === 'ct') row.push(i + 1);                            // linearer Trend
+                for (let k = 1; k <= lag; k++) row.push(dy[i - k]);                  // Δy_{t-k}
+                X.push(row);
+                Y.push(dy[i]);
+            }
+
+            const k = X[0].length;
+            const N = X.length;
+            if (N < k + 5) return { stat: NaN, lag, crit: null, reject5: null };
+
+            // X'X und X'Y
+            const XtX = Array.from({ length: k }, () => new Array(k).fill(0));
+            const XtY = new Array(k).fill(0);
+            for (let i = 0; i < N; i++) {
+                const xi = X[i], yi = Y[i];
+                for (let a = 0; a < k; a++) {
+                    XtY[a] += xi[a] * yi;
+                    for (let b = 0; b < k; b++) XtX[a][b] += xi[a] * xi[b];
+                }
+            }
+
+            // β = (X'X)^{-1} · X'Y  (allgemeiner Gauss-Jordan)
+            const invXtX = invertMatrix(XtX);
+            if (!invXtX) return { stat: NaN, lag, crit: null, reject5: null };
+            const beta = new Array(k).fill(0);
+            for (let a = 0; a < k; a++)
+                for (let b = 0; b < k; b++) beta[a] += invXtX[a][b] * XtY[b];
+
+            // RSS und σ²
+            let rss = 0;
+            for (let i = 0; i < N; i++) {
+                let pred = 0;
+                for (let a = 0; a < k; a++) pred += X[i][a] * beta[a];
+                const e = Y[i] - pred;
+                rss += e * e;
+            }
+            const sigma2 = rss / (N - k);
+
+            // SE des Koeffizienten β (Index 0)
+            const se0 = Math.sqrt(sigma2 * invXtX[0][0]);
+            if (!isFinite(se0) || se0 === 0) return { stat: NaN, lag, crit: null, reject5: null };
+
+            const tStat = beta[0] / se0;
+
+            // Asymptotische kritische Werte (MacKinnon/Fuller, große Stichproben)
+            const crit = (regression === 'ct')
+                ? { '1%': -3.96, '5%': -3.41, '10%': -3.12 }
+                : { '1%': -3.43, '5%': -2.86, '10%': -2.57 };
+
+            return { stat: tStat, lag, crit, reject5: tStat < crit['5%'] };
+        }
+
+        // ── Allgemeine Matrixinversion (Gauss-Jordan mit partieller Pivotsuche) ──
+        function invertMatrix(M) {
+            const n = M.length;
+            // Erweiterte Matrix [M | I]
+            const A = M.map((row, i) => {
+                const id = new Array(n).fill(0);
+                id[i] = 1;
+                return [...row, ...id];
+            });
+
+            for (let i = 0; i < n; i++) {
+                // Pivot: größter Absolutbetrag in Spalte i ab Zeile i
+                let maxRow = i;
+                for (let r = i + 1; r < n; r++) {
+                    if (Math.abs(A[r][i]) > Math.abs(A[maxRow][i])) maxRow = r;
+                }
+                if (maxRow !== i) [A[i], A[maxRow]] = [A[maxRow], A[i]];
+
+                const pivot = A[i][i];
+                if (Math.abs(pivot) < 1e-12) return null; // singulär
+
+                for (let j = 0; j < 2 * n; j++) A[i][j] /= pivot;
+
+                for (let r = 0; r < n; r++) {
+                    if (r === i) continue;
+                    const f = A[r][i];
+                    if (f === 0) continue;
+                    for (let j = 0; j < 2 * n; j++) A[r][j] -= f * A[i][j];
+                }
+            }
+            return A.map(row => row.slice(n));
+        }
+
+        let adfResult = NaN;
+
+        // ── Erweiterung von regenerate() ─────────────────────────────────────────
+        function regenerate() {
+            cachedData = generateData();
+            chart.data.labels = cachedData.map(p => p.x);
+            chart.data.datasets[0].data = cachedData.map(p => p.y);
+            chart.update('none');
+
+            // ADF-Test asynchron (blockiert UI nicht)
+            setTimeout(() => {
+                const res = adfTest(cachedData, 'ct');
+                adfResult = res.stat;
+                const el = document.getElementById('adf-value');
+                if (isNaN(res.stat)) {
+                    el.innerText = '–';
+                    el.title = '';
+                } else {
+                    const verdict = res.reject5 ? '✓ stationär' : '✗ Einheitswurzel';
+                    el.innerText = `${res.stat.toFixed(3)}  (${verdict}, lag=${res.lag})`;
+                    el.title =
+                        `ADF (c+Trend), n=${cachedData.length}, lag=${res.lag}\n` +
+                        `Kritische Werte: 1%=${res.crit['1%']}, 5%=${res.crit['5%']}, 10%=${res.crit['10%']}\n` +
+                        `H0 (Einheitswurzel) wird bei 5% ${res.reject5 ? 'abgelehnt' : 'NICHT abgelehnt'}.`;
+                }
+            }, 0);
+        }
+
+        renderComponents();
+        initChart();
+    </script>
+</body>
+
+</html>
