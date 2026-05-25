@@ -1,0 +1,76 @@
+flowchart TB
+    Start(("START:<br>Modellwahl")) --> ModelType{"Modelltyp?"}
+    ModelType -- Klassisches ML --> ML_Branch["Branch: Klassisches ML"]
+    ML_Branch --> ML_TaskType{"Aufgabe?"}
+    ML_TaskType -- Klassifikation --> ML_Stratified["Stratified K-Fold<br>(Erhält Klassen-Balance)"]
+    ML_TaskType -- Regression --> ML_Normal["Standard K-Fold<br>(Zufälliger Shuffle)"]
+    ML_Stratified --> ML_Size{"Datenmenge?"}
+    ML_Normal --> ML_Size
+    ML_Size -- Klein (&lt; 1k) --> ML_Small["Szenario: Small Data"]
+    ML_Small --> ML_NoHoldout["KEIN Test-Set abtrennen!<br>(Jeder Datenpunkt zählt)"]
+    ML_NoHoldout --> ML_TuneSmall{"Tuning nötig?"}
+    ML_TuneSmall -- Ja (Teuer) --> ML_NestedCV["Nested CV<br>(Außen: Eval, Innen: Tuning)"]
+    ML_TuneSmall -- Nein (Standard) --> ML_SimpleCV["Simple K-Fold CV"]
+    ML_NestedCV --> ML_EvalSmall["Ergebnis: CV-Score<br>(Schätzer für Generalisierung)"]
+    ML_SimpleCV --> ML_EvalSmall
+    ML_EvalSmall --> ML_DeploySmall{"Deployment?"}
+    ML_DeploySmall -- Standard --> ML_RefitSmall["Refit auf 100% der Daten"]
+    ML_DeploySmall -- Max Robustheit --> ML_EnsembleSmall["Ensemble:<br>Alle K Modelle behalten"]
+    ML_RefitSmall --> ML_Warning["⚠ WARNUNG:<br>Kein unabhängiger Test möglich.<br>CV-Score ist nur Indikator."]
+    ML_EnsembleSmall --> ML_Warning
+    ML_Warning --> ML_EndSmall(("Deploy"))
+    ML_Size -- "Mittel (1k - 100k)" --> ML_Medium["Szenario: Gold Standard"]
+    ML_Medium --> ML_Split["Split: 20% Test (Tresor)<br>80% Training"]
+    ML_Split --> ML_CV_Loop["K-Fold CV auf den 80% Train"]
+    ML_CV_Loop --> ML_TuneMed{"Tuning?"}
+    ML_TuneMed -- Ja --> ML_GridSearch["GridSearch / Optuna<br>innerhalb der Folds"]
+    ML_TuneMed -- Nein --> ML_EvalOnly["Reine Evaluation<br>der Methode"]
+    ML_GridSearch --> ML_BestModel["Beste Parameter finden"]
+    ML_EvalOnly --> ML_CheckCV["CV-Score prüfen"]
+    ML_BestModel --> ML_CheckCV
+    ML_CheckCV -- Score schlecht --> ML_Iterate["Zurück zu Feature Engineering"]
+    ML_CheckCV -- Score gut --> ML_RefitTrain["Refit auf gesamten 80% Train"]
+    ML_RefitTrain --> ML_FinalTest["Prüfung am 20% Tresor (Test-Set)"]
+    ML_FinalTest --> ML_Compare{"Test-Score ≈ CV-Score?"}
+    ML_Compare -- Nein (Overfitting) --> ML_Debug["Data Leakage prüfen!"]
+    ML_Compare -- Ja (Valide) --> ML_DeployMed{"Deployment?"}
+    ML_DeployMed -- Standard --> ML_RefitAll["Finaler Refit auf 100%<br>(Train + Test)"]
+    ML_DeployMed -- Ensemble --> ML_EnsMed["Ensemble aus CV-Modellen<br>oder Bagging auf 100%"]
+    ML_RefitAll --> ML_EndMed(("Deploy"))
+    ML_EnsMed --> ML_EndMed
+    ML_Size -- Groß (> 100k) --> ML_Large["Szenario: Large Data"]
+    ML_Large --> ML_SimpleSplit["Simple Split:<br>Train / Val / Test"]
+    ML_SimpleSplit --> ML_TrainLarge["Train auf Train<br>Optimize auf Val"]
+    ML_TrainLarge --> ML_TestLarge["Final Check auf Test"]
+    ML_TestLarge --> ML_EndLarge(("Deploy"))
+    ModelType -- Deep Learning --> DL_Branch["Branch: Deep Learning"]
+    DL_Branch --> DL_Size{"Datenmenge?"}
+    DL_Size -- Klein (&lt; 5k) --> DL_Warn["⚠ VORSICHT:<br>Zu wenig Daten für DL."]
+    DL_Warn --> DL_Transfer["Lösung:<br>Transfer Learning / Fine-Tuning <br>/ Data Augmentierung"]
+    DL_Size -- Ausreichend --> DL_Standard["Standard DL Workflow"]
+    DL_Standard --> DL_Split["Split: Train / Val / Test"]
+    DL_Split --> DL_Loop["Training Loop<br>(Backpropagation)"]
+    DL_Loop --> DL_Monitor["Monitoring auf Val-Set<br>(Early Stopping)"]
+    DL_Monitor --> DL_Select["Besten Checkpoint wählen"]
+    DL_Select --> DL_Final["Check auf Test-Set"]
+    DL_Final --> DL_End(("Deploy"))
+
+     ModelType:::decision
+     ML_TaskType:::decision
+     ML_Size:::decision
+     ML_TuneSmall:::decision
+     ML_DeploySmall:::decision
+     ML_Warning:::warning
+     ML_EndSmall:::finish
+     ML_TuneMed:::decision
+     ML_Compare:::decision
+     ML_DeployMed:::decision
+     ML_EndMed:::finish
+     ML_EndLarge:::finish
+     DL_Size:::decision
+     DL_Warn:::warning
+     DL_End:::finish
+    classDef decision fill:#f9f,stroke:#333,stroke-width:2px
+    classDef process fill:#e1f5fe,stroke:#01579b,stroke-width:1px
+    classDef warning fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef finish fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
