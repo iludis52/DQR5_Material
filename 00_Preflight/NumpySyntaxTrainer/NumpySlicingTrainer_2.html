@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NumPy Slicing Master: Step-Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .main-container {
+            width: 1000px;
+            background: white;
+            display: flex;
+            gap: 40px;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            align-items: flex-start;
+        }
+
+        #p5-container {
+            flex: 0 0 550px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+
+        .sidebar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .task-box {
+            background: #e9ecef;
+            padding: 20px;
+            border-left: 6px solid #2c3e50;
+            border-radius: 4px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            font-size: 20px;
+            font-family: 'Courier New', monospace;
+            border: 2px solid #ced4da;
+            border-radius: 6px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        input:focus { border-color: #3498db; }
+
+        .btn-group { display: flex; gap: 10px; }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        #check-btn { background: #27ae60; color: white; }
+        #next-btn { background: #3498db; color: white; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        #feedback {
+            font-size: 1.1em;
+            font-weight: bold;
+            min-height: 1.5em;
+        }
+
+        .axis-info {
+            font-size: 0.9em;
+            color: #6c757d;
+            line-height: 1.6;
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #ffeeba;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 style="color: #2c3e50; margin-bottom: 30px;">NumPy Slicing: Axis & Step Trainer 🐍</h1>
+
+    <div class="main-container">
+        <div id="p5-container"></div>
+
+        <div class="sidebar">
+            <div class="task-box">
+                <strong style="font-size: 1.2em;">Aufgabe:</strong>
+                <p id="task-text" style="margin-top: 10px; font-size: 1.1em;">Initialisierung...</p>
+            </div>
+
+            <div>
+                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Eingabe:</label>
+                <input type="text" id="code-input" placeholder="z.B. arr[::2, 1:4]" autofocus>
+            </div>
+
+            <div class="btn-group">
+                <button id="check-btn">Prüfen (Enter)</button>
+                <button id="next-btn">Nächste Aufgabe</button>
+            </div>
+
+            <div id="feedback"></div>
+
+            <div class="axis-info">
+                <strong>Vergiss es nie wieder:</strong><br>
+                • <code>axis 0</code>: <b>Vertikal</b> (Zeilen) ↓<br>
+                • <code>axis 1</code>: <b>Horizontal</b> (Spalten) →<br><br>
+                Syntax: <code>[start:stop:step, start:stop:step]</code>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let grid = [];
+        let rows = 7, cols = 7;
+        let cellSize = 60;
+        let targetCoords = [];
+        let userCoords = [];
+
+        function setup() {
+            let cnv = createCanvas(550, 550);
+            cnv.parent('p5-container');
+            
+            select('#check-btn').mousePressed(checkInput);
+            select('#next-btn').mousePressed(newTask);
+            select('#code-input').elt.addEventListener('keyup', e => { if(e.key === 'Enter') checkInput(); });
+
+            newTask();
+        }
+
+        function draw() {
+            background(255);
+            translate(60, 60); // Platz für Achsenbeschriftung
+
+            // Zeichne Achsen-Labels
+            drawAxes();
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    let x = c * cellSize;
+                    let y = r * cellSize;
+
+                    stroke(220);
+                    fill(255);
+
+                    // Markierungen
+                    if (isInList(r, c, targetCoords)) {
+                        fill(46, 204, 113, 100); // Grün für Ziel
+                        stroke(46, 204, 113);
+                    }
+                    if (isInList(r, c, userCoords)) {
+                        fill(231, 76, 60, 150); // Rot für User
+                        stroke(231, 76, 60);
+                    }
+                    if (isInList(r, c, targetCoords) && isInList(r, c, userCoords)) {
+                        fill(46, 204, 113, 220); // Kräftiges Grün bei Treffer
+                    }
+
+                    rect(x, y, cellSize, cellSize, 4);
+
+                    // Werte und Indizes
+                    noStroke();
+                    textAlign(CENTER, CENTER);
+                    
+                    // Zellen-Wert
+                    fill(50);
+                    textSize(18);
+                    text(grid[r][c], x + cellSize/2, y + cellSize/2);
+
+                    // Index-Beschriftung
+                    fill(160);
+                    textSize(12);
+                    if (c === 0) text(r, -25, y + cellSize/2); // Zeilen-Index (Axis 0)
+                    if (r === 0) text(c, x + cellSize/2, -25); // Spalten-Index (Axis 1)
+                }
+            }
+        }
+
+        function drawAxes() {
+            fill(52, 152, 219);
+            textSize(13);
+            textAlign(CENTER);
+            
+            // Axis 1 Label (Horizontal)
+            text("axis 1 (Spalten) →", (cols * cellSize)/2, -45);
+            
+            // Axis 0 Label (Vertikal)
+            push();
+            translate(-45, (rows * cellSize)/2);
+            rotate(-HALF_PI);
+            text("axis 0 (Zeilen) →", 0, 0);
+            pop();
+        }
+
+        function isInList(r, c, list) {
+            return list.some(coord => coord[0] === r && coord[1] === c);
+        }
+
+        function newTask() {
+            grid = Array.from({length: rows}, () => 
+                Array.from({length: cols}, () => floor(random(10, 99)))
+            );
+
+            // Generiere zufälliges Slice-Muster inklusive Step
+            let rParams = generateSlice(rows);
+            let cParams = generateSlice(cols);
+
+            targetCoords = [];
+            for(let r of rParams) {
+                for(let c of cParams) {
+                    targetCoords.push([r, c]);
+                }
+            }
+
+            userCoords = [];
+            select('#feedback').html('');
+            select('#code-input').value('');
+            select('#task-text').html("Wähle die grünen Felder aus. Nutze die <code>start:stop:step</code> Notation!");
+        }
+
+        function generateSlice(max) {
+            let start = floor(random(0, 2));
+            let stop = floor(random(max-2, max + 1));
+            let step = random() > 0.4 ? floor(random(2, 4)) : 1; // 40% Chance auf Step > 1
+            
+            let res = [];
+            for(let i = start; i < stop; i += step) res.push(i);
+            return res;
+        }
+
+        function checkInput() {
+            let str = select('#code-input').value();
+            let parsed = parse2D(str);
+            
+            if(!parsed) {
+                select('#feedback').html('<span style="color:#e67e22">Syntax-Check fehlgeschlagen! Nutze [0:5:2, :]</span>');
+                return;
+            }
+
+            userCoords = parsed;
+            let success = JSON.stringify(targetCoords.sort()) === JSON.stringify(userCoords.sort());
+
+            if(success) {
+                select('#feedback').html('<span style="color:#27ae60">Perfekt! Das Slicing sitzt. 🎉</span>');
+            } else {
+                select('#feedback').html('<span style="color:#e74c3c">Leider nicht richtig. Achte auf den Step!</span>');
+            }
+        }
+
+        function parse2D(str) {
+            try {
+                let s = str.includes('[') ? str.substring(str.indexOf('[')+1, str.lastIndexOf(']')) : str;
+                s = s.replace(/arr|iloc|data|\s/g, '');
+                let parts = s.split(',');
+                if(parts.length !== 2) return null;
+
+                const getIndices = (p, max) => {
+                    if(p === ':' || p === '') return Array.from({length: max}, (_, i) => i);
+                    if(!p.includes(':')) {
+                        let v = parseInt(p);
+                        return isNaN(v) ? [] : [v];
+                    }
+                    let bits = p.split(':');
+                    let start = bits[0] === '' ? 0 : parseInt(bits[0]);
+                    let stop = bits[1] === '' || bits[1] === undefined ? max : parseInt(bits[1]);
+                    let step = bits[2] === '' || bits[2] === undefined ? 1 : parseInt(bits[2]);
+                    
+                    let res = [];
+                    for(let i = start; i < stop; i += step) if(i < max) res.push(i);
+                    return res;
+                };
+
+                let rIdx = getIndices(parts[0], rows);
+                let cIdx = getIndices(parts[1], cols);
+                let res = [];
+                for(let r of rIdx) for(let c of cIdx) res.push([r, c]);
+                return res;
+            } catch(e) { return null; }
+        }
+    </script>
+</body>
+</html>
