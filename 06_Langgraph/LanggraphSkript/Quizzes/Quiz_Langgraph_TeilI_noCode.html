@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktives Quiz mit SVGs</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 40px;
+        }
+
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px;
+            /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar">
+        <div class="status-info">
+            <span>Fortschritt: <span id="progress-text">0%</span></span>
+            <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </div>
+
+    <h1 id="quiz-main-title">Automaten & Logik Quiz</h1>
+
+    <div class="quiz-container" id="quiz-container"></div>
+
+    <div class="quiz-container">
+        <div class="final-result" id="final-result">
+            <h2>Quiz abgeschlossen!</h2>
+            <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.
+            </p>
+            <button onclick="location.reload()"
+                style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz
+                neustarten</button>
+        </div>
+    </div>
+
+    <script>
+        // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+        const questions = [
+            {
+                text: "Aus welchen formalen Komponenten besteht ein Deterministischer Endlicher Automat (DEA)?",
+                options: [
+                    "Zustandsmenge, Eingabealphabet, Übergangsfunktion, Startzustand, Endzustände",
+                    "Knoten, Kanten, Router, Startpunkt, Endpunkt",
+                    "Kontrollzustand, Datenzustand, Ausgabefunktion, Startzustand, Endzustände",
+                    "Zustandsmenge, Eingabealphabet, Ausgabealphabet, Übergangsfunktion, Startzustand"
+                ],
+                correct: 0,
+                explanation: "Ein DEA wird formal als 5-Tupel (Q, Σ, δ, q0, F) definiert. Dies entspricht der Zustandsmenge (Q), dem Eingabealphabet (Σ), der Übergangsfunktion (δ), dem Startzustand (q0) und der Menge der Endzustände (F)."
+            },
+            {
+                text: "Was ist der wesentliche Unterschied zwischen einem Moore-Automaten und einem einfachen DEA?",
+                options: [
+                    "Ein Moore-Automat hat keine Endzustände.",
+                    "Ein Moore-Automat erweitert den DEA um ein Ausgabealphabet und eine Ausgabefunktion.",
+                    "Ein Moore-Automat kann nicht deterministisch sein.",
+                    "Ein Moore-Automat ignoriert die Eingabesymbole bei der Zustandsänderung."
+                ],
+                correct: 1,
+                explanation: "Der Moore-Automat erweitert den klassischen DEA um Ausgaben. Er wird als 6-Tupel definiert und enthält zusätzlich das Ausgabealphabet (Γ) sowie die Ausgabefunktion (λ)."
+            },
+            {
+                text: "Welche Eigenschaft beweist, dass es sich bei der abgebildeten Ampelsteuerung um einen Moore-Automaten handelt?",
+                svgId: "svg-ampel",
+                options: [
+                    "Die Pfeile sind alle mit der gleichen Eingabe 'takt' beschriftet.",
+                    "Es gibt keinen definierten Endzustand.",
+                    "Der Automat hat genau vier Zustände, was typisch für Moore ist.",
+                    "Die Ausgabe (z.B. 'rot', 'r/g') steht direkt im Zustandsknoten."
+                ],
+                correct: 3,
+                explanation: "Bei einem Moore-Automaten hängt die Ausgabe ausschließlich vom aktuellen Zustand ab, nicht vom Übergang. Daher wird sie grafisch in den Zuständen (Knoten) notiert."
+            },
+            {
+                text: "Wovon hängt die Ausgabe bei einem Mealy-Automaten ab?",
+                options: [
+                    "Ausschließlich von der aktuellen Eingabe.",
+                    "Vom aktuellen Zustand UND von der aktuellen Eingabe.",
+                    "Ausschließlich vom aktuellen Zustand.",
+                    "Vom vorherigen Zustand und dem Endzustand."
+                ],
+                correct: 1,
+                explanation: "Im Gegensatz zum Moore-Automaten (Ausgabe hängt nur vom Zustand ab) hängt die Ausgabe beim Mealy-Automaten vom Zustand und der Eingabe ab. Formal: λ: Q × Σ → Γ."
+            },
+            {
+                text: "Wo wird in einem Zustandsdiagramm die Ausgabe eines Mealy-Automaten typischerweise notiert?",
+                options: [
+                    "Innerhalb des Zustandsknotens.",
+                    "Über dem Startzustand.",
+                    "In einem separaten Ausgabeknoten.",
+                    "An den Übergangskanten (Kantenbeschriftung)."
+                ],
+                correct: 3,
+                explanation: "Da die Ausgabe beim Mealy-Automaten vom aktuellen Zustand und der Eingabe abhängt (also beim Wechsel geschieht), wird sie an der Kante notiert (Format: 'Eingabe / Ausgabe')."
+            },
+            {
+                text: "Was ist der Zweck dieses abgebildeten Automaten?",
+                svgId: "svg-endet11",
+                options: [
+                    "Er akzeptiert jede Sequenz, die genau zwei Einsen enthält.",
+                    "Er wechselt bei jeder '0' sofort in den Endzustand.",
+                    "Er akzeptiert Binärsequenzen, die auf '11' enden.",
+                    "Er akzeptiert nur die exakte Eingabe '11' und stoppt dann komplett."
+                ],
+                correct: 2,
+                explanation: "Der Automat erreicht den Doppelkreis (akzeptierender Zustand q2) nur, wenn zweimal hintereinander eine '1' gelesen wird. Eine '0' wirft ihn immer wieder in den Startzustand q0 zurück."
+            },
+            {
+                text: "Welches praktische Problem löst der 'Erweiterte Zustandsautomat' (EFSM) gegenüber klassischen DEAs?",
+                options: [
+                    "Er rechnet Moore- in Mealy-Automaten um.",
+                    "Er erlaubt das Speichern zusätzlicher Daten in einem separaten 'Datenzustand'.",
+                    "Er reduziert die Anzahl der benötigten Zustände auf maximal zwei.",
+                    "Er verzichtet auf Endzustände."
+                ],
+                correct: 1,
+                explanation: "Ein klassischer Automat weiß nur 'In welchem Knoten bin ich gerade?'. Der EFSM spaltet den Zustand auf und fügt einen 'Datenzustand' (z.B. einen Rucksack für Variablen, Chatverläufe oder Zähler) hinzu."
+            },
+            {
+                text: "Wie arbeitet die Übergangsfunktion (δ) in einem Erweiterten Zustandsautomaten (EFSM)?",
+                options: [
+                    "Sie hängt nur vom aktuellen Kontrollzustand (Knoten) ab.",
+                    "Sie ignoriert den Datenzustand vollständig.",
+                    "Sie bestimmt nur den nächsten Knoten, verändert aber nie die Daten.",
+                    "Sie berücksichtigt den Kontrollzustand UND den Datenzustand, um den nächsten Knoten und neue Daten zu bestimmen."
+                ],
+                correct: 3,
+                explanation: "Im EFSM wird der vollständige Zustand als Paar (Kontrollzustand, Datenzustand) abgebildet. Die Übergangsfunktion δ(q, D) → (q', D') wertet beides aus, um den nächsten Knoten und das Datenupdate zu ermitteln."
+            },
+            {
+                text: "Welche Aussage über das Verhältnis von Moore- und Mealy-Automaten ist aus formalsprachlicher Sicht korrekt?",
+                options: [
+                    "Jeder Moore-Automat lässt sich in einen Mealy-Automaten umwandeln und umgekehrt.",
+                    "Mealy-Automaten sind theoretisch mächtiger als Moore-Automaten.",
+                    "Moore-Automaten können keine Endlosschleifen modellieren.",
+                    "Mealy-Automaten benötigen immer mehr Zustände als Moore-Automaten."
+                ],
+                correct: 0,
+                explanation: "Moore- und Mealy-Automaten sind gleich mächtig. Es lässt sich jeder Automat des einen Typs in einen äquivalenten Automaten des anderen Typs überführen."
+            },
+            {
+                text: "Was unterscheidet das Verständnis eines 'Endzustands' bei der Modellierung realer Prozesse (z.B. Mikrowelle) von der theoretischen Informatik?",
+                options: [
+                    "Er darf niemals verlassen werden.",
+                    "Er muss zwingend bei jedem Durchlauf in der ersten Minute erreicht werden.",
+                    "Er markiert nicht zwingend einen 'akzeptierenden Zustand' einer Sprache, sondern oft das erfolgreiche Prozessende.",
+                    "Er führt dazu, dass das Gerät physisch vom Strom getrennt wird."
+                ],
+                correct: 2,
+                explanation: "In der Automatentheorie ist ein Endzustand ein Merkmal eines Akzeptors (wird ein Wort akzeptiert?). In der Systemmodellierung steht er meistens einfach für den Abschluss eines Use-Cases."
+            }
+        ];
+
+        let correctCount = 0;
+        let mistakeCount = 0;
+
+        function initQuiz() {
+            const container = document.getElementById('quiz-container');
+
+            questions.forEach((q, qIndex) => {
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                card.id = `question-card-${qIndex}`;
+
+                const title = document.createElement('div');
+                title.className = 'question-title';
+                title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+                const text = document.createElement('div');
+                text.className = 'question-text';
+                text.textContent = q.text;
+
+                card.appendChild(title);
+                card.appendChild(text);
+
+                // --- NEU: SVG Injektion ---
+                if (q.svgId) {
+                    const svgSource = document.getElementById(q.svgId);
+                    if (svgSource) {
+                        const svgContainer = document.createElement('div');
+                        svgContainer.className = 'question-svg-container';
+                        // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                        svgContainer.innerHTML = svgSource.innerHTML;
+                        card.appendChild(svgContainer);
+                    } else {
+                        console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                    }
+                }
+                // --------------------------
+
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'options';
+
+                q.options.forEach((opt, optIndex) => {
+                    const btn = document.createElement('button');
+                    btn.textContent = opt;
+                    btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                    optionsContainer.appendChild(btn);
+                });
+
+                const feedback = document.createElement('div');
+                feedback.className = 'feedback';
+                feedback.id = `feedback-${qIndex}`;
+
+                card.appendChild(optionsContainer);
+                card.appendChild(feedback);
+                container.appendChild(card);
+            });
+        }
+
+        function handleAnswer(qIndex, optIndex, btnElement) {
+            const q = questions[qIndex];
+            const card = document.getElementById(`question-card-${qIndex}`);
+            const feedback = document.getElementById(`feedback-${qIndex}`);
+
+            if (card.classList.contains('completed')) return;
+
+            if (optIndex === q.correct) {
+                btnElement.classList.add('correct');
+                card.classList.add('completed');
+
+                const allBtns = card.querySelectorAll('button');
+                allBtns.forEach(b => b.disabled = true);
+
+                feedback.className = 'feedback correct-feedback';
+                feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+                feedback.style.display = 'block';
+
+                correctCount++;
+                updateProgress();
+            } else {
+                btnElement.classList.add('wrong');
+                btnElement.disabled = true;
+
+                mistakeCount++;
+                document.getElementById('mistake-counter').textContent = mistakeCount;
+
+                feedback.className = 'feedback wrong-feedback';
+                feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+                feedback.style.display = 'block';
+            }
+        }
+
+        function updateProgress() {
+            const percent = Math.round((correctCount / questions.length) * 100);
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('progress-text').textContent = percent + '%';
+
+            if (correctCount === questions.length) {
+                document.getElementById('final-mistakes').textContent = mistakeCount;
+                document.getElementById('final-result').style.display = 'block';
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", initQuiz);
+    </script>
+
+    <div id="svg-assets" style="display: none;">
+
+        <div id="svg-ampel">
+            <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow-ampel" viewBox="0 0 10 10" refX="25" refY="5" markerWidth="6" markerHeight="6"
+                        orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+                    </marker>
+                </defs>
+                <circle cx="200" cy="150" r="60" fill="none" stroke="#333" stroke-width="4" />
+                <text x="200" y="140" text-anchor="middle" font-family="sans-serif" font-size="22">ROT</text>
+                <line x1="155" y1="155" x2="245" y2="155" stroke="#333" stroke-width="3" />
+                <text x="200" y="185" text-anchor="middle" font-family="sans-serif" font-size="22">rot</text>
+
+                <circle cx="600" cy="150" r="60" fill="none" stroke="#333" stroke-width="4" />
+                <text x="600" y="140" text-anchor="middle" font-family="sans-serif" font-size="22">R_G</text>
+                <line x1="555" y1="155" x2="645" y2="155" stroke="#333" stroke-width="3" />
+                <text x="600" y="185" text-anchor="middle" font-family="sans-serif" font-size="22">r/g</text>
+
+                <circle cx="600" cy="450" r="60" fill="none" stroke="#333" stroke-width="4" />
+                <text x="600" y="440" text-anchor="middle" font-family="sans-serif" font-size="22">GRUEN</text>
+                <line x1="555" y1="455" x2="645" y2="455" stroke="#333" stroke-width="3" />
+                <text x="600" y="485" text-anchor="middle" font-family="sans-serif" font-size="22">gruen</text>
+
+                <circle cx="200" cy="450" r="60" fill="none" stroke="#333" stroke-width="4" />
+                <text x="200" y="440" text-anchor="middle" font-family="sans-serif" font-size="22">GELB</text>
+                <line x1="155" y1="455" x2="245" y2="455" stroke="#333" stroke-width="3" />
+                <text x="200" y="485" text-anchor="middle" font-family="sans-serif" font-size="22">gelb</text>
+
+                <path d="M 40 150 L 140 150" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-ampel)" />
+                <text x="90" y="135" text-anchor="middle" font-family="sans-serif" font-size="20">Start</text>
+
+                <path d="M 260 150 L 540 150" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-ampel)" />
+                <text x="400" y="135" text-anchor="middle" font-family="sans-serif" font-size="20">takt</text>
+
+                <path d="M 600 210 L 600 390" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-ampel)" />
+                <text x="635" y="310" text-anchor="middle" font-family="sans-serif" font-size="20">takt</text>
+
+                <path d="M 540 450 L 260 450" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-ampel)" />
+                <text x="400" y="485" text-anchor="middle" font-family="sans-serif" font-size="20">takt</text>
+
+                <path d="M 200 390 L 200 210" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-ampel)" />
+                <text x="160" y="310" text-anchor="middle" font-family="sans-serif" font-size="20">takt</text>
+            </svg>
+        </div>
+
+        <div id="svg-endet11">
+            <svg viewBox="0 0 900 450" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow-endet11" viewBox="0 0 10 10" refX="25" refY="5" markerWidth="6" markerHeight="6"
+                        orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+                    </marker>
+                </defs>
+                <circle cx="200" cy="250" r="50" fill="none" stroke="#333" stroke-width="4" />
+                <text x="200" y="258" text-anchor="middle" font-family="sans-serif" font-size="24">q0</text>
+
+                <circle cx="450" cy="250" r="50" fill="none" stroke="#333" stroke-width="4" />
+                <text x="450" y="258" text-anchor="middle" font-family="sans-serif" font-size="24">q1</text>
+
+                <circle cx="700" cy="250" r="50" fill="none" stroke="#333" stroke-width="4" />
+                <circle cx="700" cy="250" r="40" fill="none" stroke="#333" stroke-width="4" />
+                <text x="700" y="258" text-anchor="middle" font-family="sans-serif" font-size="24">q2</text>
+
+                <path d="M 60 250 L 150 250" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="105" y="235" text-anchor="middle" font-family="sans-serif" font-size="22">Start</text>
+
+                <path d="M 180 205 C 140 120, 260 120, 220 205" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="200" y="115" text-anchor="middle" font-family="sans-serif" font-size="22">0</text>
+
+                <path d="M 245 225 Q 325 180 405 225" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="325" y="190" text-anchor="middle" font-family="sans-serif" font-size="22">1</text>
+
+                <path d="M 405 275 Q 325 320 245 275" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="325" y="325" text-anchor="middle" font-family="sans-serif" font-size="22">0</text>
+
+                <path d="M 495 225 Q 575 180 655 225" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="575" y="190" text-anchor="middle" font-family="sans-serif" font-size="22">1</text>
+
+                <path d="M 680 205 Q 450 30 230 205" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="450" y="100" text-anchor="middle" font-family="sans-serif" font-size="22">0</text>
+
+                <path d="M 680 205 C 640 120, 760 120, 720 205" stroke="#333" stroke-width="4" fill="none"
+                    marker-end="url(#arrow-endet11)" />
+                <text x="700" y="115" text-anchor="middle" font-family="sans-serif" font-size="22">1</text>
+            </svg>
+        </div>
+
+    </div>
+
+</body>
+
+</html>

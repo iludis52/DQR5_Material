@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktives Quiz mit SVGs</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 40px;
+        }
+
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px;
+            /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar">
+        <div class="status-info">
+            <span>Fortschritt: <span id="progress-text">0%</span></span>
+            <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+    </div>
+
+    <h1 id="quiz-main-title">Automaten & Logik Quiz</h1>
+
+    <div class="quiz-container" id="quiz-container"></div>
+
+    <div class="quiz-container">
+        <div class="final-result" id="final-result">
+            <h2>Quiz abgeschlossen!</h2>
+            <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.
+            </p>
+            <button onclick="location.reload()"
+                style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz
+                neustarten</button>
+        </div>
+    </div>
+
+    <script>
+        // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+        const questions = [
+            {
+                text: "Was unterscheidet ein 'TypedDict' grundlegend von einem normalen Python-'dict'?",
+                options: [
+                    "Es ist ein normales dict, aber läuft in LangGraph schneller.",
+                    "Es definiert im Voraus feste Schlüssel und Datentypen für das Dictionary.",
+                    "Es kann ausschließlich Strings und Integer speichern.",
+                    "Es wird zur Laufzeit vom Browser kryptografisch validiert."
+                ],
+                correct: 1,
+                explanation: "Ein TypedDict legt zur Entwicklungszeit fest: 'Genau diese Felder gibt es, und sie haben genau diese Typen'[cite: 2]. Ein normales dict hingegen kann beliebige Schlüssel enthalten[cite: 2]."
+            },
+            {
+                text: "Welche Analogie verwendet der Text, um den Unterschied zwischen einem normalen 'dict' und einem 'TypedDict' zu verdeutlichen?",
+                options: [
+                    "Ein normales dict ist ein Rucksack, ein TypedDict ein Koffer.",
+                    "Ein normales dict ist ein leeres Blatt Papier, ein TypedDict ein Formular mit vorgegebenen Feldern.",
+                    "Ein normales dict ist ein Array, ein TypedDict eine verlinkte Liste.",
+                    "Ein normales dict ist ein DEA, ein TypedDict ein Moore-Automat."
+                ],
+                correct: 1,
+                explanation: "Das Dokument vergleicht ein normales dict mit einem leeren Blatt Papier (auf dem alles erlaubt ist) und ein TypedDict mit einem Formular mit vorgedruckten Feldern[cite: 2]."
+            },
+            {
+                text: "Welche der folgenden Aussagen gehört NICHT zu den drei primären Garantien, die ein TypedDict in LangGraph liefert?",
+                options: [
+                    "Struktur: Jeder Knoten weiß, welche Felder er lesen und schreiben kann.",
+                    "Performance-Boost: Das Programm läuft durch die Typisierung deutlich schneller.",
+                    "Fehlervermeidung: Typ-Checker können Tippfehler vor der Ausführung erkennen.",
+                    "Dokumentation: Man sieht sofort den 'Inhalt des Rucksacks'."
+                ],
+                correct: 1,
+                explanation: "Die drei im Text genannten Garantien sind Struktur, Dokumentation und Fehlervermeidung[cite: 2]. Von einer Performance-Steigerung durch TypedDicts ist nicht die Rede, da Python Typen zur Laufzeit standardmäßig nicht prüft."
+            },
+            {
+                text: "Was bedeutet das Prinzip des 'partiellen Updates' in LangGraph-Knoten?",
+                options: [
+                    "Ein Knoten gibt nur die Felder als dict zurück, die sich ändern; die anderen bleiben im State erhalten.",
+                    "Ein Knoten muss immer den gesamten State zurückgeben, aktualisiert aber nur Teile.",
+                    "Der Knoten löscht alle Felder aus dem State, die er nicht explizit zurückgibt.",
+                    "Das Update wird vom Framework nur teilweise und zeitverzögert übernommen."
+                ],
+                correct: 0,
+                explanation: "Wenn ein Knoten (wie im Beispiel 'klassifizieren') nur das Feld 'kategorie' zurückgibt, bleiben alle anderen Felder des States unverändert[cite: 2]. Dies ist das partielle Update[cite: 2]."
+            },
+            {
+                text: "Wie erkennt man in der Definition eines 'TypedDict', ob ein Feld bei Updates überschrieben wird oder ob neue Werte angehängt werden (Aggregierung)?",
+                options: [
+                    "An einem Kommentar '# reducer' neben dem Feld.",
+                    "An der Verwendung des 'Annotated'-Musters (z.B. Annotated[list, operator.add]).",
+                    "Das passiert bei jedem Feld vom Typ 'list' oder 'dict' automatisch.",
+                    "Man muss dafür in der jeweiligen Routing-Funktion nachschauen."
+                ],
+                correct: 1,
+                explanation: "Felder, die mit dem 'Annotated'-Muster und einer Reducer-Funktion versehen sind, aggregieren Werte[cite: 2]. Felder ohne Reducer (z.B. nur 'str') überschreiben den alten Wert[cite: 2]."
+            },
+            {
+                text: "Welche drei Schritte empfiehlt das Dokument, um ein TypedDict in einem LangGraph-Programm zu 'lesen'?",
+                options: [
+                    "1. Knoten zählen, 2. Kanten zählen, 3. Router prüfen.",
+                    "1. Felder auflisten, 2. Typen/Reducer prüfen, 3. Datenfluss nachvollziehen.",
+                    "1. Syntax prüfen, 2. Code ausführen, 3. Logs lesen.",
+                    "1. Startknoten finden, 2. Endknoten finden, 3. Endlosschleifen suchen."
+                ],
+                correct: 1,
+                explanation: "Der Text rät: Schritt 1 - Felder auflisten (Fächer des Rucksacks), Schritt 2 - Typen prüfen (Gibt es Reducer?), Schritt 3 - Datenfluss nachvollziehen (Wer liest/schreibt was?)[cite: 2]."
+            },
+            {
+                text: "In der Datenfluss-Tabelle (Knoten vs. Felder): Was passiert, wenn ein Knoten in ein 'Reducer-Feld' (z.B. nachrichten) schreibt?",
+                options: [
+                    "Der Knoten überschreibt die bisherige Nachricht mit der neuen.",
+                    "Der Knoten löscht die Liste vollständig und erstellt eine neue.",
+                    "Der Knoten hängt einen Wert an, ohne die bisherigen Einträge zu löschen.",
+                    "Das Schreiben in ein Reducer-Feld ist aus einem Knoten heraus verboten."
+                ],
+                correct: 2,
+                explanation: "Felder mit einem Reducer wachsen mit jedem Update[cite: 2]. Wenn ein Knoten dorthin schreibt, wird der neue Wert an die bestehende Sammlung (z.B. den Chatverlauf) angehängt[cite: 2]."
+            },
+            {
+                text: "Welcher Fehler tritt zur Laufzeit auf, wenn ein Knoten auf ein Feld zugreift, das im TypedDict vergessen (also nicht definiert) wurde?",
+                options: [
+                    "Ein KeyError zur Laufzeit.",
+                    "Ein SyntaxError beim Kompilieren.",
+                    "Eine Endlosschleife im Graphen.",
+                    "Gar keiner, LangGraph fügt vergessene Felder dynamisch hinzu."
+                ],
+                correct: 0,
+                explanation: "Laut der Tabelle 'Häufige Fehler beim State-Design' führt das Vergessen eines Feldes im TypedDict zu einem KeyError zur Laufzeit, sobald ein Knoten versucht, darauf zuzugreifen[cite: 2]."
+            },
+            {
+                text: "Was ist die Folge, wenn man bei einer Liste für den Chatverlauf den Reducer im TypedDict vergisst (z.B. nur 'list' statt 'Annotated[...]' schreibt)?",
+                options: [
+                    "Das Programm stürzt sofort beim ersten Knoten ab.",
+                    "Es können gar keine Nachrichten mehr im State gespeichert werden.",
+                    "Nur die letzte Nachricht überlebt, der gesamte vorherige Verlauf geht verloren.",
+                    "Typ-Checker wie mypy werfen sofort einen Kompilierungsfehler und blockieren den Code."
+                ],
+                correct: 2,
+                explanation: "Ohne den Reducer überschreibt jedes State-Update den alten Wert[cite: 2]. Bei einem Chatverlauf führt dieser Fehler dazu, dass jede neue Nachricht die Liste der alten Nachrichten komplett ersetzt[cite: 2]."
+            },
+            {
+                text: "Was passiert in Python standardmäßig zur Laufzeit, wenn man im TypedDict einen falschen Typ annotiert (z.B. 'int' statt 'str') und das Programm ausführt?",
+                options: [
+                    "Python wirft sofort einen Type-Error und stoppt die Ausführung.",
+                    "LangGraph versucht, den Datentyp automatisch in den richtigen Typ zu konvertieren.",
+                    "Es gibt keinen Laufzeitfehler, aber Typ-Checker (wie mypy) melden Warnungen im Vorfeld.",
+                    "Der Graph gerät durch die Typ-Diskrepanz in eine Endlosschleife."
+                ],
+                correct: 2,
+                explanation: "Python ist dynamisch typisiert und prüft Typ-Annotationen zur Laufzeit nicht strikt[cite: 2]. Ein falscher Typ führt daher nicht zum Laufzeitfehler, kann aber von statischen Typ-Checkern als Warnung markiert werden[cite: 2]."
+            }
+        ];
+
+        let correctCount = 0;
+        let mistakeCount = 0;
+
+        function initQuiz() {
+            const container = document.getElementById('quiz-container');
+
+            questions.forEach((q, qIndex) => {
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                card.id = `question-card-${qIndex}`;
+
+                const title = document.createElement('div');
+                title.className = 'question-title';
+                title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+                const text = document.createElement('div');
+                text.className = 'question-text';
+                text.textContent = q.text;
+
+                card.appendChild(title);
+                card.appendChild(text);
+
+                // --- NEU: SVG Injektion ---
+                if (q.svgId) {
+                    const svgSource = document.getElementById(q.svgId);
+                    if (svgSource) {
+                        const svgContainer = document.createElement('div');
+                        svgContainer.className = 'question-svg-container';
+                        // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                        svgContainer.innerHTML = svgSource.innerHTML;
+                        card.appendChild(svgContainer);
+                    } else {
+                        console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                    }
+                }
+                // --------------------------
+
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'options';
+
+                q.options.forEach((opt, optIndex) => {
+                    const btn = document.createElement('button');
+                    btn.textContent = opt;
+                    btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                    optionsContainer.appendChild(btn);
+                });
+
+                const feedback = document.createElement('div');
+                feedback.className = 'feedback';
+                feedback.id = `feedback-${qIndex}`;
+
+                card.appendChild(optionsContainer);
+                card.appendChild(feedback);
+                container.appendChild(card);
+            });
+        }
+
+        function handleAnswer(qIndex, optIndex, btnElement) {
+            const q = questions[qIndex];
+            const card = document.getElementById(`question-card-${qIndex}`);
+            const feedback = document.getElementById(`feedback-${qIndex}`);
+
+            if (card.classList.contains('completed')) return;
+
+            if (optIndex === q.correct) {
+                btnElement.classList.add('correct');
+                card.classList.add('completed');
+
+                const allBtns = card.querySelectorAll('button');
+                allBtns.forEach(b => b.disabled = true);
+
+                feedback.className = 'feedback correct-feedback';
+                feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+                feedback.style.display = 'block';
+
+                correctCount++;
+                updateProgress();
+            } else {
+                btnElement.classList.add('wrong');
+                btnElement.disabled = true;
+
+                mistakeCount++;
+                document.getElementById('mistake-counter').textContent = mistakeCount;
+
+                feedback.className = 'feedback wrong-feedback';
+                feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+                feedback.style.display = 'block';
+            }
+        }
+
+        function updateProgress() {
+            const percent = Math.round((correctCount / questions.length) * 100);
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('progress-text').textContent = percent + '%';
+
+            if (correctCount === questions.length) {
+                document.getElementById('final-mistakes').textContent = mistakeCount;
+                document.getElementById('final-result').style.display = 'block';
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", initQuiz);
+    </script>
+
+    <div id="svg-assets" style="display: none;">
+
+    </div>
+
+</body>
+
+</html>
