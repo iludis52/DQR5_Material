@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCA Profi-Quiz (Erweitert)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>PCA Masterclass (Erweitert)</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 10px 20px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was ist der wichtigste Vorverarbeitungsschritt (Preprocessing), bevor man eine PCA durchführt?",
+            options: [
+                "Alle Datenpunkte quadrieren und danach die absoluten Fehlerraten berechnen.",
+                "Standardisierung / Skalierung der Daten (z.B. auf Mittelwert 0 und Varianz 1).",
+                "Daten in Kategorien einteilen und anschließend alphabetisch neu sortieren.",
+                "Es ist keine Vorverarbeitung nötig, das Modell übernimmt die Formatierung."
+            ],
+            correct: 1,
+            explanation: "Absolut kritisch! Da PCA auf Varianz basiert, würden Features mit großen Zahlenwerten (z.B. Gehalt in Tausendern) Features mit kleinen Werten (z.B. Alter in Jahren) komplett dominieren, wenn man sie nicht vorher auf den gleichen Maßstab bringt."
+        },
+        {
+            text: "PCA gehört zu welcher Kategorie von Machine Learning Algorithmen?",
+            options: [
+                "Supervised Learning (Rein überwachtes Lernen).",
+                "Reinforcement Learning (Bestärkendes Lernen).",
+                "Unsupervised Learning (Unüberwachtes Lernen).",
+                "Deep Transfer Learning (Modellbasiertes Lernen)."
+            ],
+            correct: 2,
+            explanation: "Richtig. PCA benötigt keine Labels (Zielvariablen/y-Werte). Sie schaut sich nur die Struktur der Input-Daten (X) an, um Muster zu finden."
+        },
+        {
+            text: "Was ist ein 'Scree Plot' (Ellenbogen-Diagramm) im Kontext der PCA?",
+            options: [
+                "Ein visuelles Diagramm, das exakt aufzeigt, wie viele statistische Ausreißer es gibt.",
+                "Eine Grafik, die hilft zu entscheiden, wie viele Hauptkomponenten man behalten sollte.",
+                "Eine hochdimensionale Darstellung der Rohdaten, bevor man die Gewichtung durchführt.",
+                "Ein Verlaufsdiagramm, das die voraussichtliche Rechenzeit für das Modell prognostiziert."
+            ],
+            correct: 1,
+            explanation: "Genau. Der Scree Plot zeigt die erklärte Varianz pro Komponente. Man sucht oft den 'Knick' (Ellenbogen) in der Kurve, um zu entscheiden, ab wann weitere Komponenten kaum noch Information liefern."
+        },
+        {
+            text: "Wenn die erste Hauptkomponente (PC1) 60% der Varianz erklärt und die zweite (PC2) 25%, wie viel Information enthalten die übrigen Komponenten zusammen?",
+            options: [
+                "Exakt 100% (da die restlichen Datenpunkte hier aufaddiert werden).",
+                "Exakt 85% (da man die ersten beiden Werte hierbei zusammenzählt).",
+                "Exakt 15% (da die Summe aller Komponenten immer 100% ergeben muss).",
+                "Exakt 0% (da die übrigen Werte in der PCA automatisch entfallen)."
+            ],
+            correct: 2,
+            explanation: "Korrekt. Die Summe aller Komponenten muss immer 100% der ursprünglichen Varianz ergeben. 100% - 60% - 25% = 15%."
+        },
+        {
+            text: "Was ist oft der größte Nachteil, wenn man PCA auf seine Daten anwendet?",
+            options: [
+                "Die Gesamtdatenmenge wird dadurch signifikant und unkontrollierbar größer.",
+                "Die Interpretierbarkeit der Features geht stark verloren (Black-Box-Effekt).",
+                "Das trainierte ML-Modell wird durch die Transformation extrem verlangsamt.",
+                "Man kann danach keine lineare Regression mehr auf den Datensatz anwenden."
+            ],
+            correct: 1,
+            explanation: "Sehr wichtig! Ein Original-Feature wie 'Anzahl Schlafzimmer' versteht jeder. Eine Hauptkomponente ist aber eine mathematische Mischung aus *allen* Features (z.B. 0.3*Zimmer - 0.5*Alter + 0.1*Größe). Das ist schwer inhaltlich zu erklären."
+        },
+        {
+            text: "Sind Hauptkomponenten immer lineare Kombinationen der ursprünglichen Features?",
+            options: [
+                "Ja, PCA ist ein rein lineares Verfahren.",
+                "Nein, PCA ist hochgradig nicht-linear.",
+                "Nur bei Nutzung von Deep Neural Networks.",
+                "Das variiert je nach Datengröße extrem."
+            ],
+            correct: 0,
+            explanation: "Richtig. PCA dreht und streckt das Koordinatensystem nur (Matrixmultiplikation). Für krumme, nicht-lineare Zusammenhänge bräuchte man andere Verfahren wie t-SNE oder Kernel-PCA."
+        },
+        {
+            text: "Wie reagiert die PCA auf starke Ausreißer (Outliers) in den Daten?",
+            options: [
+                "Sie ignoriert diese Werte völlig automatisch, um die Stabilität des Modells zu bewahren.",
+                "Sie ist äußerst robust und lässt sich durch einzelne Extremwerte praktisch nicht ablenken.",
+                "Sie ist sehr empfindlich, da Ausreißer die Varianz (und damit die Richtung) stark verzerren.",
+                "Sie löscht betroffene Ausreißer im Vorfeld selbstständig aus dem ursprünglichen Datensatz."
+            ],
+            correct: 2,
+            explanation: "Stimmt. Da PCA versucht, Varianz zu maximieren, zieht ein weit entfernter Ausreißer die Hauptkomponente oft stark in seine Richtung. Ausreißer sollten vorher behandelt werden."
+        },
+        {
+            text: "Kann man aus den reduzierten Hauptkomponenten die Originaldaten wiederherstellen?",
+            options: [
+                "Nein, die Daten sind für immer unwiederbringlich gelöscht und lassen sich nicht rekonstruieren.",
+                "Ja, zu hundert Prozent exakt identisch, völlig unabhängig von der Anzahl entfernter Komponenten.",
+                "Ja, aber nur näherungsweise (mit Informationsverlust), wenn man Komponenten weggelassen hat.",
+                "Nur dann, wenn man den exakten Algorithmus zur Entschlüsselung und die Metadaten gespeichert hat."
+            ],
+            correct: 2,
+            explanation: "Genau. Man kann die Transformation umkehren (Inverse Transform). Aber die Details, die in den weggelassenen Komponenten (dem Rauschen) steckten, sind verloren. Man erhält eine 'geglättete' Version der Originaldaten."
+        },
+        {
+            text: "Wofür kann PCA neben dem Training von Modellen noch verwendet werden?",
+            options: [
+                "Zur Visualisierung von hochdimensionalen Daten (z.B. in Form von 2D- oder 3D-Plots).",
+                "Zur sicheren Verschlüsselung von sensiblen Passwörtern innerhalb großer Datenbanken.",
+                "Um relationale Datenbanken für schnelle und komplexe Suchanfragen optimal zu sortieren.",
+                "Um die Ladezeiten von großen Webseiten durch komprimierte HTML-Strukturen zu verkürzen."
+            ],
+            correct: 0,
+            explanation: "Ein klassischer Anwendungsfall! Wir können uns 50 Dimensionen nicht vorstellen. Mit PCA dampfen wir sie auf 2 oder 3 ein und können die Datenpunkte dann auf ein Blatt Papier zeichnen."
+        },
+        {
+            text: "Was bedeutet es, wenn der 'Eigenwert' (Eigenvalue) einer Komponente sehr klein ist?",
+            options: [
+                "Dass diese Komponente das Modell stark dominiert und zwingend im Datensatz bleiben muss.",
+                "Dass diese Komponente kaum Varianz (Information) erklärt und eventuell weggelassen wird.",
+                "Dass die zugrundeliegenden Datenpunkte korrupt sind und das Preprocessing fehlerhaft war.",
+                "Dass die interne mathematische Matrixberechnung des Algorithmus einen Fehler erzeugt hat."
+            ],
+            correct: 1,
+            explanation: "Richtig. Der Eigenwert ist ein Maß für die Varianz, die von einer Komponente abgedeckt wird. Kleiner Eigenwert = wenig Information = Kandidat zum Weglassen."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>

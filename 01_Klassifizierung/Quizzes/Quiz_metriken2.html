@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz 2: Vertiefung ML Metriken & ROC</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #8e44ad; /* Lila Akzent für Quiz 2 */
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .scenario-text {
+            display: block;
+            font-size: 1rem;
+            font-style: italic;
+            color: #555;
+            background: #fdf6ff;
+            padding: 10px;
+            border-left: 4px solid #8e44ad;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #fbf8ff;
+            border-color: #8e44ad;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #fbf5ff;
+            border: 2px solid #8e44ad;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Quiz 2: Vertiefung ML Metriken & ROC</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Vertiefungs-Quiz abgeschlossen!</h2>
+        <p>Du hast alle theoretischen Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #8e44ad; color: white; border: none; text-align: center; margin-top: 15px; padding: 10px 20px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "<span class='scenario-text'>Szenario: FaceID Sicherheitssystem für einen Banktresor.</span>Welche Fehlerrate musst du unbedingt minimieren, damit kein Fremder Zugriff erhält?",
+            options: [
+                "False Negative Rate (FNR)",
+                "False Positive Rate (FPR)",
+                "True Positive Rate (TPR)",
+                "True Negative Rate (TNR)"
+            ],
+            correct: 1,
+            explanation: "Genau! Ein False Positive bedeutet hier: Ein Unberechtigter (Negativ) wird fälschlicherweise als berechtigt erkannt. Das ist das größte Risiko."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Gegeben aus Confusion Matrix: TP = 80, FP = 20.</span>Wie hoch ist die Precision?",
+            options: [
+                "Exakt 0.20 (also 20%)",
+                "Genau 4.00 (also 400%)",
+                "Exakt 0.80 (also 80%)",
+                "Exakt 1.00 (also 100%)"
+            ],
+            correct: 2,
+            explanation: "Richtig. Formel: TP / (TP + FP) = 80 / (80 + 20) = 80 / 100 = 0.8."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Begriffsdefinition</span>Was beschreibt der F1-Score?",
+            options: [
+                "Das arithmetische Mittel von Precision und Recall.",
+                "Die absolute Summe aus True Positives und Negatives.",
+                "Das prozentuale Verhältnis von False Positives zu FN.",
+                "Das harmonische Mittel aus Precision und Recall."
+            ],
+            correct: 3,
+            explanation: "Korrekt. Der F1-Score balanciert beide Werte aus und bestraft es stark, wenn einer der beiden Werte schlecht ist."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: 990 gesunde und 10 kranke Patienten. Das Modell sagt IMMER 'Gesund'.</span>Welche Aussage trifft zu?",
+            options: [
+                "Der Recall erreicht perfekte 100%, das Modell ist fehlerfrei.",
+                "Die Precision liegt bei 99%, was für ein gutes Modell spricht.",
+                "Die Accuracy ist sehr hoch (99%), aber das Modell ist nutzlos.",
+                "Der F1-Score ist extrem hoch, da fast alle Patienten gesund sind."
+            ],
+            correct: 2,
+            explanation: "Stimmt. Accuracy ist (990+0)/1000 = 99%. Aber da keine Kranken gefunden werden (Recall=0%), ist das Modell wertlos."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Begriffsdefinition</span>Welche Metrik ist synonym zur 'True Positive Rate' (TPR)?",
+            options: [
+                "Genauigkeit (oder Precision)",
+                "Sensitivität (oder Recall)",
+                "Spezifität (oder TNR-Wert)",
+                "Trefferquote (oder Accuracy)"
+            ],
+            correct: 1,
+            explanation: "Richtig. Sensitivität, Recall und TPR bezeichnen mathematisch exakt dasselbe."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Theorie zur ROC-Kurve</span>Was wird auf der X-Achse der ROC-Kurve aufgetragen?",
+            options: [
+                "Die Metrik Precision (Genauigk.)",
+                "Die True Positive Rate (TPR)",
+                "Die allgemeine Accuracy (ACC)",
+                "Die False Positive Rate (FPR)"
+            ],
+            correct: 3,
+            explanation: "Genau. Die ROC-Kurve zeigt TPR (Y-Achse) gegen FPR (X-Achse)."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Theorie zur Area Under Curve (AUC)</span>Ein AUC-Wert von 0.5 bedeutet...",
+            options: [
+                "...das Modell arbeitet absolut fehlerfrei.",
+                "...das Modell macht durchgehend nur Fehler.",
+                "...das Modell rät nur (wie beim Münzwurf).",
+                "...die zugrundeliegenden Daten sind kaputt."
+            ],
+            correct: 2,
+            explanation: "Korrekt. 0.5 entspricht der Diagonalen in der ROC-Kurve – das ist so gut wie ein Münzwurf."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Begriffsdefinition</span>Welche Aussage beschreibt die 'Spezifität' korrekt?",
+            options: [
+                "Von allen als positiv Klassifizierten: Wie viele stimmen wirklich?",
+                "Von allen tatsächlich Positiven: Wie viele werden davon gefunden?",
+                "Der Anteil aller korrekten Entscheidungen im Verhältnis zum Ganzen.",
+                "Von allen tatsächlich Negativen: Wie viele werden korrekt erkannt?"
+            ],
+            correct: 3,
+            explanation: "Richtig. Spezifität (TNR) ist die Fähigkeit, den Normalzustand (Negativ) korrekt zu identifizieren."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Mathematischer Zusammenhang</span>Wie hängen FPR und Spezifität zusammen?",
+            options: [
+                "Beide Metriken sind völlig identisch.",
+                "Die Formel lautet: FPR = 1 - Spezifität.",
+                "Die Formel lautet: FPR = 1 / Spezifität.",
+                "Es gibt keinen mathematischen Bezug."
+            ],
+            correct: 1,
+            explanation: "Stimmt. Zusammen ergeben sie 100% aller negativen Fälle."
+        },
+        {
+            text: "<span class='scenario-text'>Szenario: Trade-off Analyse</span>Du erhöhst den Schwellenwert drastisch (nur bei 99% Sicherheit 'Positiv'). Was passiert?",
+            options: [
+                "Precision sinkt, Recall steigt stark.",
+                "Beide Metriken steigen stetig an.",
+                "Precision steigt, Recall sinkt stark.",
+                "Beide Metriken fallen deutlich ab."
+            ],
+            correct: 2,
+            explanation: "Exakt. Du wirst 'wählerischer' (weniger Fehler bei deinen Aussagen -> Precision hoch), übersiehst aber mehr Fälle (Recall runter)."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.innerHTML = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

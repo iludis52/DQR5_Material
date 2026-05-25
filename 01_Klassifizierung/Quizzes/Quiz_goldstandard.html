@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Gold-Standard Quiz</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; color: #333; }
+        .status-bar { position: sticky; top: 0; background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .status-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; }
+        .mistakes { color: #dc3545; }
+        .progress-container { width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
+        .quiz-container { max-width: 800px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
+        .quiz-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .question-text { font-size: 1.2rem; color: #2c3e50; margin-bottom: 20px; font-weight: 600; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px 15px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; text-align: left; }
+        button:hover:not([disabled]) { background-color: #f0f8ff; border-color: #3498db; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        button.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; text-decoration: line-through; }
+        .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .feedback.correct-feedback { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback.wrong-feedback { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .final-result { display: none; text-align: center; background: #e8f4fd; border: 2px solid #3498db; padding: 2rem; border-radius: 12px; margin-bottom: 40px; }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>🎓 ML-Pipeline & Gold-Standard</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Welcher Zustand wird in der Pipeline gespeichert, nachdem .fit() aufgerufen wurde?",
+            options: [
+                "Nur die gelernten mathematischen Gewichte des Classifiers.",
+                "Sowohl die Skalierungsparameter als auch die Modellgewichte.",
+                "Der gesamte ursprüngliche Trainingsdatensatz im Rohformat.",
+                "Ausschließlich die Metadaten der Features ohne Modellparameter."
+            ],
+            correct: 1,
+            explanation: "Die Pipeline konserviert die Zustände aller Schritte: Der Scaler speichert z.B. Mittelwerte/Standardabweichungen, der Classifier seine gelernten Parameter."
+        },
+        {
+            text: "Warum wird cross_val_score auf X_train angewendet und nicht auf den gesamten Datensatz X?",
+            options: [
+                "Um das Test-Set als absolut unberührte Instanz zu bewahren.",
+                "Weil Scikit-Learn sonst eine technische Fehlermeldung ausgibt.",
+                "Damit die gesamte Rechenzeit im Training verkürzt werden kann.",
+                "Weil das Modell sonst keine statistische Validität mehr besitzt."
+            ],
+            correct: 0,
+            explanation: "Das Test-Set ist die finale, unabhängige 'Real-World'-Simulation. Es darf nicht in Modell- oder Pipeline-Entscheidungen einfließen."
+        },
+        {
+            text: "Was passiert technisch bei pipeline.score(X_test, y_test)?",
+            options: [
+                "Die Testdaten werden komplett neu skaliert (neuer Fit-Vorgang).",
+                "X_test wird mit Trainings-Parametern transformiert und bewertet.",
+                "Es wird nur die Genauigkeit ohne jegliche Skalierung berechnet.",
+                "Die Testdaten werden zur weiteren Verfeinerung des Trends genutzt."
+            ],
+            correct: 1,
+            explanation: "Beim Score wird kein neuer Fit durchgeführt. X_test wird via transform (mit Parametern aus dem Train-Fit) verarbeitet und dann bewertet."
+        },
+        {
+            text: "Die Pipeline nutzt StandardScaler(). Für welchen Algorithmus wäre dieser Schritt UNNÖTIG?",
+            options: [
+                "Support Vector Machines (SVM) zur Trennung der Hyper-Ebenen.",
+                "Random Forest (oder auch andere baumbasierte Algorithmen).",
+                "K-Nearest Neighbors (KNN) zur Bestimmung der Punkt-Distanzen.",
+                "Logistische Regression zur Klassifizierung der Klassen-Labels."
+            ],
+            correct: 1,
+            explanation: "Baumbasierte Modelle sind skaleninvariant, weil Splits auf Schwellenwerten je Feature basieren."
+        },
+        {
+            text: "Welche Aussage beschreibt 'Data Leakage' im Kontext von Skalierung am besten?",
+            options: [
+                "Wenn das Modell im Training viel zu viele Epochen durchläuft.",
+                "Wenn Informationen aus Testdaten in Trainingsschritte einfließen.",
+                "Wenn man versehentlich einen falschen Random-Seed im Code nutzt.",
+                "Wenn der Datensatz insgesamt viel zu wenig Features aufweist."
+            ],
+            correct: 1,
+            explanation: "Leakage bedeutet: Parameter/Entscheidungen werden mit Daten bestimmt, die eigentlich als 'unbekannt' gelten sollten."
+        },
+        {
+            text: "Warum ist eine Pipeline selbst dann sinnvoll, wenn man nur skaliert (kein PCA, keine Selection)?",
+            options: [
+                "Weil sie die benötigte Rechenzeit in jedem Durchlauf halbiert.",
+                "Weil sie die korrekte Skalierung pro Fold in der CV garantiert.",
+                "Weil Logistic Regression ohne Pipeline technisch nicht funktioniert.",
+                "Weil dadurch die Daten automatisch in Normalverteilung kommen."
+            ],
+            correct: 1,
+            explanation: "Der Hauptgewinn ist methodische Korrektheit: fit() des Scalers geschieht pro Fold nur auf dem jeweiligen Trainingsanteil."
+        },
+        {
+            text: "Welche Reihenfolge ist in einer Pipeline für 'StandardScaler' und 'LogisticRegression' korrekt?",
+            options: [
+                "Zuerst die LogisticRegression, danach erst der StandardScaler.",
+                "Der StandardScaler und die Regression laufen parallel im System.",
+                "Zuerst der StandardScaler, danach erst die LogisticRegression.",
+                "Die Reihenfolge der Schritte ist für das Ergebnis völlig egal."
+            ],
+            correct: 2,
+            explanation: "Vorverarbeitung (Transformer) muss vor dem Modell kommen, damit das Modell konsistent auf transformierten Features trainiert."
+        },
+        {
+            text: "Was ist der wichtigste Grund für stratify=y beim Train-Test-Split in der Klassifikation?",
+            options: [
+                "Damit die Feature-Skalierung im Training besser funktioniert.",
+                "Damit die Klassenverteilung in Train und Test ähnlich bleibt.",
+                "Damit alle Daten im Speicher komplett zufällig sortiert werden.",
+                "Damit das Modell schneller konvergiert und Zeit eingespart wird."
+            ],
+            correct: 1,
+            explanation: "Stratifizierung stabilisiert die Evaluation: Train/Test enthalten ähnliche Klassenanteile, besonders wichtig bei unbalancierten Daten."
+        },
+        {
+            text: "Was ist der konzeptionelle Unterschied zwischen 'Cross-Validation' und dem finalen Test-Set?",
+            options: [
+                "Cross-Validation ersetzt ein Test-Set im Workflow vollständig.",
+                "CV dient der Modellwahl, das Test-Set der finalen Schätzung.",
+                "Das Test-Set wird in jedem Fold einmal zum Training genutzt.",
+                "CV ist für die Fehlersuche, das Test-Set für die Visualisierung."
+            ],
+            correct: 1,
+            explanation: "CV ist Teil der Trainingsphase (Modellvergleich, Robustheit). Das Test-Set ist die finale, unabhängige Messung."
+        },
+        {
+            text: "Welche Situation ist ein typischer Grund für 'max_iter' bei LogisticRegression zu erhöhen?",
+            options: [
+                "Wenn das Modell im Training zu stark zum Overfitting neigt.",
+                "Wenn der Optimierer nicht konvergiert (ConvergenceWarning).",
+                "Wenn die vorliegenden Daten insgesamt viel zu wenig Features haben.",
+                "Wenn das Modell die Klassen-Balance nicht richtig erkennen kann."
+            ],
+            correct: 1,
+            explanation: "Logistische Regression wird iterativ optimiert. Bei fehlender Konvergenz helfen mehr Iterationen (und gute Skalierung)."
+        },
+        {
+            text: "Welche Aussage über Pipeline-Schritte in sklearn ist korrekt?",
+            options: [
+                "Jeder einzelne Schritt muss zwingend ein predict() besitzen.",
+                "Transformer brauchen fit/transform, der Letzte fit/predict.",
+                "Die Reihenfolge der Schritte ist egal, solange die Namen passen.",
+                "Man darf maximal drei Schritte in einer Pipeline kombinieren."
+            ],
+            correct: 1,
+            explanation: "Transformer (vorletzte Schritte) liefern transformiertes X; der finale Estimator liefert die Vorhersagen."
+        },
+        {
+            text: "Du hast kategoriale Features (z.B. Farbe). Was ist der saubere Weg im Gold-Standard-Stil?",
+            options: [
+                "Kategoriale Spalten einfach ignorieren, damit nichts kaputtgeht.",
+                "Vor dem Split One-Hot-Encoding auf dem ganzen Datensatz machen.",
+                "ColumnTransformer (OneHotEncoder + Scaler) in der Pipeline nutzen.",
+                "Den gesamten Datensatz manuell in numerische Werte umschreiben."
+            ],
+            correct: 2,
+            explanation: "Gemischte Datentypen sauber per ColumnTransformer in die Pipeline: alles wird fold-sicher gefittet, ohne Leakage."
+        },
+        {
+            text: "Welche Aussage zur Speicherung (joblib.dump) ist konzeptionell am wichtigsten?",
+            options: [
+                "Man speichert nur den Classifier, um Speicherplatz zu sparen.",
+                "Man speichert die gesamte Pipeline für volle Reproduzierbarkeit.",
+                "Man speichert zusätzlich immer den kompletten Trainingsdatensatz.",
+                "Man speichert nur die Log-Files, um das Training zu analysieren."
+            ],
+            correct: 1,
+            explanation: "Deployment braucht dieselbe Vorverarbeitung wie Training. Pipeline-Speicherung verhindert 'Training/Serving Skew'."
+        },
+        {
+            text: "Wofür steht der Parameter random_state (z.B. im Split oder in CV)?",
+            options: [
+                "Er garantiert mathematisch immer eine viel bessere Accuracy.",
+                "Er macht Zufallsprozesse reproduzierbar (gleiche Splits/Folds).",
+                "Er sorgt aktiv dafür, dass das Modell niemals overfittet.",
+                "Er optimiert die Verarbeitungsgeschwindigkeit des Prozessors."
+            ],
+            correct: 1,
+            explanation: "random_state fixiert den Zufallszahlengenerator und macht Experimente wiederholbar."
+        },
+        {
+            text: "Du wählst das beste Modell anhand von CV-Ergebnissen aus. Welche Praxis ist am saubersten?",
+            options: [
+                "Das Test-Set mehrfach nutzen, bis ein Modell gut aussieht.",
+                "Modellwahl über CV auf X_train; Test-Set nur einmal am Ende.",
+                "Test-Set ganz weglassen, weil CV zur Evaluierung immer reicht.",
+                "Das finale Modell auf dem gesamten Datensatz ohne CV wählen."
+            ],
+            correct: 1,
+            explanation: "Das Test-Set ist kein Optimierungswerkzeug. Mehrfaches 'Draufschauen' führt zu indirektem Overfitting auf das Test-Set."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+</body>
+</html>
