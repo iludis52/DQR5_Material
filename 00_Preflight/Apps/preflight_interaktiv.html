@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preflight-Check: ML-Arbeitsumgebung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --dark-blue: #1B3A5C;
+  --mid-blue: #2E75B6;
+  --light-blue: #D5E8F0;
+  --bg: #F4F7FA;
+  --card-bg: #FFFFFF;
+  --text: #1B3A5C;
+  --text-secondary: #5A6F85;
+  --text-muted: #8A9BB0;
+  --border: #DCE4ED;
+  --green: #2D8B4E;
+  --green-bg: #E8F5E9;
+  --green-light: #d4edda;
+  --orange: #D97B00;
+  --orange-bg: #FFF3E0;
+  --overlay-bg: rgba(27,58,92,0.5);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow-sm: 0 1px 3px rgba(27,58,92,0.06);
+  --shadow-lg: 0 12px 40px rgba(27,58,92,0.15);
+  --font: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.page { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+.header { text-align: center; margin-bottom: 32px; }
+.header-label { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mid-blue); background: var(--light-blue); padding: 4px 12px; border-radius: 20px; margin-bottom: 12px; }
+.header h1 { font-size: 28px; font-weight: 600; color: var(--dark-blue); margin-bottom: 6px; letter-spacing: -0.02em; }
+.header p { font-size: 15px; color: var(--text-secondary); }
+.progress-card { background: var(--card-bg); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); position: sticky; top: 12px; z-index: 50; }
+.progress-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.progress-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.progress-count { font-size: 14px; font-weight: 600; color: var(--mid-blue); font-family: var(--mono); }
+.progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--mid-blue), var(--green)); border-radius: 4px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.progress-sections { display: flex; gap: 6px; margin-top: 10px; }
+.progress-dot { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background 0.3s; }
+.progress-dot.done { background: var(--green); }
+.progress-dot.partial { background: var(--orange); }
+.section { margin-bottom: 16px; }
+.section-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--card-bg); border-radius: var(--radius) var(--radius) 0 0; border: 1px solid var(--border); border-bottom: none; cursor: pointer; user-select: none; transition: background 0.2s; }
+.section-header:hover { background: var(--bg); }
+.section.complete .section-header { border-color: var(--green); }
+.section-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.section-title { flex: 1; font-size: 15px; font-weight: 600; color: var(--dark-blue); }
+.section-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; transition: all 0.3s; font-family: var(--mono); }
+.section-chevron { width: 20px; height: 20px; color: var(--text-muted); transition: transform 0.3s; flex-shrink: 0; }
+.section.open .section-chevron { transform: rotate(180deg); }
+.section-body { background: var(--card-bg); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; max-height: 0; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.section.open .section-body { max-height: 600px; }
+.section.complete .section-body { border-color: var(--green); }
+.item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border); transition: background 0.15s; }
+.item:first-child { border-top: 1px solid var(--border); }
+.item-text { flex: 1; font-size: 14px; color: var(--text); padding-top: 4px; line-height: 1.55; }
+.item.answered-yes .item-text { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--border); }
+.item-buttons { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-ja, .btn-nein { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1.5px solid var(--border); background: var(--card-bg); color: var(--text-secondary); }
+.btn-ja:hover { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+.btn-nein:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-bg); }
+.btn-ja.active { background: var(--green); color: white; border-color: var(--green); }
+.btn-nein.active { background: var(--orange); color: white; border-color: var(--orange); }
+.overlay { position: fixed; inset: 0; background: var(--overlay-bg); z-index: 100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.overlay.visible { opacity: 1; pointer-events: auto; }
+.flyout { background: var(--card-bg); border-radius: 20px 20px 0 0; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 28px 24px 40px; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: var(--shadow-lg); }
+.overlay.visible .flyout { transform: translateY(0); }
+.flyout-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+.flyout-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+.flyout-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.flyout-title { font-size: 18px; font-weight: 600; color: var(--dark-blue); margin-bottom: 2px; }
+.flyout-subtitle { font-size: 13px; color: var(--text-muted); }
+.flyout-section { margin-bottom: 18px; }
+.flyout-section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; }
+.flyout-rule { background: var(--green-bg); border-left: 3px solid var(--green); padding: 12px 16px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 14px; font-weight: 500; color: var(--dark-blue); line-height: 1.55; margin-bottom: 18px; }
+.flyout-steps { list-style: none; counter-reset: steps; }
+.flyout-steps li { counter-increment: steps; display: flex; gap: 10px; padding: 8px 0; font-size: 14px; color: var(--text); line-height: 1.5; border-bottom: 1px solid var(--border); }
+.flyout-steps li:last-child { border-bottom: none; }
+.flyout-steps li::before { content: counter(steps); display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--light-blue); color: var(--mid-blue); font-size: 12px; font-weight: 600; flex-shrink: 0; margin-top: 1px; }
+.flyout-pitfall { background: var(--orange-bg); border-left: 3px solid var(--orange); padding: 12px 16px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 13px; color: #7A4500; line-height: 1.55; }
+.flyout-close { display: block; width: 100%; padding: 12px; margin-top: 20px; font-family: var(--font); font-size: 14px; font-weight: 600; color: white; background: var(--mid-blue); border: none; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s; }
+.flyout-close:hover { background: var(--dark-blue); }
+.platform-toggle { display: inline-flex; background: var(--bg); border-radius: 6px; padding: 2px; margin-bottom: 12px; border: 1px solid var(--border); }
+.platform-btn { font-family: var(--font); font-size: 12px; font-weight: 500; padding: 4px 14px; border: none; background: none; border-radius: 4px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
+.platform-btn.active { background: var(--card-bg); color: var(--dark-blue); box-shadow: var(--shadow-sm); }
+.platform-steps { display: none; }
+.platform-steps.active { display: block; }
+.reset-row { text-align: center; margin-top: 24px; }
+.reset-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 8px 20px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--card-bg); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+.reset-btn:hover { border-color: var(--mid-blue); color: var(--mid-blue); }
+.completion { text-align: center; padding: 24px; background: var(--green-bg); border: 1.5px solid var(--green); border-radius: var(--radius); margin-top: 20px; display: none; }
+.completion.visible { display: block; }
+.completion-icon { font-size: 32px; margin-bottom: 8px; }
+.completion h3 { font-size: 18px; font-weight: 600; color: var(--green); margin-bottom: 4px; }
+.completion p { font-size: 14px; color: var(--text-secondary); }
+@media (max-width: 480px) { .header h1 { font-size: 22px; } .item { flex-direction: column; gap: 8px; } .item-buttons { align-self: flex-end; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-label">Vor jeder Session</div>
+    <h1>Preflight-Check</h1>
+    <p>Arbeitsumgebung f&uuml;r ML-Projekte &mdash; ehrliche Selbstdiagnose</p>
+  </div>
+  <div class="progress-card" id="progressCard">
+    <div class="progress-top">
+      <span class="progress-label">Fortschritt</span>
+      <span class="progress-count" id="progressCount">0 / 23</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-sections" id="progressDots"></div>
+  </div>
+  <div id="sectionsContainer"></div>
+  <div class="completion" id="completion">
+    <div class="completion-icon">&#x2705;</div>
+    <h3>Startklar!</h3>
+    <p>Alle Punkte beantwortet. Bei &bdquo;Nein&ldquo;-Antworten: Klicke erneut, um die Hilfe aufzurufen.</p>
+  </div>
+  <div class="reset-row">
+    <button class="reset-btn" onclick="resetAll()">Zur&uuml;cksetzen</button>
+  </div>
+</div>
+<div class="overlay" id="overlay" onclick="closeFlyout(event)">
+  <div class="flyout" id="flyout" onclick="event.stopPropagation()">
+    <div class="flyout-handle"></div>
+    <div id="flyoutContent"></div>
+    <button class="flyout-close" onclick="closeFlyout()">Verstanden</button>
+  </div>
+</div>
+<script>
+
+var sections = [
+  {
+    id: "a", icon: "\uD83D\uDCC2", title: "A \u2014 Dateisystem & Pfade",
+    color: "#2E75B6", bg: "#E6F1FB",
+    items: [
+      "Ich wei\u00DF, wo heruntergeladene Dateien gespeichert werden.",
+      "Ich kann lokal vs. Cloud-Ordner unterscheiden (OneDrive, iCloud).",
+      "Absoluter vs. relativer Pfad ist mir klar.",
+      "Ich kann Dateien gezielt kopieren / verschieben."
+    ],
+    help: {
+      rule: "Alle Projektdateien m\u00FCssen lokal liegen \u2014 nicht in einem Cloud-synchronisierten Ordner.",
+      stepsWin: [
+        "Explorer \u00F6ffnen (Windows-Taste + E).",
+        "Links auf \u201EDieser PC\u201C klicken.",
+        "Doppelklick auf C: \u2192 Benutzer \u2192 dein Name.",
+        "Rechtsklick \u2192 Neu \u2192 Ordner \u2192 \u201Eprojekte\u201C nennen.",
+        "Pr\u00FCfe: Enth\u00E4lt der Pfad \u201EOneDrive\u201C? Falls ja: Falscher Ort!"
+      ],
+      stepsMac: [
+        "Finder \u00F6ffnen (Cmd + Leertaste \u2192 \u201EFinder\u201C).",
+        "Men\u00FC: Gehe zu \u2192 Benutzerordner.",
+        "Rechtsklick \u2192 Neuer Ordner \u2192 \u201Eprojekte\u201C nennen.",
+        "Pr\u00FCfe: Liegt der Ordner unter /Users/deinname/projekte?",
+        "Achtung: iCloud-Ordner meiden!"
+      ],
+      pitfall: "OneDrive-Falle: Unter Windows liegt der Desktop oft in C:\\Users\\name\\OneDrive\\Desktop \u2014 alles dort wird synchronisiert."
+    }
+  },
+  {
+    id: "b", icon: "\uD83D\uDDC2\uFE0F", title: "B \u2014 Projektordner & Struktur",
+    color: "#2D8B4E", bg: "#E8F5E9",
+    items: [
+      "Jedes Projekt hat einen eigenen Ordner (nicht Desktop / Downloads).",
+      "Ich erstelle Unterordner: data/, notebooks/, models/, scripts/.",
+      "Neue Dateien landen bewusst im richtigen Unterordner.",
+      "Ich verstehe, warum alle Dateien im selben Ordnerbaum liegen m\u00FCssen."
+    ],
+    help: {
+      rule: "Jedes Projekt bekommt einen eigenen Ordner mit fester Unterstruktur. Immer. Ohne Ausnahme.",
+      stepsWin: [
+        "Explorer \u2192 C:\\Users\\name\\projekte.",
+        "Rechtsklick \u2192 Neu \u2192 Ordner \u2192 \u201Esklearn-kurs\u201C.",
+        "Doppelklick auf sklearn-kurs.",
+        "Vier neue Ordner erstellen: data, notebooks, models, scripts.",
+        "Rechtsklick auf sklearn-kurs \u2192 \u201EMit Code \u00F6ffnen\u201C."
+      ],
+      stepsMac: [
+        "Finder \u2192 /Users/name/projekte.",
+        "Rechtsklick \u2192 Neuer Ordner \u2192 \u201Esklearn-kurs\u201C.",
+        "Doppelklick auf sklearn-kurs.",
+        "Vier neue Ordner erstellen: data, notebooks, models, scripts.",
+        "Rechtsklick auf sklearn-kurs \u2192 \u201EOpen with Code\u201C."
+      ],
+      pitfall: "Relative Pfade funktionieren nur, wenn das Notebook im erwarteten Ordner liegt. \u00D6ffne immer den Projektordner in VS\u00A0Code!"
+    }
+  },
+  {
+    id: "c", icon: "\uD83D\uDCBB", title: "C \u2014 Datei-Explorer & VS\u00A0Code",
+    color: "#6C4DC4", bg: "#EEEDFE",
+    items: [
+      "Ich kann im Explorer / Finder gezielt zu einem Ordner navigieren.",
+      "Ich kann einen Ordner per Rechtsklick in VS\u00A0Code \u00F6ffnen.",
+      "VS\u00A0Code \u00F6ffnet immer einen Ordner als Arbeitsbereich \u2014 verstanden.",
+      "Ich kann in der VS\u00A0Code-Seitenleiste Dateien erstellen und verschieben."
+    ],
+    help: {
+      rule: "Du \u00F6ffnest immer den Projektordner in VS\u00A0Code \u2014 nie eine einzelne Datei.",
+      stepsWin: [
+        "Explorer \u2192 zum Projektordner navigieren.",
+        "Rechtsklick auf den Ordner \u2192 \u201EMit Code \u00F6ffnen\u201C.",
+        "VS\u00A0Code: Seitenleiste zeigt die Ordnerstruktur.",
+        "Neue Datei: Rechtsklick in der Seitenleiste \u2192 \u201ENeue Datei\u201C.",
+        "Titelleiste pr\u00FCfen: Ordnername muss sichtbar sein."
+      ],
+      stepsMac: [
+        "Finder \u2192 zum Projektordner navigieren.",
+        "Rechtsklick auf den Ordner \u2192 \u201EOpen with Code\u201C.",
+        "VS\u00A0Code: Seitenleiste zeigt die Ordnerstruktur.",
+        "Neue Datei: Rechtsklick in der Seitenleiste \u2192 \u201ENew File\u201C.",
+        "Titelleiste pr\u00FCfen: Ordnername muss sichtbar sein."
+      ],
+      pitfall: "H\u00E4ufiger Fehler: Datei \u2192 \u00D6ffnen \u2192 einzelne .ipynb-Datei. Dann hat VS\u00A0Code keinen Ordner-Kontext!"
+    }
+  },
+  {
+    id: "d", icon: "\uD83D\uDC0D", title: "D \u2014 Python-Environments (VS\u00A0Code)",
+    color: "#D97B00", bg: "#FFF3E0",
+    items: [
+      "Ich wei\u00DF, was ein virtuelles Environment ist und warum es existiert.",
+      "Ich kann \u00FCber die \u201EPython Environments\u201C-Extension ein Environment erstellen.",
+      "Ich kann in VS\u00A0Code den richtigen Python-Interpreter ausw\u00E4hlen.",
+      "Pakete sind nur im aktiven Environment verf\u00FCgbar \u2014 verstanden."
+    ],
+    help: {
+      rule: "Jedes Projekt hat ein eigenes Environment. Erstellt und verwaltet \u00FCber die \u201EPython Environments\u201C-Extension in VS\u00A0Code.",
+      stepsWin: [
+        "VS\u00A0Code \u00F6ffnen mit Projektordner.",
+        "Extensions: \u201EPython Environments\u201C installieren.",
+        "Ctrl+Shift+P \u2192 \u201ECreate Environment\u201C.",
+        "Typ: \u201EVenv\u201C w\u00E4hlen \u2192 Python-Version ausw\u00E4hlen.",
+        "Statusleiste unten links: Environment-Name pr\u00FCfen."
+      ],
+      stepsMac: [
+        "VS\u00A0Code \u00F6ffnen mit Projektordner.",
+        "Extensions: \u201EPython Environments\u201C installieren.",
+        "Cmd+Shift+P \u2192 \u201ECreate Environment\u201C.",
+        "Typ: \u201EVenv\u201C w\u00E4hlen \u2192 Python-Version ausw\u00E4hlen.",
+        "Statusleiste unten links: Environment-Name pr\u00FCfen."
+      ],
+      pitfall: "Das Environment ist an den Projektordner gebunden. Anderer Ordner = anderes (oder kein) Environment!"
+    }
+  },
+  {
+    id: "e", icon: "\uD83D\uDCBE", title: "E \u2014 Speicherplatz & Hygiene",
+    color: "#C0392B", bg: "#FDE8E8",
+    items: [
+      "Ich wei\u00DF, wie viel Platz auf meiner Festplatte frei ist.",
+      "Ich kann gro\u00DFe, unn\u00F6tige Dateien finden und l\u00F6schen.",
+      "Jupyter-Outputs vor dem Speichern l\u00F6schen \u2014 kenne ich."
+    ],
+    help: {
+      rule: "Pr\u00FCfe vor jeder Arbeitssession, ob mindestens 5\u00A0GB frei sind.",
+      stepsWin: [
+        "Explorer \u00F6ffnen \u2192 \u201EDieser PC\u201C.",
+        "Rechtsklick auf C: \u2192 Eigenschaften.",
+        "Freier Speicher wird als Balken angezeigt.",
+        "Aufr\u00E4umen: Einstellungen \u2192 System \u2192 Speicher.",
+        "Alte .venv-Ordner im Explorer l\u00F6schen."
+      ],
+      stepsMac: [
+        "Apple-Men\u00FC \u2192 \u00DCber diesen Mac \u2192 Festplatten.",
+        "(oder: Systemeinstellungen \u2192 Allgemein \u2192 Speicher)",
+        "Freier Speicher wird farblich dargestellt.",
+        "Gro\u00DFe Dateien im Finder suchen (Cmd+F \u2192 Gr\u00F6\u00DFe).",
+        "Alte .venv-Ordner im Finder l\u00F6schen."
+      ],
+      pitfall: "Jupyter-Notebooks mit Outputs k\u00F6nnen hunderte MB gro\u00DF werden. Alte .venv-Ordner belegen jeweils mehrere GB."
+    }
+  },
+  {
+    id: "f", icon: "\uD83D\uDD17", title: "F \u2014 Dateien orchestrieren",
+    color: "#0F6E56", bg: "#E1F5EE",
+    items: [
+      "Datenfluss nachvollziehen: Daten \u2192 Training \u2192 Modell \u2192 App.",
+      "Ich kann .pkl / .joblib an definiertem Ort speichern und laden.",
+      "Ordnerstruktur f\u00FCr Gradio-Deployment ist mir klar."
+    ],
+    help: {
+      rule: "Du musst den Datenfluss deines Projekts kennen: Welche Datei erzeugt was, und welche liest es ein?",
+      stepsWin: [
+        "Datenfluss aufzeichnen: Daten \u2192 Training \u2192 Modell \u2192 App.",
+        "train.py speichert Modell in models/ (z.\u00A0B. models/model.pkl).",
+        "app.py l\u00E4dt Modell aus models/ \u2014 mit demselben Pfad.",
+        "Beide Skripte m\u00FCssen im selben VS\u00A0Code-Arbeitsbereich liegen.",
+        "Testen: Funktioniert app.py, wenn aus dem Projektordner gestartet?"
+      ],
+      stepsMac: [
+        "Datenfluss aufzeichnen: Daten \u2192 Training \u2192 Modell \u2192 App.",
+        "train.py speichert Modell in models/ (z.\u00A0B. models/model.pkl).",
+        "app.py l\u00E4dt Modell aus models/ \u2014 mit demselben Pfad.",
+        "Beide Skripte m\u00FCssen im selben VS\u00A0Code-Arbeitsbereich liegen.",
+        "Testen: Funktioniert app.py, wenn aus dem Projektordner gestartet?"
+      ],
+      pitfall: "train.py und app.py verwenden unterschiedliche Pfade f\u00FCr das Modell. Relative Pfade sind immer relativ zum VS\u00A0Code-Arbeitsbereich!"
+    }
+  }
+];
+
+var state = {};
+sections.forEach(function(s) { s.items.forEach(function(_, i) { state[s.id + i] = null; }); });
+var openSections = {};
+sections.forEach(function(s) { openSections[s.id] = true; });
+
+function render() {
+  var total = Object.keys(state).length;
+  var answered = 0;
+  for (var k in state) { if (state[k] !== null) answered++; }
+  document.getElementById("progressFill").style.width = (answered / total * 100) + "%";
+  document.getElementById("progressCount").textContent = answered + " / " + total;
+
+  var dotsHtml = "";
+  sections.forEach(function(s) {
+    var sAnswered = 0;
+    s.items.forEach(function(_, i) { if (state[s.id + i] !== null) sAnswered++; });
+    var cls = sAnswered === s.items.length ? "done" : sAnswered > 0 ? "partial" : "";
+    dotsHtml += '<div class="progress-dot ' + cls + '"></div>';
+  });
+  document.getElementById("progressDots").innerHTML = dotsHtml;
+
+  var container = document.getElementById("sectionsContainer");
+  container.innerHTML = "";
+  sections.forEach(function(s) {
+    var sAnswered = 0;
+    s.items.forEach(function(_, i) { if (state[s.id + i] !== null) sAnswered++; });
+    var complete = sAnswered === s.items.length;
+    var isOpen = openSections[s.id];
+    var div = document.createElement("div");
+    div.className = "section" + (complete ? " complete" : "") + (isOpen ? " open" : "");
+    var itemsHtml = "";
+    s.items.forEach(function(item, i) {
+      var key = s.id + i;
+      var v = state[key];
+      var cls = v === true ? "answered-yes" : v === false ? "answered-nein" : "";
+      itemsHtml += '<div class="item ' + cls + '"><div class="item-text">' + item + '</div><div class="item-buttons"><button class="btn-ja' + (v === true ? " active" : "") + '" onclick="answer(\'' + key + '\',true,\'' + s.id + '\')">Ja</button><button class="btn-nein' + (v === false ? " active" : "") + '" onclick="answer(\'' + key + '\',false,\'' + s.id + '\')">Nein</button></div></div>';
+    });
+    div.innerHTML = '<div class="section-header" onclick="toggleSection(\'' + s.id + '\')"><div class="section-icon" style="background:' + s.bg + ';color:' + s.color + '">' + s.icon + '</div><div class="section-title">' + s.title + '</div><div class="section-badge" style="background:' + (complete ? "var(--green-light)" : s.bg) + ';color:' + (complete ? "var(--green)" : s.color) + '">' + (complete ? "\u2713 fertig" : sAnswered + "/" + s.items.length) + '</div><svg class="section-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8l4 4 4-4"/></svg></div><div class="section-body">' + itemsHtml + '</div>';
+    container.appendChild(div);
+  });
+  document.getElementById("completion").className = "completion" + (answered === total ? " visible" : "");
+}
+
+function toggleSection(id) { openSections[id] = !openSections[id]; render(); }
+
+function answer(key, value, sectionId) {
+  if (state[key] === value) { state[key] = null; render(); return; }
+  state[key] = value; render();
+  if (value === false) openFlyout(sectionId);
+}
+
+function openFlyout(sectionId) {
+  var s = null;
+  for (var i = 0; i < sections.length; i++) { if (sections[i].id === sectionId) { s = sections[i]; break; } }
+  if (!s) return;
+  var h = s.help;
+  var winHtml = ""; h.stepsWin.forEach(function(st) { winHtml += "<li>" + st + "</li>"; });
+  var macHtml = ""; h.stepsMac.forEach(function(st) { macHtml += "<li>" + st + "</li>"; });
+  document.getElementById("flyoutContent").innerHTML =
+    '<div class="flyout-header"><div class="flyout-icon" style="background:' + s.bg + ';color:' + s.color + '">' + s.icon + '</div><div><div class="flyout-title">' + s.title + '</div><div class="flyout-subtitle">Hilfe &amp; Kurzanleitung</div></div></div>' +
+    '<div class="flyout-rule">' + h.rule + '</div>' +
+    '<div class="flyout-section"><div class="flyout-section-title">Schritt f\u00FCr Schritt</div>' +
+    '<div class="platform-toggle"><button class="platform-btn active" onclick="switchPlatform(this,\'win\')">Windows</button><button class="platform-btn" onclick="switchPlatform(this,\'mac\')">macOS</button></div>' +
+    '<ol class="flyout-steps platform-steps active" data-platform="win">' + winHtml + '</ol>' +
+    '<ol class="flyout-steps platform-steps" data-platform="mac">' + macHtml + '</ol></div>' +
+    '<div class="flyout-section"><div class="flyout-section-title">\u26A0 Typische Falle</div><div class="flyout-pitfall">' + h.pitfall + '</div></div>';
+  document.getElementById("overlay").classList.add("visible");
+  document.body.style.overflow = "hidden";
+}
+
+function closeFlyout(event) {
+  if (event && event.target !== document.getElementById("overlay")) return;
+  document.getElementById("overlay").classList.remove("visible");
+  document.body.style.overflow = "";
+}
+
+function switchPlatform(btn, platform) {
+  var btns = btn.parentElement.querySelectorAll(".platform-btn");
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove("active");
+  btn.classList.add("active");
+  var lists = document.getElementById("flyoutContent").querySelectorAll(".platform-steps");
+  for (var j = 0; j < lists.length; j++) {
+    if (lists[j].getAttribute("data-platform") === platform) lists[j].classList.add("active");
+    else lists[j].classList.remove("active");
+  }
+}
+
+function resetAll() {
+  for (var k in state) state[k] = null;
+  sections.forEach(function(s) { openSections[s.id] = true; });
+  render();
+}
+
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeFlyout(); });
+render();
+</script>
+</body>
+</html>
