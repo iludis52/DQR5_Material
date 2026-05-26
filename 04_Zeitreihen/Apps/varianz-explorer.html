@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Varianz & Zeitreihen Explorer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<style>
+:root {
+  --blue-dark: #1B3A5C;
+  --blue-mid: #2E75B6;
+  --blue-light: #4A9FD9;
+  --blue-pale: #D6EAF8;
+  --bg: #F5F7FA;
+  --bg-card: #FFFFFF;
+  --text: #2C3E50;
+  --text-light: #7F8C8D;
+  --accent: #E74C3C;
+  --accent2: #27AE60;
+  --accent3: #F39C12;
+  --sensor-a: #2E75B6;
+  --sensor-b: #E67E22;
+  --border: #DCE1E8;
+  --shadow: 0 2px 12px rgba(27,58,92,0.08);
+  --radius: 10px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
+}
+.app-header {
+  background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue-mid) 100%);
+  color: white; padding: 24px 32px 16px; text-align: center;
+}
+.app-header h1 { font-size: 1.6em; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 4px; }
+.app-header p { font-size: 0.9em; opacity: 0.85; }
+.tab-bar {
+  display: flex; background: white; border-bottom: 2px solid var(--border);
+  padding: 0 16px; overflow-x: auto; gap: 4px;
+}
+.tab-btn {
+  padding: 12px 20px; border: none; background: none; font-size: 0.88em; font-weight: 500;
+  color: var(--text-light); cursor: pointer; border-bottom: 3px solid transparent;
+  transition: all 0.25s; white-space: nowrap; font-family: inherit;
+}
+.tab-btn:hover { color: var(--blue-mid); }
+.tab-btn.active { color: var(--blue-dark); border-bottom-color: var(--blue-mid); font-weight: 600; }
+.tab-content { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+.tab-content.active { display: block; }
+.card {
+  background: var(--bg-card); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px;
+}
+.card h3 { font-size: 1em; font-weight: 600; color: var(--blue-dark); margin-bottom: 12px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+  border: none; border-radius: 6px; font-size: 0.9em; font-weight: 500;
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.btn-primary { background: var(--blue-mid); color: white; }
+.btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); }
+.btn-secondary { background: var(--blue-pale); color: var(--blue-dark); }
+.btn-secondary:hover { background: #BDD7EE; }
+.btn-accent { background: var(--accent); color: white; }
+.btn-accent:hover { background: #C0392B; }
+.btn-small { padding: 6px 14px; font-size: 0.82em; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.slider-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.slider-row label { font-size: 0.85em; min-width: 140px; color: var(--text); }
+.slider-row input[type=range] { flex: 1; accent-color: var(--blue-mid); max-width: 300px; }
+.slider-row .val { font-size: 0.85em; font-weight: 600; color: var(--blue-dark); min-width: 40px; }
+.stats-panel { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+.stat-box { background: var(--blue-pale); border-radius: 8px; padding: 10px 16px; min-width: 120px; }
+.stat-box .stat-label {
+  font-size: 0.72em; color: var(--blue-mid); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.stat-box .stat-value {
+  font-size: 1.2em; font-weight: 700; color: var(--blue-dark); font-variant-numeric: tabular-nums;
+}
+canvas { display: block; width: 100%; border-radius: 6px; }
+.formula-box {
+  background: #FAFBFC; border-left: 4px solid var(--blue-mid);
+  border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 12px 0; text-align: center;
+}
+.transition-hint {
+  background: linear-gradient(135deg, #EBF5FB 0%, #D6EAF8 100%);
+  border-left: 4px solid var(--accent3); border-radius: 0 8px 8px 0;
+  padding: 14px 18px; margin: 20px 0 8px; font-size: 0.9em;
+  color: var(--blue-dark); font-style: italic;
+}
+.row { display: flex; gap: 16px; flex-wrap: wrap; }
+.row > .card { flex: 1; min-width: 280px; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 0.85em; }
+.check-row input { accent-color: var(--blue-mid); }
+select {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.88em; font-family: inherit; color: var(--text); background: white;
+}
+.toggle-group { display: flex; gap: 0; margin: 8px 0; }
+.toggle-btn {
+  padding: 8px 16px; border: 2px solid var(--blue-mid); background: white;
+  color: var(--blue-mid); font-size: 0.82em; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.toggle-btn:first-child { border-radius: 6px 0 0 6px; }
+.toggle-btn:last-child { border-radius: 0 6px 6px 0; }
+.toggle-btn.active { background: var(--blue-mid); color: white; }
+.thermo-container { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.thermo-panel { display: flex; flex-direction: column; align-items: center; min-width: 200px; }
+.thermo-label {
+  font-size: 0.85em; font-weight: 600; padding: 5px 14px; border-radius: 6px; color: white; margin-bottom: 10px;
+}
+.thermo-label-a { background: var(--sensor-a); }
+.thermo-label-b { background: var(--sensor-b); }
+.thermo-stats { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; width: 100%; }
+.thermo-stat {
+  display: flex; justify-content: space-between; font-size: 0.82em;
+  padding: 4px 10px; background: #F5F7FA; border-radius: 4px;
+}
+.thermo-stat .ts-label { color: var(--text-light); }
+.thermo-stat .ts-val { font-weight: 700; color: var(--blue-dark); font-variant-numeric: tabular-nums; }
+.measure-pulse { animation: pulse 0.4s ease-out; }
+@keyframes pulse { 0%{transform:scale(1);} 30%{transform:scale(1.06);} 100%{transform:scale(1);} }
+.t2-cond { transition: all 0.2s; border: 2px solid transparent; }
+.t2-cond.active { border-color: var(--blue-mid); background: var(--blue-mid); color: white; }
+.t2-cond.active-warn { border-color: var(--accent); background: #FDEDEC; color: var(--accent); font-weight: 600; }
+@media (max-width: 700px) {
+  .tab-btn { padding: 10px 12px; font-size: 0.8em; }
+  .tab-content { padding: 14px; }
+  .row { flex-direction: column; }
+  .thermo-container { gap: 20px; }
+  .stats-panel { gap: 8px; }
+  .stat-box { min-width: 100px; }
+}
+</style>
+</head>
+<body>
+<div class="app-header">
+  <h1>Varianz & Zeitreihen Explorer</h1>
+  <p>Von der Messung zur Stationarität — interaktiv erkunden</p>
+</div>
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab(0)">1 — Zwei Thermometer</button>
+  <button class="tab-btn" onclick="switchTab(1)">2 — Störung im Signal</button>
+  <button class="tab-btn" onclick="switchTab(2)">3 — Zeitreihe</button>
+  <button class="tab-btn" onclick="switchTab(3)">4 — Stationarität</button>
+</div>
+
+<!-- TAB 1 -->
+<div class="tab-content active" id="tab0">
+  <div class="card">
+    <h3>🌡️ Zwei Thermometer, ein Raum</h3>
+    <p style="font-size:0.85em; color:var(--text-light); margin-bottom:6px;">
+      Ein Raum hat eine feste Temperatur von 20 °C. Zwei Thermometer messen gleichzeitig — aber sie liefern unterschiedlich genaue Werte. Jeder Klick auf „Messen" erzeugt je einen Messwert pro Gerät.
+    </p>
+    <div style="text-align:center; margin: 14px 0;">
+      <button class="btn btn-primary" onclick="tab1.measure()" id="t1MeasureBtn">🌡️ Messen</button>
+      <button class="btn btn-secondary" style="margin-left:8px;" onclick="tab1.reset()">Reset</button>
+      <span style="font-size:0.82em; color:var(--text-light); margin-left:12px;">Messungen: <strong id="t1Count">0</strong></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="thermo-container">
+      <div class="thermo-panel">
+        <div class="thermo-label thermo-label-a">Thermometer A — Profi</div>
+        <canvas id="c1ThA" width="220" height="260" style="max-width:220px;"></canvas>
+        <div class="thermo-stats">
+          <div class="thermo-stat"><span class="ts-label">Messungen</span><span class="ts-val" id="t1nA">0</span></div>
+          <div class="thermo-stat"><span class="ts-label">Mittelwert</span><span class="ts-val" id="t1meanA">–</span></div>
+          <div class="thermo-stat"><span class="ts-label">Varianz</span><span class="ts-val" id="t1varA">–</span></div>
+          <div class="thermo-stat"><span class="ts-label">Std.-Abweichung</span><span class="ts-val" id="t1stdA">–</span></div>
+        </div>
+      </div>
+      <div class="thermo-panel">
+        <div class="thermo-label thermo-label-b">Thermometer B — Billig</div>
+        <canvas id="c1ThB" width="220" height="260" style="max-width:220px;"></canvas>
+        <div class="thermo-stats">
+          <div class="thermo-stat"><span class="ts-label">Messungen</span><span class="ts-val" id="t1nB">0</span></div>
+          <div class="thermo-stat"><span class="ts-label">Mittelwert</span><span class="ts-val" id="t1meanB">–</span></div>
+          <div class="thermo-stat"><span class="ts-label">Varianz</span><span class="ts-val" id="t1varB">–</span></div>
+          <div class="thermo-stat"><span class="ts-label">Std.-Abweichung</span><span class="ts-val" id="t1stdB">–</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Verteilung der Messwerte</h3>
+    <div class="row" style="gap:12px;">
+      <div style="flex:1;"><canvas id="c1HistA" height="120"></canvas></div>
+      <div style="flex:1;"><canvas id="c1HistB" height="120"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="formula-box" id="t1Formula"></div>
+  </div>
+</div>
+
+<!-- TAB 2 -->
+<div class="tab-content" id="tab1">
+  <div class="card">
+    <h3>📡 Störung im Signal</h3>
+    <p style="font-size:0.85em; color:var(--text-light); margin-bottom:10px;">
+      Wir messen jetzt mit dem Billig-Thermometer (B) aus Tab 1 weiter — aber über einen längeren Zeitraum. Mit „+10 Werte" kommen neue Messungen hinzu. Schalte Störungen ein oder aus — sie wirken auf die <em>nächsten</em> Messwerte. Verschiebe das grüne Fenster, um lokale Statistiken zu vergleichen.
+    </p>
+    <div class="btn-group" style="margin-bottom:10px;">
+      <button class="btn btn-primary" onclick="tab2.add10()">+10 Werte</button>
+      <button class="btn btn-accent" onclick="tab2.reset()">Reset</button>
+      <span style="font-size:0.82em; color:var(--text-light); margin-left:8px;">Werte: <strong id="t2Count">0</strong> / 50</span>
+    </div>
+    <div class="btn-group">
+      <span style="font-size:0.85em; margin-right:4px;">Bedingung:</span>
+      <button class="btn btn-small btn-secondary t2-cond active" id="t2BtnStable" onclick="tab2.toggleCond('stable')">🏠 Stabil</button>
+      <button class="btn btn-small btn-secondary t2-cond" id="t2BtnWindow" onclick="tab2.toggleCond('window')">🪟 Fenster offen</button>
+      <button class="btn btn-small btn-secondary t2-cond" id="t2BtnSensor" onclick="tab2.toggleCond('sensor')">⚠️ Sensor altert</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Temperaturverlauf</h3>
+    <canvas id="c2Stream" height="110"></canvas>
+    <div class="slider-row"><label>Fensterposition:</label><input type="range" id="t2WinPos" min="0" max="0" value="0" oninput="tab2.draw()"><span class="val" id="t2WinPosVal">0</span></div>
+    <div class="slider-row"><label>Fenstergrösse k:</label><input type="range" id="t2WinSize" min="3" max="20" value="10" oninput="tab2.draw()"><span class="val" id="t2WinVal">10</span></div>
+    <div class="stats-panel">
+      <div class="stat-box"><div class="stat-label">Gesamt Mittelwert</div><div class="stat-value" id="t2MeanAll">–</div></div>
+      <div class="stat-box"><div class="stat-label">Gesamt Varianz</div><div class="stat-value" id="t2VarAll">–</div></div>
+      <div class="stat-box" style="background:#D5F5E3;"><div class="stat-label" style="color:var(--accent2);">Fenster Mittelwert</div><div class="stat-value" id="t2MeanWin">–</div></div>
+      <div class="stat-box" style="background:#D5F5E3;"><div class="stat-label" style="color:var(--accent2);">Fenster Varianz</div><div class="stat-value" id="t2VarWin">–</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Varianz-Verlauf</h3>
+    <canvas id="c2Variance" height="90"></canvas>
+    <div style="font-size:0.8em; color:var(--text-light); margin-top:6px;">
+      <span style="color:var(--blue-mid);">━</span> Gesamt-Varianz &nbsp;&nbsp;
+      <span style="color:var(--accent2);">━</span> Fenster-Varianz (rollierend)
+    </div>
+    <div class="formula-box" id="t2Formula"></div>
+  </div>
+</div>
+
+<!-- TAB 3 -->
+<div class="tab-content" id="tab2">
+  <div class="card">
+    <h3>📈 Zeitreihe: Varianz in Bewegung</h3>
+    <p style="font-size:0.85em; color:var(--text-light); margin-bottom:10px;">Jetzt betrachten wir einen langen, kontinuierlichen Temperaturverlauf. Das Sliding Window zeigt, wie sich Mittelwert und Varianz lokal verhalten.</p>
+    <div class="btn-group" style="margin-bottom:12px;">
+      <span style="font-size:0.85em;">Preset:</span>
+      <select id="t3Preset" onchange="tab3.loadPreset()">
+        <option value="stationary">Stabiler Innenraum</option>
+        <option value="stock">Aussentemperatur (Tagesverlauf)</option>
+        <option value="sine">Heizung ein/aus (Zyklisch)</option>
+        <option value="walk">Driftendes Thermometer</option>
+        <option value="hetero">Zunehmend instabil</option>
+      </select>
+      <button class="btn btn-small btn-secondary" onclick="tab3.toggleDraw()" id="t3DrawBtn">✏️ Freihand zeichnen</button>
+      <button class="btn btn-small btn-accent" onclick="tab3.loadPreset()">Neu generieren</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Temperaturverlauf mit Sliding Window</h3>
+    <canvas id="c3Series" height="240"></canvas>
+    <div class="slider-row"><label>Fensterposition:</label><input type="range" id="t3WinPos" min="0" max="60" value="10" oninput="tab3.draw()"><span class="val" id="t3WinPosVal">10</span></div>
+    <div class="slider-row"><label>Fensterbreite:</label><input type="range" id="t3WinSize" min="5" max="30" value="15" oninput="tab3.draw()"><span class="val" id="t3WinSizeVal">15</span></div>
+    <div class="stats-panel">
+      <div class="stat-box"><div class="stat-label">Fenster Mittelwert</div><div class="stat-value" id="t3WinMean">–</div></div>
+      <div class="stat-box"><div class="stat-label">Fenster Varianz</div><div class="stat-value" id="t3WinVar">–</div></div>
+    </div>
+    <div class="check-row"><input type="checkbox" id="t3ShowBand" checked onchange="tab3.draw()"><label for="t3ShowBand">+/- Standardabweichung im Fenster anzeigen</label></div>
+  </div>
+  <div class="card">
+    <h3>Rolling Variance</h3>
+    <canvas id="c3Rolling" height="160"></canvas>
+    <div class="formula-box" id="t3Formula"></div>
+  </div>
+</div>
+
+<!-- TAB 4 -->
+<div class="tab-content" id="tab3">
+  <div class="card">
+    <h3>🔬 Stationarität: Wann bleibt alles stabil?</h3>
+    <p style="font-size:0.85em; color:var(--text-light); margin-bottom:10px;">Wir teilen die Zeitreihe in Segmente und vergleichen deren Mittelwerte und Varianzen. Sind sie annähernd gleich, ist die Reihe stationär.</p>
+    <div class="btn-group" style="margin-bottom:12px;">
+      <span style="font-size:0.85em;">Zeitreihen-Typ:</span>
+      <select id="t4Type" onchange="tab4.generate()">
+        <option value="stationary">Klimaanlage (stationär)</option>
+        <option value="trend">Globale Erwärmung (Trend)</option>
+        <option value="hetero">Defekter Sensor (wachsende Varianz)</option>
+        <option value="seasonal">Jahreszeiten (saisonal)</option>
+        <option value="trend_seasonal">Erwärmung + Jahreszeiten</option>
+      </select>
+      <button class="btn btn-small btn-accent" onclick="tab4.generate()">Neu generieren</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Temperaturverlauf</h3>
+    <canvas id="c4Series" height="200"></canvas>
+    <div class="slider-row"><label>Anzahl Segmente:</label><input type="range" id="t4Segments" min="2" max="8" value="4" oninput="tab4.draw()"><span class="val" id="t4SegVal">4</span></div>
+    <div class="toggle-group" style="margin-top:10px;">
+      <button class="toggle-btn active" onclick="tab4.setTransform('none',this)">Original</button>
+      <button class="toggle-btn" onclick="tab4.setTransform('detrend',this)">Trend entfernen</button>
+      <button class="toggle-btn" onclick="tab4.setTransform('diff',this)">Differenzieren</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card"><h3>Segment-Mittelwerte</h3><canvas id="c4Means" height="160"></canvas></div>
+    <div class="card"><h3>Segment-Varianzen</h3><canvas id="c4Vars" height="160"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="formula-box" id="t4Formula"></div>
+    <div id="t4Verdict" style="text-align:center; font-size:0.95em; font-weight:600; margin-top:10px;"></div>
+  </div>
+</div>
+
+<script>
+function mean(a){if(!a.length)return 0;return a.reduce((s,v)=>s+v,0)/a.length;}
+function variance(a){if(a.length<2)return 0;const m=mean(a);return a.reduce((s,v)=>s+(v-m)**2,0)/a.length;}
+function std(a){return Math.sqrt(variance(a));}
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function fmt(v,d=2){return v.toFixed(d);}
+function switchTab(i){
+  document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  document.querySelectorAll('.tab-content').forEach((t,j)=>t.classList.toggle('active',j===i));
+  [tab1,tab2,tab3,tab4][i].draw();
+}
+function getCtx(id){
+  const c=document.getElementById(id),dpr=window.devicePixelRatio||1;
+  if(!c.dataset.origH) c.dataset.origH=c.getAttribute('height')||'150';
+  const r=c.getBoundingClientRect();
+  const w=r.width||300;
+  const h=r.height||(+c.dataset.origH);
+  c.style.height=h+'px';
+  c.width=w*dpr;c.height=h*dpr;
+  const ctx=c.getContext('2d');ctx.scale(dpr,dpr);ctx.W=w;ctx.H=h;return ctx;
+}
+function getCtxFixed(id){
+  const c=document.getElementById(id),dpr=window.devicePixelRatio||1;
+  if(!c.dataset.origW){c.dataset.origW=c.getAttribute('width');c.dataset.origH=c.getAttribute('height');}
+  const w=+c.dataset.origW,h=+c.dataset.origH;
+  c.width=w*dpr;c.height=h*dpr;c.style.width=w+'px';c.style.height=h+'px';
+  const ctx=c.getContext('2d');ctx.scale(dpr,dpr);ctx.W=w;ctx.H=h;return ctx;
+}
+function renderFormula(id,tex){
+  document.getElementById(id).innerHTML=katex.renderToString(tex,{displayMode:true,throwOnError:false});
+}
+
+// ==================== TAB 1 ====================
+const tab1={
+  TRUE_TEMP:20.0, SIGMA_A:0.3, SIGMA_B:1.5,
+  valsA:[], valsB:[],
+  init(){
+    renderFormula('t1Formula','\\sigma^2 = \\frac{1}{n}\\sum_{i=1}^{n}(x_i - \\bar{x})^2');
+    this.draw();
+  },
+  measure(){
+    this.valsA.push(this.TRUE_TEMP+randn()*this.SIGMA_A);
+    this.valsB.push(this.TRUE_TEMP+randn()*this.SIGMA_B);
+    const btn=document.getElementById('t1MeasureBtn');
+    btn.classList.remove('measure-pulse');void btn.offsetWidth;btn.classList.add('measure-pulse');
+    this.draw();
+  },
+  reset(){this.valsA=[];this.valsB=[];this.draw();},
+  draw(){
+    document.getElementById('t1Count').textContent=this.valsA.length;
+    this.drawThermo('c1ThA',this.valsA,'rgba(46,117,182,');
+    this.drawThermo('c1ThB',this.valsB,'rgba(230,126,34,');
+    this.drawHist('c1HistA',this.valsA,'rgba(46,117,182,0.7)');
+    this.drawHist('c1HistB',this.valsB,'rgba(230,126,34,0.7)');
+    this.updateStats('A',this.valsA);
+    this.updateStats('B',this.valsB);
+  },
+  updateStats(label,vals){
+    const n=vals.length;
+    document.getElementById('t1n'+label).textContent=n;
+    if(n>0){
+      document.getElementById('t1mean'+label).textContent=fmt(mean(vals))+' °C';
+      document.getElementById('t1var'+label).textContent=n>1?fmt(variance(vals)):'–';
+      document.getElementById('t1std'+label).textContent=n>1?fmt(std(vals))+' °C':'–';
+    } else {
+      ['mean','var','std'].forEach(k=>document.getElementById('t1'+k+label).textContent='–');
+    }
+  },
+  drawThermo(cid,vals,rgba){
+    const ctx=getCtxFixed(cid),W=ctx.W,H=ctx.H;
+    ctx.clearRect(0,0,W,H);
+    const range=6,scaleMin=this.TRUE_TEMP-range/2,scaleMax=this.TRUE_TEMP+range/2;
+    const pad={l:42,r:48,t:12,b:12};
+    const scaleH=H-pad.t-pad.b, scaleX=pad.l+28, colW=22;
+    const toY=v=>pad.t+scaleH*(1-(v-scaleMin)/(scaleMax-scaleMin));
+    const tubeX=scaleX-colW/2, r=8;
+    // tube
+    ctx.fillStyle='#F0F3F6';ctx.strokeStyle='#C8CED6';ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(tubeX+r,pad.t);ctx.lineTo(tubeX+colW-r,pad.t);
+    ctx.arcTo(tubeX+colW,pad.t,tubeX+colW,pad.t+r,r);
+    ctx.lineTo(tubeX+colW,H-pad.b-r);
+    ctx.arcTo(tubeX+colW,H-pad.b,tubeX+colW-r,H-pad.b,r);
+    ctx.lineTo(tubeX+r,H-pad.b);
+    ctx.arcTo(tubeX,H-pad.b,tubeX,H-pad.b-r,r);
+    ctx.lineTo(tubeX,pad.t+r);
+    ctx.arcTo(tubeX,pad.t,tubeX+r,pad.t,r);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // ticks
+    ctx.textAlign='right';
+    for(let t=Math.ceil(scaleMin);t<=Math.floor(scaleMax);t++){
+      const y=toY(t);
+      ctx.strokeStyle='#DCE1E8';ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(tubeX-3,y);ctx.lineTo(tubeX,y);ctx.stroke();
+      ctx.fillStyle=t===this.TRUE_TEMP?'#E74C3C':'#7F8C8D';
+      ctx.font=t===this.TRUE_TEMP?'bold 11px sans-serif':'10px sans-serif';
+      ctx.fillText(t+'°',tubeX-7,y+3.5);
+    }
+    // true temp line
+    const trueY=toY(this.TRUE_TEMP);
+    ctx.strokeStyle='rgba(231,76,60,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(tubeX-3,trueY);ctx.lineTo(tubeX+colW+3,trueY);ctx.stroke();
+    ctx.setLineDash([]);
+    if(!vals.length){
+      ctx.fillStyle='#BDC3C7';ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Noch keine',scaleX,H/2-5);ctx.fillText('Messungen',scaleX,H/2+9);return;
+    }
+    // dots
+    vals.forEach((v,i)=>{
+      const y=toY(v);
+      const jit=Math.sin(i*7.3)*colW*0.25;
+      const al=Math.max(0.25,1-(vals.length-1-i)*0.03);
+      ctx.beginPath();ctx.arc(scaleX+jit,y,3.5,0,Math.PI*2);
+      ctx.fillStyle=rgba+al+')';ctx.fill();
+    });
+    // latest highlight
+    ctx.beginPath();ctx.arc(scaleX,toY(vals[vals.length-1]),5.5,0,Math.PI*2);
+    ctx.strokeStyle=rgba+'0.9)';ctx.lineWidth=2;ctx.stroke();
+    // sigma band
+    if(vals.length>1){
+      const m=mean(vals),s=std(vals),mY=toY(m),topY=toY(m+s),botY=toY(m-s);
+      ctx.fillStyle=rgba+'0.1)';
+      ctx.fillRect(tubeX+colW+4,topY,16,botY-topY);
+      ctx.strokeStyle=rgba+'0.4)';ctx.lineWidth=1;
+      ctx.strokeRect(tubeX+colW+4,topY,16,botY-topY);
+      ctx.strokeStyle=rgba+'0.8)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(tubeX+colW+4,mY);ctx.lineTo(tubeX+colW+20,mY);ctx.stroke();
+      ctx.fillStyle=rgba+'0.8)';ctx.font='9px sans-serif';ctx.textAlign='left';
+      ctx.fillText('\u0078\u0304',tubeX+colW+22,mY+3);
+      ctx.fillText('+s',tubeX+colW+22,topY+3);
+      ctx.fillText('\u2013s',tubeX+colW+22,botY+3);
+    }
+  },
+  drawHist(cid,vals,fillC){
+    const ctx=getCtx(cid),W=ctx.W,H=ctx.H;
+    ctx.clearRect(0,0,W,H);
+    const pad={l:35,r:10,t:5,b:20},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    if(vals.length<2){
+      ctx.fillStyle='#BDC3C7';ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Histogramm ab 2 Messungen',W/2,H/2);return;
+    }
+    const nBins=12;
+    const all=[...this.valsA,...this.valsB];
+    const vMin=Math.min(...all)-0.5,vMax=Math.max(...all)+0.5;
+    const binW=(vMax-vMin)/nBins;
+    const bins=new Array(nBins).fill(0);
+    vals.forEach(v=>{const bi=Math.min(Math.floor((v-vMin)/binW),nBins-1);bins[bi]++;});
+    const maxB=Math.max(...bins,1);
+    ctx.strokeStyle='#DCE1E8';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,H-pad.b);ctx.lineTo(W-pad.r,H-pad.b);ctx.stroke();
+    const bpw=pw/nBins;
+    bins.forEach((c,i)=>{
+      const x=pad.l+i*bpw,bh=(c/maxB)*ph;
+      ctx.fillStyle=fillC;ctx.fillRect(x+1,H-pad.b-bh,bpw-2,bh);
+    });
+    // true temp
+    const trueX=pad.l+((this.TRUE_TEMP-vMin)/(vMax-vMin))*pw;
+    ctx.strokeStyle='rgba(231,76,60,0.6)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(trueX,pad.t);ctx.lineTo(trueX,H-pad.b);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#E74C3C';ctx.font='9px sans-serif';ctx.textAlign='center';
+    ctx.fillText('20°C',trueX,pad.t+10);
+    ctx.fillStyle='#7F8C8D';ctx.font='9px sans-serif';ctx.textAlign='center';
+    for(let i=0;i<=nBins;i+=3){
+      const v=vMin+i*binW;ctx.fillText(fmt(v,1),pad.l+i*bpw,H-pad.b+13);
+    }
+  }
+};
+
+// ==================== TAB 2 ====================
+const tab2={
+  data:[],
+  // Each data point remembers which condition generated it
+  conditions:[], // 'stable','window','sensor' per data point
+  activeCond:'stable',
+  MAX_N:50,
+  BASE_TEMP:20.0,
+  init(){
+    renderFormula('t2Formula','\\sigma^2_{\\text{Fenster}} = \\frac{1}{k}\\sum_{i=t-k+1}^{t}(x_i - \\bar{x}_{\\text{Fenster}})^2');
+  },
+  toggleCond(c){
+    if(c==='stable'){
+      this.activeCond='stable';
+    } else if(this.activeCond===c){
+      this.activeCond='stable'; // toggle off → back to stable
+    } else {
+      this.activeCond=c;
+    }
+    // Update button states
+    document.getElementById('t2BtnStable').className='btn btn-small btn-secondary t2-cond'+(this.activeCond==='stable'?' active':'');
+    document.getElementById('t2BtnWindow').className='btn btn-small btn-secondary t2-cond'+(this.activeCond==='window'?' active-warn':'');
+    document.getElementById('t2BtnSensor').className='btn btn-small btn-secondary t2-cond'+(this.activeCond==='sensor'?' active-warn':'');
+  },
+  genVal(){
+    let mu=this.BASE_TEMP, sigma=0.5;
+    if(this.activeCond==='window') mu-=4;
+    if(this.activeCond==='sensor') sigma*=3;
+    return mu+randn()*sigma;
+  },
+  add10(){
+    const room=this.MAX_N-this.data.length;
+    const count=Math.min(10,room);
+    if(count<=0) return;
+    for(let i=0;i<count;i++){
+      this.data.push(this.genVal());
+      this.conditions.push(this.activeCond);
+    }
+    // Update window position slider range
+    const k=+document.getElementById('t2WinSize').value;
+    const maxPos=Math.max(0,this.data.length-k);
+    const slider=document.getElementById('t2WinPos');
+    slider.max=maxPos;
+    slider.value=maxPos; // snap to end after adding
+    this.draw();
+  },
+  reset(){
+    this.data=[];this.conditions=[];
+    this.activeCond='stable';
+    this.toggleCond('stable');
+    document.getElementById('t2WinPos').max=0;document.getElementById('t2WinPos').value=0;
+    ['t2MeanAll','t2VarAll','t2MeanWin','t2VarWin'].forEach(id=>document.getElementById(id).textContent='–');
+    document.getElementById('t2Count').textContent='0';
+    this.draw();
+  },
+  draw(){
+    const n=this.data.length;
+    const k=+document.getElementById('t2WinSize').value;
+    document.getElementById('t2WinVal').textContent=k;
+    document.getElementById('t2Count').textContent=n;
+    // Update slider max
+    const maxPos=Math.max(0,n-k);
+    const slider=document.getElementById('t2WinPos');
+    if(+slider.max!==maxPos) slider.max=maxPos;
+    const wPos=Math.min(+slider.value, maxPos);
+    document.getElementById('t2WinPosVal').textContent=wPos;
+    this.drawStream();this.drawVariance();
+    if(n>0){
+      document.getElementById('t2MeanAll').textContent=fmt(mean(this.data))+' °C';
+      document.getElementById('t2VarAll').textContent=fmt(variance(this.data));
+      if(n>=k){
+        const win=this.data.slice(wPos,wPos+k);
+        document.getElementById('t2MeanWin').textContent=fmt(mean(win))+' °C';
+        document.getElementById('t2VarWin').textContent=fmt(variance(win));
+      }
+    }
+  },
+  drawStream(){
+    const ctx=getCtx('c2Stream'),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:12,b:22},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    if(!this.data.length){ctx.fillStyle='#7F8C8D';ctx.font='12px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Klicke „+10 Werte" um Messungen zu erzeugen',W/2,H/2);return;}
+    const n=this.data.length;
+    const yMin=Math.min(...this.data)-1,yMax=Math.max(...this.data)+1,yR=yMax-yMin||1;
+    // X axis: always 0..MAX_N so scale stays stable
+    const toX=i=>pad.l+(i/(this.MAX_N-1))*pw;
+    const toY=v=>pad.t+ph*(1-(v-yMin)/yR);
+    const k=+document.getElementById('t2WinSize').value;
+    const wPos=Math.min(+document.getElementById('t2WinPos').value, Math.max(0,n-k));
+
+    // Condition zone coloring (background bands per condition)
+    let segStart=0;
+    for(let i=0;i<=n;i++){
+      if(i===n || (i>0 && this.conditions[i]!==this.conditions[segStart])){
+        const cond=this.conditions[segStart];
+        if(cond==='window'){
+          ctx.fillStyle='rgba(52,152,219,0.08)';
+          ctx.fillRect(toX(segStart),pad.t,toX(i-1)-toX(segStart),ph);
+        } else if(cond==='sensor'){
+          ctx.fillStyle='rgba(231,76,60,0.06)';
+          ctx.fillRect(toX(segStart),pad.t,toX(i-1)-toX(segStart),ph);
+        }
+        segStart=i;
+      }
+    }
+
+    // Window highlight
+    if(n>=k){
+      const wx1=toX(wPos),wx2=toX(wPos+k-1);
+      ctx.fillStyle='rgba(39,174,96,0.1)';ctx.fillRect(wx1,pad.t,wx2-wx1,ph);
+      ctx.strokeStyle='rgba(39,174,96,0.5)';ctx.lineWidth=1.5;ctx.strokeRect(wx1,pad.t,wx2-wx1,ph);
+    }
+
+    // Y axis
+    ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=3;i++){const v=yMin+yR*i/3;ctx.fillText(fmt(v,1)+'°',pad.l-6,toY(v)+3);}
+
+    // Data line
+    ctx.strokeStyle='#2E75B6';ctx.lineWidth=1.5;ctx.beginPath();
+    this.data.forEach((v,i)=>{i===0?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+
+    // Dots colored by window membership
+    this.data.forEach((v,i)=>{
+      ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);
+      const inWin=(n>=k && i>=wPos && i<wPos+k);
+      ctx.fillStyle=inWin?'rgba(39,174,96,0.8)':'rgba(46,117,182,0.5)';ctx.fill();
+    });
+
+    // Overall mean
+    const m=mean(this.data);
+    ctx.strokeStyle='rgba(231,76,60,0.4)';ctx.lineWidth=1;ctx.setLineDash([5,3]);
+    ctx.beginPath();ctx.moveTo(pad.l,toY(m));ctx.lineTo(toX(n-1),toY(m));ctx.stroke();ctx.setLineDash([]);
+  },
+  drawVariance(){
+    const ctx=getCtx('c2Variance'),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:8,b:18},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    const n=this.data.length, k=+document.getElementById('t2WinSize').value;
+    if(n<k+1){ctx.fillStyle='#7F8C8D';ctx.font='11px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Varianz-Verlauf erscheint ab genügend Werten',W/2,H/2);return;}
+
+    // Compute rolling overall and rolling window variance
+    const rvAll=[],rvWin=[];
+    for(let i=0;i<n;i++){
+      rvAll.push(i>=1?variance(this.data.slice(0,i+1)):0);
+      rvWin.push(i>=k-1?variance(this.data.slice(i-k+1,i+1)):null);
+    }
+
+    const allV=[...rvAll,...rvWin.filter(v=>v!==null)];
+    const yMax=Math.max(...allV,0.5)*1.15;
+    const toX=i=>pad.l+(i/(this.MAX_N-1))*pw;
+    const toY=v=>pad.t+ph*(1-v/yMax);
+
+    // Window position marker
+    const wPos=Math.min(+document.getElementById('t2WinPos').value, Math.max(0,n-k));
+    const markerX=toX(wPos+Math.floor(k/2));
+    ctx.strokeStyle='rgba(39,174,96,0.3)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(markerX,pad.t);ctx.lineTo(markerX,H-pad.b);ctx.stroke();
+
+    ctx.fillStyle='#7F8C8D';ctx.font='9px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=2;i++){const v=yMax*i/2;ctx.fillText(fmt(v,1),pad.l-6,toY(v)+3);
+      ctx.strokeStyle='#EEE';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(pad.l,toY(v));ctx.lineTo(W-pad.r,toY(v));ctx.stroke();}
+
+    // Overall variance curve
+    ctx.strokeStyle='#2E75B6';ctx.lineWidth=1.5;ctx.beginPath();
+    rvAll.forEach((v,i)=>{i===0?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+
+    // Window variance curve
+    ctx.strokeStyle='#27AE60';ctx.lineWidth=1.5;ctx.beginPath();let st=false;
+    rvWin.forEach((v,i)=>{if(v===null)return;if(!st){ctx.moveTo(toX(i),toY(v));st=true;}else ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+  }
+};
+
+// ==================== TAB 3 ====================
+const tab3={
+  data:[],drawing:false,drawPoints:[],
+  init(){
+    renderFormula('t3Formula','\\sigma^2_{\\text{rolling}}(t) = \\frac{1}{w}\\sum_{i=t}^{t+w-1}(x_i - \\bar{x}_w)^2');
+    this.loadPreset();
+  },
+  gen(type,n=80){
+    const d=[];
+    if(type==='stationary')for(let i=0;i<n;i++)d.push(20+randn()*0.5);
+    else if(type==='stock')for(let i=0;i<n;i++)d.push(10+12*Math.sin(i*0.08)+4*Math.sin(i*0.02)+randn()*1.5);
+    else if(type==='sine')for(let i=0;i<n;i++)d.push(20+3*Math.sin(i*0.15)+randn()*0.4);
+    else if(type==='walk'){d.push(20);for(let i=1;i<n;i++)d.push(d[i-1]+randn()*0.25);}
+    else if(type==='hetero')for(let i=0;i<n;i++)d.push(20+randn()*(0.3+i*0.04));
+    return d;
+  },
+  loadPreset(){
+    this.drawing=false;document.getElementById('t3DrawBtn').textContent='✏️ Freihand zeichnen';
+    this.data=this.gen(document.getElementById('t3Preset').value);
+    document.getElementById('t3WinPos').max=Math.max(0,this.data.length-10);this.draw();
+  },
+  toggleDraw(){
+    this.drawing=!this.drawing;const btn=document.getElementById('t3DrawBtn'),c=document.getElementById('c3Series');
+    if(this.drawing){
+      btn.textContent='✏️ Zeichnung übernehmen';this.drawPoints=[];this.data=[];c.style.cursor='crosshair';
+      c.onmousedown=e=>this._onD(e,c);c.onmousemove=e=>{if(e.buttons)this._onD(e,c);};
+      c.ontouchstart=c.ontouchmove=e=>{e.preventDefault();this._onD(e.touches[0],c);};this.draw();
+    }else{
+      c.style.cursor='default';c.onmousedown=c.onmousemove=c.ontouchstart=c.ontouchmove=null;
+      if(this.drawPoints.length>2){
+        const pts=this.drawPoints.sort((a,b)=>a.x-b.x);this.data=[];
+        for(let i=0;i<200;i++){const t=i/199;let j=0;while(j<pts.length-1&&pts[j+1].x<t)j++;
+          if(j>=pts.length-1)this.data.push(pts[pts.length-1].y);
+          else{const f=(t-pts[j].x)/(pts[j+1].x-pts[j].x||1);this.data.push(pts[j].y*(1-f)+pts[j+1].y*f);}}
+      }
+      document.getElementById('t3WinPos').max=Math.max(0,this.data.length-10);this.draw();
+    }
+  },
+  _onD(e,c){
+    const r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=1-(e.clientY-r.top)/r.height;
+    this.drawPoints.push({x,y:y*30+5});
+    this.data=this.drawPoints.sort((a,b)=>a.x-b.x).map(p=>p.y);
+    document.getElementById('t3WinPos').max=Math.max(0,this.data.length-10);this.draw();
+  },
+  draw(){if(this.data.length<2){this.drawEmpty();return;}this.drawSeries();this.drawRolling();},
+  drawEmpty(){
+    const ctx=getCtx('c3Series');ctx.clearRect(0,0,ctx.W,ctx.H);
+    ctx.fillStyle='#7F8C8D';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(this.drawing?'Zeichne mit der Maus in diesen Bereich':'Wähle einen Preset',ctx.W/2,ctx.H/2);
+    const c2=getCtx('c3Rolling');c2.clearRect(0,0,c2.W,c2.H);
+  },
+  drawSeries(){
+    const ctx=getCtx('c3Series'),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:15,b:30},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    const n=this.data.length,yMin=Math.min(...this.data),yMax=Math.max(...this.data);
+    const yP=(yMax-yMin)*0.1||1,yr={min:yMin-yP,max:yMax+yP};
+    const toX=i=>pad.l+(i/(n-1))*pw,toY=v=>pad.t+ph*(1-(v-yr.min)/(yr.max-yr.min));
+    ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=4;i++){const v=yr.min+(yr.max-yr.min)*i/4;ctx.fillText(fmt(v,1)+'°',pad.l-6,toY(v)+3);}
+    const wPos=+document.getElementById('t3WinPos').value,wSize=+document.getElementById('t3WinSize').value;
+    document.getElementById('t3WinPosVal').textContent=wPos;document.getElementById('t3WinSizeVal').textContent=wSize;
+    const ws=Math.min(wPos,n-wSize),we=Math.min(ws+wSize,n);
+    if(we>ws&&we<=n){
+      const wx1=toX(ws),wx2=toX(we-1);
+      ctx.fillStyle='rgba(243,156,18,0.12)';ctx.fillRect(wx1,pad.t,wx2-wx1,ph);
+      ctx.strokeStyle='rgba(243,156,18,0.6)';ctx.lineWidth=1.5;ctx.strokeRect(wx1,pad.t,wx2-wx1,ph);
+      const wd=this.data.slice(ws,we),wm=mean(wd),wv=variance(wd),ws2=std(wd);
+      document.getElementById('t3WinMean').textContent=fmt(wm)+' °C';
+      document.getElementById('t3WinVar').textContent=fmt(wv);
+      ctx.strokeStyle='rgba(243,156,18,0.8)';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+      ctx.beginPath();ctx.moveTo(wx1,toY(wm));ctx.lineTo(wx2,toY(wm));ctx.stroke();ctx.setLineDash([]);
+      if(document.getElementById('t3ShowBand').checked){
+        ctx.fillStyle='rgba(243,156,18,0.15)';ctx.fillRect(wx1,toY(wm+ws2),wx2-wx1,toY(wm-ws2)-toY(wm+ws2));
+        ctx.strokeStyle='rgba(243,156,18,0.4)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        ctx.beginPath();ctx.moveTo(wx1,toY(wm+ws2));ctx.lineTo(wx2,toY(wm+ws2));ctx.stroke();
+        ctx.beginPath();ctx.moveTo(wx1,toY(wm-ws2));ctx.lineTo(wx2,toY(wm-ws2));ctx.stroke();ctx.setLineDash([]);
+        ctx.fillStyle='rgba(243,156,18,0.7)';ctx.font='10px sans-serif';ctx.textAlign='left';
+        ctx.fillText('+s',wx2+3,toY(wm+ws2)+3);ctx.fillText('-s',wx2+3,toY(wm-ws2)+3);
+      }
+    }
+    ctx.strokeStyle='#2E75B6';ctx.lineWidth=1.5;ctx.beginPath();
+    this.data.forEach((v,i)=>{i===0?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+  },
+  drawRolling(){
+    const ctx=getCtx('c3Rolling'),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:10,b:25},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    const n=this.data.length,wSize=+document.getElementById('t3WinSize').value;
+    if(n<wSize+2){ctx.fillStyle='#7F8C8D';ctx.font='12px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Zu wenig Daten für Rolling Variance',W/2,H/2);return;}
+    const rv=[];for(let i=0;i<=n-wSize;i++)rv.push(variance(this.data.slice(i,i+wSize)));
+    const yMax=Math.max(...rv)*1.2||1;
+    const toX=i=>pad.l+(i/(rv.length-1))*pw,toY=v=>pad.t+ph*(1-v/yMax);
+    ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=3;i++){const v=yMax*i/3;ctx.fillText(fmt(v,1),pad.l-6,toY(v)+3);
+      ctx.strokeStyle='#EEE';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(pad.l,toY(v));ctx.lineTo(W-pad.r,toY(v));ctx.stroke();}
+    const wPos=+document.getElementById('t3WinPos').value;
+    const centerX=pad.l+((wPos+wSize/2)/(n-1))*pw; // align with center of window in series chart
+    ctx.strokeStyle='rgba(243,156,18,0.5)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(centerX,pad.t);ctx.lineTo(centerX,H-pad.b);ctx.stroke();
+    ctx.strokeStyle='#E74C3C';ctx.lineWidth=2;ctx.beginPath();
+    rv.forEach((v,i)=>{i===0?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+    ctx.fillStyle='#E74C3C';ctx.font='bold 11px sans-serif';ctx.textAlign='right';
+    ctx.fillText('Rolling Varianz',W-pad.r-5,pad.t+15);
+  }
+};
+
+// ==================== TAB 4 ====================
+const tab4={
+  original:[],transform:'none',
+  init(){
+    renderFormula('t4Formula','\\text{Stationär:} \\quad \\mu(t) \\approx \\text{const}, \\quad \\sigma^2(t) \\approx \\text{const} \\quad \\forall\\, t');
+    this.generate();
+  },
+  generate(){
+    const type=document.getElementById('t4Type').value,n=80,d=[];
+    if(type==='stationary')for(let i=0;i<n;i++)d.push(20+randn()*0.8);
+    else if(type==='trend')for(let i=0;i<n;i++)d.push(15+0.1*i+randn()*0.8);
+    else if(type==='hetero')for(let i=0;i<n;i++)d.push(20+randn()*(0.3+i*0.05));
+    else if(type==='seasonal')for(let i=0;i<n;i++)d.push(15+10*Math.sin(i*0.08)+randn()*1);
+    else if(type==='trend_seasonal')for(let i=0;i<n;i++)d.push(10+0.12*i+6*Math.sin(i*0.08)+randn()*0.8);
+    this.original=d;this.transform='none';
+    document.querySelectorAll('#tab3 .toggle-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+    this.draw();
+  },
+  setTransform(t,btn){
+    this.transform=t;document.querySelectorAll('#tab3 .toggle-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');this.draw();
+  },
+  getTransformed(){
+    if(this.transform==='none')return[...this.original];
+    if(this.transform==='detrend'){
+      const n=this.original.length,xm=n/2,ym=mean(this.original);
+      let num=0,den=0;this.original.forEach((v,i)=>{num+=(i-xm)*(v-ym);den+=(i-xm)**2;});
+      const sl=num/(den||1),ic=ym-sl*xm;return this.original.map((v,i)=>v-(sl*i+ic));
+    }
+    if(this.transform==='diff'){const d=[];for(let i=1;i<this.original.length;i++)d.push(this.original[i]-this.original[i-1]);return d;}
+    return[...this.original];
+  },
+  draw(){
+    const data=this.getTransformed(),nSeg=+document.getElementById('t4Segments').value;
+    document.getElementById('t4SegVal').textContent=nSeg;
+    this.drawSeries(data,nSeg);this.drawBars(data,nSeg);this.updateVerdict(data,nSeg);
+  },
+  drawSeries(data,nSeg){
+    const ctx=getCtx('c4Series'),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:15,b:30},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    const n=data.length,yMin=Math.min(...data),yMax=Math.max(...data);
+    const yP=(yMax-yMin)*0.1||1,yr={min:yMin-yP,max:yMax+yP};
+    const toX=i=>pad.l+(i/(n-1))*pw,toY=v=>pad.t+ph*(1-(v-yr.min)/(yr.max-yr.min));
+    const segC=['rgba(46,117,182,0.08)','rgba(39,174,96,0.08)','rgba(243,156,18,0.08)','rgba(142,68,173,0.08)','rgba(231,76,60,0.08)','rgba(22,160,133,0.08)','rgba(211,84,0,0.08)','rgba(41,128,185,0.08)'];
+    const segS=Math.floor(n/nSeg);
+    for(let s=0;s<nSeg;s++){
+      const si=s*segS,ei=s===nSeg-1?n-1:(s+1)*segS-1;
+      const x1=toX(si),x2=toX(ei);
+      ctx.fillStyle=segC[s%segC.length];ctx.fillRect(x1,pad.t,x2-x1,ph);
+      if(s>0){ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+        ctx.beginPath();ctx.moveTo(x1,pad.t);ctx.lineTo(x1,H-pad.b);ctx.stroke();ctx.setLineDash([]);}
+      ctx.fillStyle='rgba(0,0,0,0.3)';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('S'+(s+1),(x1+x2)/2,pad.t+12);
+    }
+    ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=4;i++){const v=yr.min+(yr.max-yr.min)*i/4;ctx.fillText(fmt(v,1)+'°',pad.l-6,toY(v)+3);}
+    ctx.strokeStyle='#2E75B6';ctx.lineWidth=1.5;ctx.beginPath();
+    data.forEach((v,i)=>{i===0?ctx.moveTo(toX(i),toY(v)):ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+  },
+  drawBars(data,nSeg){
+    const segS=Math.floor(data.length/nSeg),sm=[],sv=[];
+    for(let s=0;s<nSeg;s++){const si=s*segS,ei=s===nSeg-1?data.length:(s+1)*segS;
+      sm.push(mean(data.slice(si,ei)));sv.push(variance(data.slice(si,ei)));}
+    this._bar('c4Means',sm,nSeg,'°C');this._bar('c4Vars',sv,nSeg,'');
+  },
+  _bar(cid,vals,nSeg,unit){
+    const ctx=getCtx(cid),W=ctx.W,H=ctx.H;ctx.clearRect(0,0,W,H);
+    const pad={l:50,r:20,t:15,b:30},pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
+    const am=Math.max(...vals.map(Math.abs),0.1)*1.3;
+    const hasN=vals.some(v=>v<0),yMin=hasN?-am:0,yMax=am;
+    const toY=v=>pad.t+ph*(1-(v-yMin)/(yMax-yMin));
+    const zY=toY(0);ctx.strokeStyle='#DCE1E8';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,zY);ctx.lineTo(W-pad.r,zY);ctx.stroke();
+    ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.textAlign='right';
+    for(let i=0;i<=4;i++){const v=yMin+(yMax-yMin)*i/4;ctx.fillText(fmt(v,1)+unit,pad.l-6,toY(v)+3);}
+    const bw=pw/nSeg;
+    const sc=['#2E75B6','#27AE60','#F39C12','#8E44AD','#E74C3C','#16A085','#D35400','#2980B9'];
+    const avg=mean(vals);ctx.strokeStyle='rgba(231,76,60,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+    ctx.beginPath();ctx.moveTo(pad.l,toY(avg));ctx.lineTo(W-pad.r,toY(avg));ctx.stroke();ctx.setLineDash([]);
+    vals.forEach((v,i)=>{
+      const x=pad.l+i*bw,bW=bw*0.6,bX=x+(bw-bW)/2;
+      const bH=Math.abs(toY(v)-zY),bY=v>=0?toY(v):zY;
+      ctx.fillStyle=sc[i%sc.length]+'CC';ctx.fillRect(bX,bY,bW,bH);
+      ctx.fillStyle='#2C3E50';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+      ctx.fillText(fmt(v,2),x+bw/2,v>=0?toY(v)-5:zY+bH+14);
+      ctx.fillStyle='#7F8C8D';ctx.font='10px sans-serif';ctx.fillText('S'+(i+1),x+bw/2,H-pad.b+14);
+    });
+  },
+  updateVerdict(data,nSeg){
+    const segS=Math.floor(data.length/nSeg),sm=[],sv=[];
+    for(let s=0;s<nSeg;s++){const si=s*segS,ei=s===nSeg-1?data.length:(s+1)*segS;
+      sm.push(mean(data.slice(si,ei)));sv.push(variance(data.slice(si,ei)));}
+    const mR=Math.max(...sm)-Math.min(...sm),vR=Math.max(...sv)-Math.min(...sv);
+    const oS=std(data)||1;
+    const mOk=mR<oS*0.5,vOk=vR<Math.max(...sv)*0.6;
+    const el=document.getElementById('t4Verdict');
+    if(mOk&&vOk)el.innerHTML='<span style="color:var(--accent2);">✓ Erscheint stationär</span> — Mittelwerte und Varianzen der Segmente sind annähernd konstant.';
+    else{let r=[];if(!mOk)r.push('Mittelwert variiert über die Segmente');if(!vOk)r.push('Varianz variiert über die Segmente');
+      el.innerHTML='<span style="color:var(--accent);">✗ Nicht stationär</span> — '+r.join('; ')+'.';}
+  }
+};
+
+document.addEventListener('DOMContentLoaded',()=>{tab1.init();tab2.init();tab3.init();tab4.init();});
+window.addEventListener('resize',()=>{
+  const idx=[...document.querySelectorAll('.tab-content')].findIndex(t=>t.classList.contains('active'));
+  [tab1,tab2,tab3,tab4][idx].draw();
+});
+</script>
+</body>
+</html>
