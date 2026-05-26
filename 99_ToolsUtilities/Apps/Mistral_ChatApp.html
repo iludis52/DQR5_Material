@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mistral Chat</title>
+
+<!-- ── CDN: KaTeX (Mathe-Rendering) ── -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+
+<!-- ── CDN: marked.js (Markdown-Rendering) ── -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- ── CDN: pdf.js (PDF-Textextraktion) ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- ── Google Font: Nunito (kinderfreundlich & freundlich) ── -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════════
+   RESET & GRUNDLAYOUT
+   ══════════════════════════════════════════ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f0f4ff;
+  background-image:
+    radial-gradient(circle at 15% 25%, #ffe8f0 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, #e8f4ff 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, #fff5e6 0%, transparent 50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  color: #3a3a5c;
+}
+
+.app {
+  width: 1000px;
+  height: 600px;
+  background: #ffffff;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 4px 24px rgba(100, 120, 200, 0.12),
+    0 1px 4px rgba(100, 120, 200, 0.08);
+  border: 2px solid #e4e8f4;
+}
+
+/* ══════════════════════════════════════════
+   TOP BAR – API-Key + Systemprompt
+   ══════════════════════════════════════════ */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f8f9fe;
+  border-bottom: 2px solid #e4e8f4;
+  flex-shrink: 0;
+}
+
+.top-bar label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7a82a6;
+  white-space: nowrap;
+}
+
+.top-bar input {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #3a3a5c;
+  font-size: 13px;
+  font-family: monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.top-bar input:focus { border-color: #ff9b44; }
+.top-bar input::placeholder { color: #b0b8d4; }
+
+.btn-sysprompt {
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #7a82a6;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-sysprompt:hover {
+  border-color: #a78bfa;
+  background: #f5f0ff;
+  color: #7c3aed;
+}
+
+.btn-sysprompt.has-prompt {
+  border-color: #a78bfa;
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+/* ══════════════════════════════════════════
+   SYSTEMPROMPT-POPUP (Overlay)
+   ══════════════════════════════════════════ */
+.popup-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(100, 110, 160, 0.3);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.popup-overlay.visible {
+  display: flex;
+}
+
+.popup {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow:
+    0 12px 48px rgba(100, 120, 200, 0.2),
+    0 2px 8px rgba(100, 120, 200, 0.1);
+  border: 2px solid #e4e8f4;
+  width: 520px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popupIn 0.25s ease-out;
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.popup-header {
+  padding: 16px 20px;
+  border-bottom: 2px solid #e4e8f4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.popup-header .popup-icon {
+  font-size: 22px;
+}
+
+.popup-header h2 {
+  font-size: 16px;
+  font-weight: 800;
+  color: #3a3a5c;
+  flex: 1;
+}
+
+.popup-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: #f0f2fa;
+  color: #7a82a6;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.popup-close:hover {
+  background: #ffe4e4;
+  color: #e05050;
+}
+
+.popup-body {
+  padding: 16px 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.popup-body textarea {
+  width: 100%;
+  height: 180px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 2px solid #e4e8f4;
+  background: #fafbff;
+  color: #3a3a5c;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.popup-body textarea:focus {
+  border-color: #a78bfa;
+}
+
+.popup-body textarea::placeholder {
+  color: #b0b8d4;
+}
+
+.popup-hint {
+  font-size: 12px;
+  color: #9aa0c0;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.popup-footer {
+  padding: 12px 20px;
+  border-top: 2px solid #e4e8f4;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.popup-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.popup-btn-reset {
+  background: #fff0f0;
+  color: #e05050;
+  border-color: #ffd4d4;
+}
+.popup-btn-reset:hover {
+  background: #ffe0e0;
+}
+
+.popup-btn-ok {
+  background: #7c3aed;
+  color: #fff;
+}
+.popup-btn-ok:hover {
+  background: #6d28d9;
+}
+
+/* ══════════════════════════════════════════
+   HAUPTBEREICH
+   ══════════════════════════════════════════ */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ══════════════════════════════════════════
+   NACHRICHTEN-BEREICH
+   ══════════════════════════════════════════ */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.messages::-webkit-scrollbar { width: 6px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+.messages::-webkit-scrollbar-thumb { background: #d4d8ea; border-radius: 3px; }
+
+/* ── Nachrichten-Bubbles ── */
+.msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, #ff9b44, #ff7b54);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+  white-space: pre-wrap;
+  box-shadow: 0 2px 8px rgba(255, 123, 84, 0.25);
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: #f4f6fc;
+  color: #3a3a5c;
+  border-bottom-left-radius: 6px;
+  border: 2px solid #e4e8f4;
+}
+
+.msg.system {
+  align-self: center;
+  background: #f0f8ff;
+  color: #6a8ccc;
+  border: 2px dashed #c8d8f0;
+  font-size: 12px;
+  max-width: 90%;
+  border-radius: 12px;
+}
+
+.msg.error {
+  align-self: center;
+  background: #fff4f4;
+  color: #d05050;
+  border: 2px solid #ffd4d4;
+  font-size: 13px;
+  border-radius: 12px;
+}
+
+/* ══════════════════════════════════════════
+   MARKDOWN & KATEX – Inline-Styles
+   ══════════════════════════════════════════ */
+.msg.assistant p { margin: 0.4em 0; }
+.msg.assistant p:first-child { margin-top: 0; }
+.msg.assistant p:last-child { margin-bottom: 0; }
+
+.msg.assistant ul,
+.msg.assistant ol {
+  margin: 0.4em 0 0.4em 1.4em;
+}
+
+.msg.assistant li { margin: 0.2em 0; }
+.msg.assistant strong { color: #5a3a8c; }
+
+.msg.assistant code {
+  background: #eef0fa;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #c06020;
+}
+
+.msg.assistant pre {
+  background: #f0f2fa;
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+  border: 2px solid #e4e8f4;
+}
+
+.msg.assistant pre code {
+  background: none;
+  padding: 0;
+  color: #3a3a5c;
+  font-size: 13px;
+}
+
+.msg.assistant blockquote {
+  border-left: 3px solid #ff9b44;
+  padding-left: 10px;
+  margin: 0.5em 0;
+  color: #7a82a6;
+}
+
+.msg.assistant table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 13px;
+  width: 100%;
+}
+
+.msg.assistant th,
+.msg.assistant td {
+  border: 2px solid #e4e8f4;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.msg.assistant th {
+  background: #f4f6fc;
+  color: #7a82a6;
+}
+
+.msg.assistant .katex-display {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ══════════════════════════════════════════
+   TIPP-INDIKATOR
+   ══════════════════════════════════════════ */
+.typing-indicator {
+  align-self: flex-start;
+  padding: 10px 14px;
+  margin: 0 16px;
+  background: #f4f6fc;
+  border-radius: 16px;
+  border-bottom-left-radius: 6px;
+  border: 2px solid #e4e8f4;
+  display: none;
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 7px; height: 7px;
+  background: #a0a8cc;
+  border-radius: 50%;
+  margin: 0 2px;
+  animation: bounce 1.2s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+}
+
+/* ══════════════════════════════════════════
+   EINGABE-LEISTE
+   ══════════════════════════════════════════ */
+.input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f8f9fe;
+  border-top: 2px solid #e4e8f4;
+  flex-shrink: 0;
+  align-items: flex-end;
+}
+
+.input-bar textarea {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #3a3a5c;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  height: 42px;
+  max-height: 100px;
+  line-height: 1.4;
+  transition: border-color 0.2s;
+}
+
+.input-bar textarea:focus { border-color: #ff9b44; }
+.input-bar textarea::placeholder { color: #b0b8d4; }
+
+.btn {
+  padding: 0 16px;
+  height: 42px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-send {
+  background: linear-gradient(135deg, #ff9b44, #ff7b54);
+  color: #fff;
+  min-width: 70px;
+  box-shadow: 0 2px 8px rgba(255, 123, 84, 0.25);
+}
+.btn-send:hover { background: linear-gradient(135deg, #ff8a30, #ff6a40); }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+.btn-pdf {
+  background: #f0f2fa;
+  color: #7a82a6;
+  min-width: 42px;
+  font-size: 16px;
+  border: 2px solid #e4e8f4;
+}
+.btn-pdf:hover { background: #e8ecf8; color: #5a60a0; }
+.btn-pdf.has-file { background: #e8f8ee; color: #40a060; border-color: #c0e8cc; }
+
+.btn-reset {
+  background: #f0f2fa;
+  color: #7a82a6;
+  min-width: 42px;
+  font-size: 18px;
+  border: 2px solid #e4e8f4;
+}
+.btn-reset:hover { background: #e8ecf8; color: #5a60a0; }
+
+#pdfInput { display: none; }
+
+/* ══════════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════════ */
+.sidebar {
+  width: 210px;
+  background: #f8f9fe;
+  border-left: 2px solid #e4e8f4;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  flex-shrink: 0;
+}
+
+.sidebar h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #7a82a6;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #e4e8f4;
+  border-radius: 3px;
+  outline: none;
+}
+
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9b44, #ff7b54);
+  cursor: pointer;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(255,123,84,0.3);
+}
+
+.slider-val {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ff7b54;
+  min-width: 32px;
+  text-align: right;
+  font-family: monospace;
+}
+
+.sidebar select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #3a3a5c;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.sidebar select:focus { border-color: #ff9b44; }
+
+.pdf-info {
+  font-size: 11px;
+  color: #7a82a6;
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+}
+
+.pdf-info .filename {
+  color: #40a060;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.pdf-info .remove-pdf {
+  color: #e05050;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.pdf-info .remove-pdf:hover { color: #c03030; }
+
+.model-badge {
+  margin-top: auto;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 2px solid #e4e8f4;
+  text-align: center;
+  font-size: 11px;
+  color: #7a82a6;
+  letter-spacing: 0.5px;
+}
+
+.model-badge strong {
+  display: block;
+  font-size: 12px;
+  color: #5a60a0;
+  margin-top: 2px;
+  font-weight: 800;
+}
+
+/* ── Leerzustand ── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #a0a8cc;
+  gap: 8px;
+  padding: 40px;
+  text-align: center;
+}
+
+.empty-state .icon { font-size: 36px; opacity: 0.7; }
+.empty-state p { font-size: 14px; line-height: 1.5; }
+.empty-state strong { color: #5a60a0; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── Top Bar: API-Key + Systemprompt-Knopf ── -->
+  <div class="top-bar">
+    <label for="apiKey">API-Key:</label>
+    <input type="password" id="apiKey" placeholder="Mistral API-Key eingeben …" autocomplete="off" spellcheck="false">
+    <button class="btn-sysprompt" id="sysPromptBtn" title="Systemprompt festlegen">
+      <span>🛠</span> Systemprompt
+    </button>
+  </div>
+
+  <!-- ── Systemprompt-Popup ── -->
+  <div class="popup-overlay" id="sysPromptOverlay">
+    <div class="popup">
+      <div class="popup-header">
+        <span class="popup-icon">🛠</span>
+        <h2>Systemprompt</h2>
+        <button class="popup-close" id="sysPromptClose" title="Schließen">✕</button>
+      </div>
+      <div class="popup-body">
+        <textarea id="sysPromptText" placeholder="Hier den Systemprompt eingeben, z.B.&#10;&#10;„Du bist ein freundlicher Lernhelfer für Grundschulkinder. Erkläre alles einfach und mit Beispielen.""></textarea>
+        <div class="popup-hint">Der Systemprompt wird bei jeder Nachricht als Anweisung an das Modell mitgeschickt. Er bleibt aktiv, bis du ihn zurücksetzt.</div>
+      </div>
+      <div class="popup-footer">
+        <button class="popup-btn popup-btn-reset" id="sysPromptReset">Zurücksetzen</button>
+        <button class="popup-btn popup-btn-ok" id="sysPromptOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Hauptbereich ── -->
+  <div class="main">
+    <div class="chat-column">
+
+      <!-- Nachrichtenbereich -->
+      <div class="messages" id="messages">
+        <div class="empty-state" id="emptyState">
+          <div class="icon">✦</div>
+          <p>Neuer Chat mit <strong>Mistral Large</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>
+        </div>
+      </div>
+      <div class="typing-indicator" id="typing">
+        <span></span><span></span><span></span>
+      </div>
+
+      <!-- Eingabeleiste -->
+      <div class="input-bar">
+        <textarea id="userInput" placeholder="Nachricht eingeben …" rows="1"></textarea>
+        <button class="btn btn-pdf" id="pdfBtn" title="PDF hochladen (max. 1 MB)">📄</button>
+        <input type="file" id="pdfInput" accept="application/pdf">
+        <button class="btn btn-send" id="sendBtn" title="Senden">Senden</button>
+        <button class="btn btn-reset" id="resetBtn" title="Neuer Chat">⟳</button>
+      </div>
+    </div>
+
+    <!-- ── Sidebar ── -->
+    <div class="sidebar">
+      <div class="setting-group">
+        <h3>Temperatur</h3>
+        <div class="slider-row">
+          <input type="range" id="temperature" min="0" max="1" step="0.05" value="0.7">
+          <span class="slider-val" id="tempVal">0.70</span>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <h3>Kontextfenster</h3>
+        <select id="contextWindow">
+          <option value="500">500 Tokens</option>
+          <option value="1000">1 000 Tokens</option>
+          <option value="4000" selected>4 000 Tokens</option>
+          <option value="8000">8 000 Tokens</option>
+        </select>
+      </div>
+
+      <div class="setting-group" id="pdfInfoGroup" style="display:none;">
+        <h3>PDF-Kontext</h3>
+        <div class="pdf-info" id="pdfInfo"></div>
+      </div>
+
+      <div class="model-badge">
+        Modell<br><strong>mistral-large-latest</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ══════════════════════════════════════════
+  //  KONFIGURATION
+  // ══════════════════════════════════════════
+  const MODEL = 'mistral-large-latest';
+  const API_URL = 'https://api.mistral.ai/v1/chat/completions';
+  const PDF_MAX_BYTES = 1 * 1024 * 1024;
+
+  // ══════════════════════════════════════════
+  //  DOM-REFERENZEN
+  // ══════════════════════════════════════════
+  const $ = id => document.getElementById(id);
+  const messagesEl  = $('messages');
+  const typing      = $('typing');
+  const userInput   = $('userInput');
+  const sendBtn     = $('sendBtn');
+  const resetBtn    = $('resetBtn');
+  const apiKeyInput = $('apiKey');
+  const tempSlider  = $('temperature');
+  const tempVal     = $('tempVal');
+  const ctxSelect   = $('contextWindow');
+  const pdfBtn      = $('pdfBtn');
+  const pdfInput    = $('pdfInput');
+  const pdfInfoGrp  = $('pdfInfoGroup');
+  const pdfInfoEl   = $('pdfInfo');
+
+  // ── Systemprompt-Popup DOM ──
+  const sysPromptBtn     = $('sysPromptBtn');
+  const sysPromptOverlay = $('sysPromptOverlay');
+  const sysPromptClose   = $('sysPromptClose');
+  const sysPromptText    = $('sysPromptText');
+  const sysPromptOk      = $('sysPromptOk');
+  const sysPromptReset   = $('sysPromptReset');
+
+  // ══════════════════════════════════════════
+  //  ZUSTAND
+  // ══════════════════════════════════════════
+  let conversation = [];
+  let isStreaming = false;
+  let pdfContext = null; // { name, text, charCount }
+  let systemPrompt = ''; // benutzerdefinierter Systemprompt
+
+  // ══════════════════════════════════════════
+  //  SYSTEMPROMPT-POPUP LOGIK
+  // ══════════════════════════════════════════
+
+  function openSysPromptPopup() {
+    sysPromptText.value = systemPrompt;
+    sysPromptOverlay.classList.add('visible');
+    sysPromptText.focus();
+  }
+
+  function closeSysPromptPopup() {
+    sysPromptOverlay.classList.remove('visible');
+  }
+
+  sysPromptBtn.addEventListener('click', openSysPromptPopup);
+  sysPromptClose.addEventListener('click', closeSysPromptPopup);
+
+  sysPromptOverlay.addEventListener('click', (e) => {
+    if (e.target === sysPromptOverlay) closeSysPromptPopup();
+  });
+
+  sysPromptOk.addEventListener('click', () => {
+    systemPrompt = sysPromptText.value.trim();
+    updateSysPromptBtnState();
+    closeSysPromptPopup();
+    if (systemPrompt) {
+      addSystemBubble('Systemprompt gesetzt.');
+    }
+  });
+
+  sysPromptReset.addEventListener('click', () => {
+    sysPromptText.value = '';
+    systemPrompt = '';
+    updateSysPromptBtnState();
+    closeSysPromptPopup();
+    addSystemBubble('Systemprompt entfernt.');
+  });
+
+  function updateSysPromptBtnState() {
+    if (systemPrompt) {
+      sysPromptBtn.classList.add('has-prompt');
+    } else {
+      sysPromptBtn.classList.remove('has-prompt');
+    }
+  }
+
+  // Escape-Taste schließt Popup
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sysPromptOverlay.classList.contains('visible')) {
+      closeSysPromptPopup();
+    }
+  });
+
+  // ══════════════════════════════════════════
+  //  MARKDOWN + KATEX RENDERING
+  // ══════════════════════════════════════════
+
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: false,
+    mangle: false
+  });
+
+  function renderContent(raw) {
+    const placeholders = [];
+    let idx = 0;
+
+    let text = raw.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => {
+      const key = `%%KATEX_D${idx++}%%`;
+      placeholders.push({ key, tex: tex.trim(), display: true });
+      return '\n' + key + '\n';
+    });
+    text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => {
+      const key = `%%KATEX_D${idx++}%%`;
+      placeholders.push({ key, tex: tex.trim(), display: true });
+      return '\n' + key + '\n';
+    });
+
+    text = text.replace(/\$([^\s$](?:[^$]*[^\s$])?)\$/g, (_, tex) => {
+      const key = `%%KATEX_I${idx++}%%`;
+      placeholders.push({ key, tex: tex.trim(), display: false });
+      return key;
+    });
+    text = text.replace(/\\\(([\s\S]+?)\\\)/g, (_, tex) => {
+      const key = `%%KATEX_I${idx++}%%`;
+      placeholders.push({ key, tex: tex.trim(), display: false });
+      return key;
+    });
+
+    let html = marked.parse(text);
+
+    for (const { key, tex, display } of placeholders) {
+      let rendered;
+      try {
+        rendered = katex.renderToString(tex, {
+          displayMode: display,
+          throwOnError: false,
+          output: 'html'
+        });
+      } catch {
+        rendered = `<code>${escapeHtml(tex)}</code>`;
+      }
+      html = html.replaceAll(key, rendered);
+    }
+
+    return html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ══════════════════════════════════════════
+  //  PDF-EXTRAKTION (pdf.js)
+  // ══════════════════════════════════════════
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  async function extractPdfText(arrayBuffer) {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => item.str).join(' ');
+      pages.push(text);
+    }
+    return pages.join('\n\n');
+  }
+
+  pdfBtn.addEventListener('click', () => pdfInput.click());
+
+  pdfInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > PDF_MAX_BYTES) {
+      showError(`PDF zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum: 1 MB.`);
+      pdfInput.value = '';
+      return;
+    }
+
+    try {
+      pdfBtn.textContent = '⏳';
+
+      const buffer = await file.arrayBuffer();
+      const text = await extractPdfText(buffer);
+
+      if (!text.trim()) {
+        showError('Keine extrahierbaren Textinhalte im PDF gefunden (gescannt?).');
+        pdfBtn.textContent = '📄';
+        pdfInput.value = '';
+        return;
+      }
+
+      pdfContext = {
+        name: file.name,
+        text: text.trim(),
+        charCount: text.trim().length
+      };
+
+      pdfBtn.textContent = '📄';
+      pdfBtn.classList.add('has-file');
+      pdfInfoGrp.style.display = '';
+      pdfInfoEl.innerHTML = `
+        <span class="filename">${escapeHtml(pdfContext.name)}</span><br>
+        ${pdfContext.charCount.toLocaleString('de')} Zeichen<br>
+        <span class="remove-pdf" id="removePdf">✕ Entfernen</span>`;
+
+      $('removePdf').addEventListener('click', removePdf);
+
+      addSystemBubble(`PDF geladen: ${pdfContext.name} (${pdfContext.charCount.toLocaleString('de')} Zeichen)`);
+
+    } catch (err) {
+      showError('PDF konnte nicht gelesen werden: ' + err.message);
+      pdfBtn.textContent = '📄';
+    }
+
+    pdfInput.value = '';
+  });
+
+  function removePdf() {
+    pdfContext = null;
+    pdfBtn.classList.remove('has-file');
+    pdfInfoGrp.style.display = 'none';
+    pdfInfoEl.innerHTML = '';
+    addSystemBubble('PDF-Kontext entfernt.');
+  }
+
+  // ══════════════════════════════════════════
+  //  UI-HILFSFUNKTIONEN
+  // ══════════════════════════════════════════
+
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeEmptyState() {
+    const es = $('emptyState');
+    if (es) es.remove();
+  }
+
+  function addUserBubble(text) {
+    removeEmptyState();
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    scrollToBottom();
+  }
+
+  function addAssistantBubble() {
+    removeEmptyState();
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    messagesEl.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function addSystemBubble(text) {
+    removeEmptyState();
+    const div = document.createElement('div');
+    div.className = 'msg system';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    scrollToBottom();
+  }
+
+  function showError(msg) {
+    removeEmptyState();
+    const div = document.createElement('div');
+    div.className = 'msg error';
+    div.textContent = '⚠ ' + msg;
+    messagesEl.appendChild(div);
+    scrollToBottom();
+  }
+
+  function setLoading(on) {
+    isStreaming = on;
+    sendBtn.disabled = on;
+    typing.style.display = on ? 'block' : 'none';
+    if (on) scrollToBottom();
+  }
+
+  // ══════════════════════════════════════════
+  //  KONTEXT-VERWALTUNG (erweitert um Systemprompt)
+  // ══════════════════════════════════════════
+
+  function buildMessages() {
+    const maxTokens = parseInt(ctxSelect.value);
+    const charLimit = maxTokens * 4;
+
+    const sysMessages = [];
+    let sysChars = 0;
+
+    // ── Benutzerdefinierter Systemprompt ──
+    if (systemPrompt) {
+      sysMessages.push({ role: 'system', content: systemPrompt });
+      sysChars += systemPrompt.length;
+    }
+
+    // ── PDF als System-Nachricht ──
+    if (pdfContext) {
+      const sysTxt = `Der Benutzer hat folgendes PDF-Dokument bereitgestellt ("${pdfContext.name}"):\n\n${pdfContext.text}`;
+      sysMessages.push({ role: 'system', content: sysTxt });
+      sysChars += sysTxt.length;
+    }
+
+    const remaining = Math.max(0, charLimit - sysChars);
+    let total = 0;
+    const kept = [];
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      total += conversation[i].content.length;
+      if (total > remaining) break;
+      kept.unshift(conversation[i]);
+    }
+
+    return [...sysMessages, ...kept];
+  }
+
+  // ══════════════════════════════════════════
+  //  STREAMING-LOGIK
+  // ══════════════════════════════════════════
+
+  let renderTimer = null;
+
+  function scheduleRender(bubble, rawText) {
+    if (renderTimer) return;
+    renderTimer = setTimeout(() => {
+      bubble.innerHTML = renderContent(rawText);
+      scrollToBottom();
+      renderTimer = null;
+    }, 80);
+  }
+
+  async function send() {
+    const text = userInput.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+    if (!text || isStreaming) return;
+
+    if (!apiKey) {
+      showError('Bitte zuerst einen Mistral API-Key eingeben.');
+      apiKeyInput.focus();
+      return;
+    }
+
+    addUserBubble(text);
+    conversation.push({ role: 'user', content: text });
+
+    userInput.value = '';
+    userInput.style.height = '42px';
+    setLoading(true);
+
+    const payload = buildMessages();
+    const temp = parseFloat(tempSlider.value);
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: payload,
+          temperature: temp,
+          stream: true
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+
+      setLoading(false);
+      const bubble = addAssistantBubble();
+      let fullText = '';
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith('data:')) continue;
+          const data = trimmedLine.slice(5).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullText += delta;
+              scheduleRender(bubble, fullText);
+            }
+          } catch {}
+        }
+      }
+
+      if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
+      bubble.innerHTML = renderContent(fullText);
+      scrollToBottom();
+
+      conversation.push({ role: 'assistant', content: fullText });
+
+    } catch (err) {
+      setLoading(false);
+      showError(err.message);
+    }
+
+    isStreaming = false;
+    sendBtn.disabled = false;
+  }
+
+  // ══════════════════════════════════════════
+  //  RESET (erweitert: Systemprompt bleibt erhalten)
+  // ══════════════════════════════════════════
+
+  function resetChat() {
+    conversation = [];
+    pdfContext = null;
+    pdfBtn.classList.remove('has-file');
+    pdfInfoGrp.style.display = 'none';
+    pdfInfoEl.innerHTML = '';
+
+    messagesEl.innerHTML = `
+      <div class="empty-state" id="emptyState">
+        <div class="icon">✦</div>
+        <p>Neuer Chat mit <strong>Mistral Large</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>
+      </div>`;
+    userInput.focus();
+  }
+
+  // ══════════════════════════════════════════
+  //  EVENT-LISTENER
+  // ══════════════════════════════════════════
+
+  tempSlider.addEventListener('input', () => {
+    tempVal.textContent = parseFloat(tempSlider.value).toFixed(2);
+  });
+
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
+  });
+
+  userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  sendBtn.addEventListener('click', send);
+  resetBtn.addEventListener('click', resetChat);
+
+})();
+</script>
+</body>
+</html>
