@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pascalsches Dreieck & Binomial-Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    
+    <style>
+        body {
+            background-color: #ffffff; /* a) Weißer Hintergrund */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column; /* Stapelt Elemente vertikal */
+        }
+
+        /* Container für die gesamte App */
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Container für die Bedienelemente (Slider + Button) */
+        #controls {
+            background-color: #e0e0e0;
+            padding: 15px 25px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 750px; /* Breite passend zum Canvas */
+            justify-content: space-between;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Styling für den Button */
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* Der Canvas selbst */
+        canvas {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div id="controls">
+            <div class="slider-group">
+                <label for="n-slider">n (0-11):</label>
+                <div id="slider-holder"></div>
+            </div>
+            
+            <button onclick="exportSimulation()">CSV Exportieren (1000 Exp.)</button>
+        </div>
+
+        <div id="canvas-holder"></div>
+    </div>
+
+<script>
+    let slider;
+    let maxN = 11; // c) Limit auf 11
+
+    function setup() {
+        // Canvas im Container erstellen
+        let cnv = createCanvas(800, 600);
+        cnv.parent('canvas-holder');
+        
+        // Slider erstellen und im HTML platzieren
+        slider = createSlider(0, maxN, 3); // Startwert 3
+        slider.parent('slider-holder');
+        slider.style('width', '200px');
+        
+        textAlign(CENTER, CENTER);
+    }
+
+function draw() {
+        background(240); // Leicht grauer Hintergrund
+        
+        let n = slider.value();
+        
+        // --- NEU: Berechnung und Anzeige der Summe ---
+        let summe = Math.pow(2, n);
+        
+        fill(50); // Dunkelgrau für den Text
+        noStroke();
+        textSize(16);
+        // Zeigt "n", die Summe und die Potenzschreibweise an
+        text(`n = ${n}   |   Summe = ${summe}  (2^${n})`, width/2, 30);
+        // ---------------------------------------------
+        
+        drawPascalsTriangle(n);
+    }
+
+    function drawPascalsTriangle(rows) {
+        // c) Verbesserte Skalierung
+        // Wir prüfen, was begrenzend wirkt: Die Breite oder die Höhe?
+        // Bei n=11 brauchen wir Platz für 12 Kreise vertikal.
+        
+        let availableHeight = height - 100; // Puffer oben/unten
+        let availableWidth = width - 50;    // Puffer links/rechts
+        
+        // Durchmesser basierend auf Breite
+        let dW = availableWidth / (rows + 1);
+        // Durchmesser basierend auf Höhe
+        let dH = availableHeight / (rows + 1);
+        
+        // Wir nehmen den kleineren Wert, damit es sicher passt
+        let diameter = min(dW, dH);
+        
+        // Obergrenze für kleine n (damit Kreise nicht riesig werden)
+        if (diameter > 80) diameter = 80;
+        
+        let startY = 100; // Etwas Platz nach oben lassen
+        
+        let triangle = [];
+
+        for (let i = 0; i <= rows; i++) {
+            triangle[i] = [];
+            
+            // Y-Position: Wir stapeln sie vertikal
+            let y = startY + i * (diameter * 0.9); // 0.9 damit sie etwas enger liegen
+            
+            for (let j = 0; j <= i; j++) {
+                let val;
+                
+                if (j === 0 || j === i) {
+                    val = 1;
+                } else {
+                    val = triangle[i-1][j-1] + triangle[i-1][j];
+                }
+                
+                triangle[i][j] = val;
+                
+                // X-Position
+                let x = width / 2 + (j - i / 2) * diameter;
+                
+                drawCell(x, y, diameter, val);
+            }
+        }
+    }
+
+    function drawCell(x, y, d, val) {
+        stroke(100); 
+        strokeWeight(1);
+        
+        // Farben etwas kräftiger für den hellen Hintergrund
+        if (val % 2 === 0) {
+            fill(100, 149, 237); // CornflowerBlue
+        } else {
+            fill(255, 99, 71);   // Tomato Red
+        }
+        
+        ellipse(x, y, d * 0.9, d * 0.9);
+        
+        fill(255);
+        noStroke();
+        
+        // Schriftgröße anpassen
+        let txtSize = d * 0.45;
+        if (val > 99) txtSize = d * 0.35;
+        if (val > 999) txtSize = d * 0.25;
+        
+        textSize(txtSize);
+        text(val, x, y);
+    }
+
+    // d) Die Simulations- und Export-Funktion
+    function exportSimulation() {
+        let n = slider.value();
+        let rows = 1000;
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // CSV Header
+        csvContent += "Experiment_ID,Erfolgswahrscheinlichkeit_p,Anzahl_Versuche_n,Erzielte_Treffer_k\n";
+        
+        // 1000 Simulationen
+        for (let i = 1; i <= rows; i++) {
+            let k = 0; // Anzahl Treffer in diesem Experiment
+            
+            // Wir simulieren n Münzwürfe
+            for (let wurf = 0; wurf < n; wurf++) {
+                // Zufallszahl zwischen 0 und 1. Wenn > 0.5, dann Treffer.
+                if (Math.random() > 0.5) {
+                    k++;
+                }
+            }
+            
+            // Zeile zur CSV hinzufügen
+            csvContent += `${i},0.5,${n},${k}\n`;
+        }
+
+        // Download auslösen
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `simulation_n${n}_1000x.csv`);
+        document.body.appendChild(link); // Required for FF
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
