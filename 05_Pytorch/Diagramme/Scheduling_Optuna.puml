@@ -1,0 +1,139 @@
+@startuml
+skinparam style strictuml
+skinparam DefaultFontName Arial
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #FBC02D
+skinparam PartitionBorderColor #424242
+title PyTorch Pipeline: Optuna Hyperparameter-Tuning (Production Workflow)
+
+start
+
+partition "1. Setup & Reproduzierbarkeit" #E1F5FE {
+    :1. Seed setzen
+    (set_seed(42) für numpy & torch);
+    :2. Device-Detektion
+    (CUDA / MPS / CPU automatisch wählen);
+    note right
+        **Best Practice:**
+        Device-Agnostizität
+        ermöglicht Ausführung
+        auf GPU, Apple Silicon
+        und CPU ohne Code-Änderung.
+    end note
+}
+
+partition "2. Data Pipeline (modularisiert)" #E3F2FD {
+    :3. Datensatz laden
+    (pd.read_csv('Iris.csv'));
+    :4. Label-Encoding anwenden
+    (Kategorien in 0, 1, 2 wandeln);
+    :5. Train-Test-Split
+    (Separates Test-Set abspalten);
+    :6. Train-Validation-Split
+    (Val-Set vom Train-Set abspalten);
+    :7. Feature-Skalierung (StandardScaler)
+    **Wichtig:** fit_transform() nur auf Train,
+    transform() auf Val- und Test-Daten;
+    :8. TensorDataset & DataLoader
+    (Batching, shuffle=True nur für Train);
+    note right
+        **Modularisierung:**
+        Alle Schritte gekapselt in
+        get_iris_dataloaders().
+        Verhindert Data Leakage
+        und macht Code testbar.
+    end note
+}
+
+partition "3. Model Factory" #E8F5E9 {
+    :9. Dynamisches Netz via Funktion
+    create_model(hidden_dim, dropout_rate);
+    note right
+        **Architektur (variabel):**
+        1. Linear(4, hidden_dim)
+        2. ReLU()
+        3. [Dropout] (optional)
+        4. Linear(hidden_dim, 3)
+    end note
+}
+
+partition "4. Optuna-Konfiguration" #F3E5F5 {
+    :10. Objective-Funktion definieren
+    (Search Space via trial.suggest_*);
+    note right
+        **Suchraum-Beispiele:**
+        • hidden_dim: 4..64
+        • lr: 1e-4..1e-1 (log)
+        • weight_decay: 1e-6..1e-2
+        • dropout_rate: 0.0..0.5
+        • patience: 5..20
+    end note
+    :11. Study anlegen
+    (TPESampler + MedianPruner);
+}
+
+partition "5. Hyperparameter-Suche (Trial-Loop)" #FFF3E0 {
+    while (n_trials erreicht?) is (nein)
+        :12. Neuer Trial startet
+        (Optuna schlägt Parameter vor);
+        :13. Modell instanziieren
+        (create_model mit Trial-Parametern);
+        
+        while (Epochen-Limit oder Early Stopping?) is (nein)
+            :14. Training-Loop
+            (Forward, Loss, Backward, Step);
+            :15. Validation
+            (with torch.no_grad());
+            :16. Pruning-Check
+            trial.report() & should_prune();
+            note right
+                **Gamechanger:**
+                Schlechte Trials werden
+                frühzeitig abgebrochen
+                → spart massiv Rechenzeit
+                & Cloud-Kosten.
+            end note
+            if (Trial schlechter als Median?) then (ja)
+                :raise TrialPruned();
+                stop
+            else (nein)
+            endif
+        endwhile (ja)
+        
+        :17. Besten Val-Loss an Study zurückgeben;
+    endwhile (ja)
+}
+
+partition "6. Analyse & Visualisierung" #FCE4EC {
+    :18. Beste Parameter ausgeben
+    (study.best_params);
+    :19. Optimization History Plot
+    (plot_optimization_history);
+    :20. Parameter Importances Plot
+    (plot_param_importances);
+}
+
+partition "7. Final Retraining & Deployment" #EFEBE9 {
+    :21. Finales Modell trainieren
+    (mit besten Parametern, längere Patience);
+    note right
+        **Kritischer Best Practice:**
+        Optuna speichert NUR die
+        Parameter, NICHT die Gewichte.
+        → Retraining ist Pflicht!
+        
+        Analogie:
+        Optuna = Architekt (Bauplan)
+        Retraining = Baufirma (Haus)
+    end note
+    :22. Test-Set Evaluation
+    (model.eval() + torch.no_grad());
+    :23. Artefakte für Inferenz speichern
+    • Modellgewichte (state_dict)
+    • LabelEncoder (.pkl)
+    • Feature-Scaler (.pkl)
+    • **Beste Parameter (.pkl)**;
+}
+
+stop
+@enduml
