@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCA Visualisierung (Iris Datensatz)</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.3.0/math.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --accent-color: #4169E1;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: row;
+            background-color: var(--card-bg);
+            width: 1000px;
+            height: 650px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #canvas-container {
+            flex: 2; 
+            background-color: #fff;
+            position: relative;
+            border-right: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            background-color: #fafafa;
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            margin: 0 0 5px 0;
+            color: #000;
+        }
+
+        p {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: #666;
+            margin: 0 0 10px 0;
+        }
+
+        .control-group {
+            background-color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 2px;
+            color: #555;
+        }
+
+        select {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #fff;
+            font-size: 0.85rem;
+        }
+
+        .legend {
+            display: flex;
+            gap: 10px;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+        .dot { width: 10px; height: 10px; display: inline-block; border-radius: 50%; }
+        
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            pointer-events: none;
+            background: rgba(255,255,255,0.8);
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+
+        #math-output {
+            margin-top: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.75rem;
+            color: #444;
+        }
+
+        .math-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        
+        .math-table th {
+            text-align: right;
+            border-bottom: 2px solid #ccc;
+            padding: 2px 4px;
+            color: #000;
+        }
+
+        .math-table td {
+            text-align: right;
+            border-bottom: 1px solid #eee;
+            padding: 2px 4px;
+        }
+
+        .math-header {
+            font-weight: bold;
+            color: var(--accent-color);
+            display: block;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div id="canvas-container">
+            <div id="loading">Lade iris.csv...</div>
+        </div>
+
+        <aside class="sidebar">
+            <div>
+                <h1>PCA Analyse (3D)</h1>
+                <p>
+                    Wählen Sie drei Features. 
+                    Daten werden zentriert.
+                </p>
+            </div>
+
+            <div class="control-group">
+                <label for="selectX">X-Achse Feature</label>
+                <select id="selectX"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="selectY">Y-Achse Feature</label>
+                <select id="selectY"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="selectZ">Z-Achse Feature</label>
+                <select id="selectZ"></select>
+            </div>
+
+            <div class="legend">
+                <div><span class="dot" style="background:#78ffe8"></span> Setosa</div>
+                <div><span class="dot" style="background:#888888"></span> Versicolor</div>
+                <div><span class="dot" style="background:#789cff"></span> Virginica</div>
+            </div>
+
+            <div id="math-output"></div>
+        </aside>
+    </div>
+
+<script>
+    let table;
+    let data = []; 
+    let features = []; 
+    let loaded = false;
+    let selX, selY, selZ;
+    let rotX = -0.5;
+    let rotY = 0.5;
+    
+    let uiLayer; 
+    
+    // NEU: Texturen für die Achsen-Labels
+    let labelX, labelY, labelZ;
+
+    const BOX_SIZE = 150; 
+
+    let pcaResult = {
+        eigenvalues: [],
+        eigenvectors: [],
+        normalizedData: [],
+        scaleFactor: 1
+    };
+
+    function preload() {
+        try {
+            table = loadTable('iris.csv', 'csv', 'header', 
+                () => { console.log("CSV geladen"); },
+                () => { alert("Fehler beim Laden von iris.csv"); }
+            );
+        } catch(e) { console.error(e); }
+    }
+
+    function setup() {
+        let container = document.getElementById('canvas-container');
+        let w = container.clientWidth;
+        let h = container.clientHeight;
+        
+        let cnv = createCanvas(w, h, WEBGL);
+        cnv.parent('canvas-container');
+        
+        // 2D Layer für Scree Plot
+        uiLayer = createGraphics(w, h);
+
+        // NEU: Achsen-Labels erstellen (als kleine Bilder)
+        labelX = createLabelTexture("X", "#FF4444");
+        labelY = createLabelTexture("Y", "#44FF44");
+        labelZ = createLabelTexture("Z", "#4444FF");
+
+        camera(0, 0, 1000, 0, 0, 0, 0, 1, 0);
+        perspective(PI / 3.5, width / height, 1, 5000);
+
+        if(table && table.getRowCount() > 0) {
+            processData();
+            initGUI();
+            calculatePCA();
+            loaded = true;
+            document.getElementById('loading').style.display = 'none';
+        }
+    }
+
+    // Hilfsfunktion um Text in eine Textur zu wandeln
+    function createLabelTexture(txt, col) {
+        let pg = createGraphics(64, 64);
+        pg.background(255); // Weißer Hintergrund
+        pg.fill(col);
+        pg.noStroke();
+        pg.textSize(48);
+        pg.textAlign(CENTER, CENTER);
+        pg.textStyle(BOLD);
+        pg.text(txt, 32, 32);
+        return pg;
+    }
+
+    function processData() {
+        let cols = table.columns;
+        features = cols.filter(c => c.trim() !== 'species');
+        
+        for(let r = 0; r < table.getRowCount(); r++) {
+            let rowObj = {};
+            let isRowValid = true; 
+            features.forEach(f => {
+                let valStr = String(table.getString(r, f)).replace(',', '.');
+                let val = parseFloat(valStr);
+                if (isNaN(val)) isRowValid = false;
+                rowObj[f] = val;
+            });
+            let s = table.getString(r, 'species');
+            rowObj.species = s ? s.trim() : "unknown";
+            if (isRowValid) data.push(rowObj);
+        }
+    }
+
+    function initGUI() {
+        selX = document.getElementById('selectX');
+        selY = document.getElementById('selectY');
+        selZ = document.getElementById('selectZ');
+        populateSelect(selX, features, 0); 
+        populateSelect(selY, features, 1); 
+        populateSelect(selZ, features, 2); 
+        selX.addEventListener('change', calculatePCA);
+        selY.addEventListener('change', calculatePCA);
+        selZ.addEventListener('change', calculatePCA);
+    }
+
+    function populateSelect(elem, options, defaultIdx) {
+        options.forEach((opt, i) => {
+            let el = document.createElement('option');
+            el.text = opt;
+            el.value = opt;
+            if(i === defaultIdx) el.selected = true;
+            elem.add(el);
+        });
+    }
+
+    function calculatePCA() {
+        if(!data || data.length === 0) return;
+        let fx = selX.value; let fy = selY.value; let fz = selZ.value;
+        let matrixData = data.map(d => [d[fx], d[fy], d[fz]]);
+        let N = matrixData.length;
+        
+        let mean = math.mean(matrixData, 0); 
+        let centered = matrixData.map(row => math.subtract(row, mean));
+
+        let X = math.matrix(centered);
+        let XT = math.transpose(X);
+        let cov = math.multiply(XT, X);
+        cov = math.divide(cov, N - 1);
+
+        let ans = math.eigs(cov);
+        let eigenList = ans.eigenvectors; 
+        eigenList.sort((a, b) => b.value - a.value);
+
+        pcaResult.eigenvalues = [];
+        pcaResult.eigenvectors = [];
+        for(let i=0; i < Math.min(3, eigenList.length); i++) {
+            let item = eigenList[i];
+            pcaResult.eigenvalues.push(item.value);
+            let vecArray;
+            if (item.vector && typeof item.vector.toArray === 'function') {
+                vecArray = item.vector.toArray().flat();
+            } else if (Array.isArray(item.vector)) {
+                vecArray = item.vector;
+            } else { vecArray = [0,0,0]; }
+            pcaResult.eigenvectors.push(vecArray);
+        }
+
+        let maxVal = 0;
+        centered.forEach(row => {
+            row.forEach(val => { if(Math.abs(val) > maxVal) maxVal = Math.abs(val); });
+        });
+        let scaleFactor = maxVal > 0 ? (BOX_SIZE / maxVal) : 1;
+        pcaResult.normalizedData = centered.map(row => {
+            return [row[0] * scaleFactor, row[1] * scaleFactor, row[2] * scaleFactor];
+        });
+        pcaResult.scaleFactor = scaleFactor;
+
+        updateMathPanel(cov, eigenList);
+    }
+
+    function updateMathPanel(covMatrix, eigenList) {
+        let container = document.getElementById('math-output');
+        let html = '';
+
+        html += '<span class="math-header">Kovarianzmatrix (3x3)</span>';
+        html += '<table class="math-table">';
+        let covArr = covMatrix.toArray();
+        covArr.forEach(row => {
+            html += '<tr>';
+            row.forEach(val => {
+                html += `<td>${val.toFixed(2)}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</table>';
+
+        html += '<span class="math-header">Eigenvektoren (PC) & &lambda;</span>';
+        html += '<table class="math-table">';
+        html += '<tr><th></th><th style="color:#FF0000">PC1</th><th style="color:#00FF00">PC2</th><th style="color:#0000FF">PC3</th></tr>';
+
+        let labels = ['x', 'y', 'z'];
+        for(let dim=0; dim<3; dim++) {
+            html += `<tr><td><b>${labels[dim]}</b></td>`;
+            for(let i=0; i<3; i++) {
+                let vecObj = eigenList[i].vector;
+                let vecArr = (vecObj.toArray ? vecObj.toArray() : vecObj).flat();
+                html += `<td>${vecArr[dim].toFixed(2)}</td>`;
+            }
+            html += '</tr>';
+        }
+        
+        html += '<tr style="border-top: 2px solid #ccc;"><td><b>&lambda;</b></td>';
+        for(let i=0; i<3; i++) {
+             html += `<td><b>${eigenList[i].value.toFixed(2)}</b></td>`;
+        }
+        html += '</tr></table>';
+
+        container.innerHTML = html;
+    }
+
+    function draw() {
+        background(255);
+        if(!loaded) return;
+
+        ambientLight(180); 
+        pointLight(255, 255, 255, 500, -500, 500); 
+
+        push();
+        translate(0, -90, 0);
+        
+        if (mouseIsPressed && mouseY < height * 0.7) {
+            rotY += (mouseX - pmouseX) * 0.01;
+            rotX += (mouseY - pmouseY) * 0.01;
+        }
+        rotateX(rotX);
+        rotateY(rotY);
+
+        // Achsen + Labels zeichnen
+        drawAxes();
+
+        noStroke(); 
+        for(let i=0; i<data.length; i++) {
+            if (!pcaResult.normalizedData[i]) continue;
+            let p = pcaResult.normalizedData[i]; 
+            let species = data[i].species;
+            fill(getColor(species));
+            push();
+            translate(p[0], p[1], p[2]);
+            sphere(4); 
+            pop();
+        }
+
+        strokeWeight(6);
+        let colors = ['#FF0000', '#00FF00', '#0000FF']; 
+        for(let i=0; i<pcaResult.eigenvectors.length; i++) {
+            let vec = pcaResult.eigenvectors[i];
+            let val = pcaResult.eigenvalues[i];
+            let len = Math.sqrt(val) * pcaResult.scaleFactor * 2.5; 
+            let vx = vec[0]; let vy = vec[1]; let vz = vec[2];
+
+            stroke(colors[i]);
+            line(0, 0, 0, vx*len, vy*len, vz*len);
+            
+            push();
+            translate(vx*len, vy*len, vz*len);
+            fill(colors[i]); noStroke(); 
+            sphere(3);
+            pop();
+        }
+        pop();
+
+        drawScreePlotLayer();
+
+        resetMatrix();
+        camera(); 
+        noLights(); 
+        
+        imageMode(CENTER);
+        image(uiLayer, 0, 0);
+    }
+
+    function drawAxes() {
+        let L = BOX_SIZE * 1.5; 
+        strokeWeight(2);
+
+        // X-Achse (Rot)
+        stroke(255, 190, 190);
+        line(-L, 0, 0, L, 0, 0);
+        drawAxisLabel(labelX, L, 0, 0);
+
+        // Y-Achse (Grün)
+        stroke(120, 200, 120);
+        line(0, -L, 0, 0, L, 0);
+        drawAxisLabel(labelY, 0, L, 0);
+
+        // Z-Achse (Blau)
+        stroke(190, 190, 255);
+        line(0, 0, -L, 0, 0, L);
+        drawAxisLabel(labelZ, 0, 0, L);
+    }
+
+    // Zeichnet das Label und dreht es so, dass es zur Kamera zeigt
+    function drawAxisLabel(img, x, y, z) {
+        push();
+        translate(x, y, z);
+        // Rotation rückgängig machen (Billboarding)
+        rotateY(-rotY);
+        rotateX(-rotX);
+        
+        noStroke();
+        texture(img);
+        plane(30); // Größe des Label-Schildes
+        pop();
+    }
+
+    function drawScreePlotLayer() {
+        uiLayer.clear(); 
+        
+        let startX = 50; 
+        let startY = height - 150;
+        let w = 520;
+        let h = 110;
+
+        uiLayer.noStroke();
+        uiLayer.fill(250); 
+        uiLayer.rect(startX - 10, startY - 20, w + 20, h + 40, 6);
+
+        uiLayer.fill(80);
+        uiLayer.textSize(15);
+        uiLayer.textAlign(LEFT, BOTTOM);
+        uiLayer.text("Erklärte Varianz (Eigenwerte)", startX, startY - 25);
+
+        let sum = pcaResult.eigenvalues.reduce((a, b) => a + b, 0);
+        let barW = 80;
+        let gap = 100;
+
+        for(let i=0; i<pcaResult.eigenvalues.length; i++) {
+            let val = pcaResult.eigenvalues[i];
+            let percent = sum > 0 ? val / sum : 0;
+            let barH = percent * h; 
+
+            let x = startX + i * (barW + gap);
+            let y = startY + h; 
+
+            if(i==0) uiLayer.fill('#FF0000');
+            else if(i==1) uiLayer.fill('#00FF00');
+            else uiLayer.fill('#0000FF');
+            
+            uiLayer.rect(x+50, y, barW, -barH); 
+
+            uiLayer.fill(0);
+            uiLayer.textAlign(CENTER, TOP);
+            uiLayer.text("PC" + (i+1), x + barW/2 + 50, y + 5);
+            
+            uiLayer.fill(100);
+            uiLayer.text(Math.round(percent*100)+"%", x + barW/2 + 50, y - barH - 15);
+        }
+    }
+
+    function getColor(species) {
+        if(species.includes('setosa')) return color('#78ffe8'); 
+        if(species.includes('virginica')) return color('#789cff');
+        if(species.includes('versicolor')) return color('#888888');
+        return color(150);
+    }
+    
+    function windowResized() {}
+</script>
+</body>
+</html>

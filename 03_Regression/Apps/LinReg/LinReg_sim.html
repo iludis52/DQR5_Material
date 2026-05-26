@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌻 KI-Labor: Lineare Regression</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --blue: #1565C0;
+    --blue-light: #E3F2FD;
+    --blue-mid: #90CAF9;
+    --green: #2E7D32;
+    --green-light: #E8F5E9;
+    --orange: #E65100;
+    --orange-light: #FFF3E0;
+    --red: #C62828;
+    --gray-50: #FAFAFA;
+    --gray-100: #F5F5F5;
+    --gray-200: #EEEEEE;
+    --gray-300: #E0E0E0;
+    --gray-400: #BDBDBD;
+    --gray-600: #757575;
+    --gray-800: #424242;
+    --gray-900: #212121;
+    --radius: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: var(--gray-100);
+    color: var(--gray-900);
+    line-height: 1.5;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+
+  #app {
+    width: 1000px;
+    max-width: 100%;
+  }
+
+  /* ── Header ── */
+  .app-header {
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    padding: 20px 24px 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .app-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 6px;
+  }
+  .app-header p {
+    font-size: 13.5px;
+    color: var(--gray-600);
+    line-height: 1.55;
+  }
+
+  /* ── Section boxes ── */
+  .section-box {
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--blue);
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+  }
+  .section-body { padding: 16px; }
+
+  /* ── Row layouts ── */
+  .row { display: flex; gap: 12px; }
+  .col-half { flex: 1; min-width: 0; }
+
+  /* ── CSV Upload ── */
+  .upload-zone {
+    border: 2px dashed var(--gray-400);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--blue);
+    background: var(--blue-light);
+  }
+  .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone .label { font-size: 14px; font-weight: 600; color: var(--gray-800); }
+  .upload-zone .hint { font-size: 12px; color: var(--gray-600); margin-top: 4px; }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+
+  .demo-btn {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--blue);
+    background: var(--blue-light);
+    border: 1px solid var(--blue-mid);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .demo-btn:hover { background: var(--blue-mid); color: white; }
+
+  /* ── Column selector ── */
+  .col-selector {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .col-selector label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .col-selector select {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 5px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    background: white;
+    color: var(--gray-900);
+    cursor: pointer;
+  }
+  .col-selector select:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+
+  .train-btn {
+    margin-left: auto;
+    padding: 8px 20px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    background: var(--green);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .train-btn:hover { background: #1B5E20; transform: translateY(-1px); }
+  .train-btn:disabled { background: var(--gray-400); cursor: not-allowed; transform: none; }
+  .train-btn.training {
+    background: var(--orange);
+    animation: pulse 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.7; } }
+
+  /* ── Data table ── */
+  .data-table-wrap {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .data-table thead { position: sticky; top: 0; z-index: 1; }
+  .data-table th {
+    background: var(--blue);
+    color: white;
+    font-weight: 600;
+    font-size: 12px;
+    padding: 8px 12px;
+    text-align: left;
+    letter-spacing: 0.3px;
+  }
+  .data-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-800);
+  }
+  .data-table tr:nth-child(even) { background: var(--gray-50); }
+  .data-table tr:hover { background: var(--blue-light); }
+
+  .data-info {
+    font-size: 12px;
+    color: var(--gray-600);
+    padding: 8px 0 0;
+  }
+
+  /* ── Chart ── */
+  #chart-container canvas { display: block; border-radius: 4px; }
+
+  /* ── Results ── */
+  .result-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .result-card:last-child { margin-bottom: 0; }
+  .result-card .rc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-600);
+    margin-bottom: 6px;
+  }
+  .formula-display {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--blue);
+    padding: 4px 0;
+  }
+  .metric-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .metric {
+    display: flex;
+    flex-direction: column;
+    min-width: 100px;
+  }
+  .metric .m-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--gray-600);
+  }
+  .metric .m-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+  .metric .m-value.good { color: var(--green); }
+  .metric .m-value.warn { color: var(--orange); }
+  .metric .m-value.bad { color: var(--red); }
+
+  /* ── Training progress ── */
+  .training-bar-wrap {
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .training-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    width: 0%;
+    border-radius: 2px;
+    transition: width 0.05s linear;
+  }
+  .training-status {
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--gray-600);
+    margin-top: 6px;
+    min-height: 16px;
+  }
+
+  /* ── Inference ── */
+  .inference-box {
+    background: var(--orange-light);
+    border: 1px solid #FFE0B2;
+  }
+  .inference-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .inference-row input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    padding: 8px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: 4px;
+    width: 140px;
+    background: white;
+  }
+  .inference-row input:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
+  .inference-row .arrow { font-size: 20px; color: var(--orange); }
+  .inference-result {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--orange);
+    min-width: 120px;
+  }
+  .inference-labels {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .inference-labels span {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+  }
+
+  /* ── Empty states ── */
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-400);
+    font-size: 14px;
+  }
+  .empty-state .es-icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* ── Scrollbar ── */
+  .data-table-wrap::-webkit-scrollbar { width: 6px; }
+  .data-table-wrap::-webkit-scrollbar-track { background: var(--gray-100); }
+  .data-table-wrap::-webkit-scrollbar-thumb { background: var(--gray-400); border-radius: 3px; }
+
+  /* ── Utility ── */
+  .hidden { display: none !important; }
+  .mb-12 { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div class="app-header">
+    <h1>🌻 KI-Labor: Lineare Regression</h1>
+    <p>Lade einen Datensatz (CSV), wähle zwei Spalten und trainiere ein lineares Regressionsmodell.
+       Beobachte, wie der Gradientenabstieg Schritt für Schritt die beste Gerade findet.</p>
+  </div>
+
+  <!-- Upload -->
+  <div class="section-box mb-12" id="upload-section">
+    <div class="section-title">📂 Datensatz laden</div>
+    <div class="section-body">
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".csv">
+        <div class="icon">📄</div>
+        <div class="label">CSV-Datei hierher ziehen oder klicken</div>
+        <div class="hint">Spalten durch Komma, Semikolon oder Tab getrennt</div>
+        <button class="demo-btn" id="demo-btn" onclick="event.stopPropagation(); loadDemoData();">
+          🌻 Zum Beispiel: Sonnenblumen-Daten laden
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column selector + Train button -->
+  <div class="section-box mb-12 hidden" id="controls-section">
+    <div class="section-title">⚙️ Modell konfigurieren</div>
+    <div class="section-body">
+      <div class="col-selector">
+        <label>X-Achse:</label>
+        <select id="sel-x"></select>
+        <label style="margin-left:8px;">Y-Achse:</label>
+        <select id="sel-y"></select>
+        <button class="train-btn" id="train-btn" onclick="startTraining()">▶ Modell trainieren</button>
+      </div>
+      <div class="training-bar-wrap hidden" id="training-bar-wrap">
+        <div class="training-bar" id="training-bar"></div>
+      </div>
+      <div class="training-status" id="training-status"></div>
+    </div>
+  </div>
+
+  <!-- Main content: Chart + Table -->
+  <div class="row mb-12 hidden" id="main-row">
+    <!-- Chart -->
+    <div class="col-half">
+      <div class="section-box">
+        <div class="section-title">👁‍🗨 Visualisierung: Diagramm</div>
+        <div class="section-body" id="chart-container"></div>
+      </div>
+    </div>
+    <!-- Table -->
+    <div class="col-half">
+      <div class="section-box">
+        <div class="section-title" id="table-title">✏️ Messdaten</div>
+        <div class="section-body">
+          <div class="data-table-wrap" id="table-wrap">
+            <table class="data-table" id="data-table">
+              <thead><tr id="table-head"></tr></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+          <div class="data-info" id="data-info"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="section-box mb-12 hidden" id="results-section">
+    <div class="section-title">📊 Ergebnis: Regressionsgerade</div>
+    <div class="section-body">
+      <div class="result-card">
+        <div class="rc-label">Geradengleichung</div>
+        <div class="formula-display" id="formula-display">y = m · x + b</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-label">Modell-Kennzahlen</div>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="m-label">Steigung (m)</span>
+            <span class="m-value" id="m-slope">—</span>
+          </div>
+          <div class="metric">
+            <span class="m-label">Achsenabschnitt (b)</span>
+            <span class="m-value" id="m-intercept">—</span>
+          </div>
+          <div class="metric">
+            <span class="m-label">Korrelation (r)</span>
+            <span class="m-value" id="m-corr">—</span>
+          </div>
+          <div class="metric">
+            <span class="m-label">Bestimmtheitsmaß (R²)</span>
+            <span class="m-value" id="m-r2">—</span>
+          </div>
+          <div class="metric">
+            <span class="m-label">Iterationen</span>
+            <span class="m-value" id="m-iters">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inference -->
+  <div class="section-box hidden inference-box" id="inference-section">
+    <div class="section-title">🔮 Vorhersage: Inferenz</div>
+    <div class="section-body">
+      <div class="inference-labels">
+        <span id="inf-x-label">X eingeben:</span>
+        <span style="flex:1;"></span>
+        <span id="inf-y-label">→ Vorhergesagter Y-Wert</span>
+      </div>
+      <div class="inference-row">
+        <input type="number" id="inf-input" placeholder="z.B. 50" step="any" oninput="doInference()">
+        <span class="arrow">→</span>
+        <span class="inference-result" id="inf-result">—</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let rawData = [];       // [{col1: val, col2: val, ...}, ...]
+let columns = [];       // column names
+let xCol = '';
+let yCol = '';
+let xData = [];
+let yData = [];
+
+// Model
+let model = { m: 0, b: 0, trained: false };
+let targetM = 0, targetB = 0;
+let animM = 0, animB = 0;
+let isTraining = false;
+let trainingStep = 0;
+let totalSteps = 0;
+let trainingRAF = null;
+
+// p5 sketch
+let p5Instance = null;
+const CHART_W = 468;
+const CHART_H = 360;
+const PAD = { t: 20, r: 20, b: 50, l: 60 };
+
+// ══════════════════════════════════════════════
+// CSV PARSING
+// ══════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return { columns: [], data: [] };
+
+  // Detect delimiter
+  const firstLine = lines[0];
+  let delim = ',';
+  if (firstLine.split(';').length > firstLine.split(',').length) delim = ';';
+  else if (firstLine.split('\t').length > firstLine.split(',').length) delim = '\t';
+
+  const headers = lines[0].split(delim).map(h => h.trim().replace(/^["']|["']$/g, ''));
+  const data = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(delim).map(v => v.trim().replace(/^["']|["']$/g, ''));
+    if (vals.length === headers.length) {
+      const row = {};
+      headers.forEach((h, j) => {
+        const num = parseFloat(vals[j].replace(',', '.'));
+        row[h] = isNaN(num) ? vals[j] : num;
+      });
+      data.push(row);
+    }
+  }
+  return { columns: headers, data };
+}
+
+function isNumericColumn(col) {
+  return rawData.every(row => typeof row[col] === 'number' && !isNaN(row[col]));
+}
+
+// ══════════════════════════════════════════════
+// DATA LOADING
+// ══════════════════════════════════════════════
+function loadData(csvText) {
+  const parsed = parseCSV(csvText);
+  rawData = parsed.data;
+  columns = parsed.columns;
+
+  if (rawData.length === 0) { alert('Keine Daten gefunden.'); return; }
+
+  // Populate selectors with numeric columns only
+  const numCols = columns.filter(c => isNumericColumn(c));
+  if (numCols.length < 2) { alert('Mindestens 2 numerische Spalten benötigt.'); return; }
+
+  const selX = document.getElementById('sel-x');
+  const selY = document.getElementById('sel-y');
+  selX.innerHTML = '';
+  selY.innerHTML = '';
+  numCols.forEach(c => {
+    selX.innerHTML += `<option value="${c}">${c}</option>`;
+    selY.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  if (numCols.length >= 2) selY.selectedIndex = 1;
+
+  // Show sections
+  document.getElementById('controls-section').classList.remove('hidden');
+  document.getElementById('main-row').classList.remove('hidden');
+  document.getElementById('results-section').classList.add('hidden');
+  document.getElementById('inference-section').classList.add('hidden');
+
+  // Reset model
+  model = { m: 0, b: 0, trained: false };
+  isTraining = false;
+  if (trainingRAF) cancelAnimationFrame(trainingRAF);
+  document.getElementById('training-status').textContent = '';
+  document.getElementById('training-bar-wrap').classList.add('hidden');
+  document.getElementById('train-btn').textContent = '▶ Modell trainieren';
+  document.getElementById('train-btn').classList.remove('training');
+  document.getElementById('train-btn').disabled = false;
+
+  updateColumns();
+  renderTable();
+  initChart();
+}
+
+function updateColumns() {
+  xCol = document.getElementById('sel-x').value;
+  yCol = document.getElementById('sel-y').value;
+  xData = rawData.map(r => r[xCol]);
+  yData = rawData.map(r => r[yCol]);
+}
+
+document.getElementById('sel-x').addEventListener('change', () => { updateColumns(); renderTable(); if (p5Instance) p5Instance.redraw(); });
+document.getElementById('sel-y').addEventListener('change', () => { updateColumns(); renderTable(); if (p5Instance) p5Instance.redraw(); });
+
+// File input
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => loadData(ev.target.result);
+  reader.readAsText(file);
+});
+
+// Drag & drop
+const uz = document.getElementById('upload-zone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('dragover'); });
+uz.addEventListener('dragleave', () => uz.classList.remove('dragover'));
+uz.addEventListener('drop', e => {
+  e.preventDefault();
+  uz.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = ev => loadData(ev.target.result);
+    reader.readAsText(file);
+  }
+});
+
+// Demo data
+function loadDemoData() {
+  const csv = `Tag;Hoehe_cm
+7;18
+14;36
+21;68
+28;98
+35;131
+42;170`;
+  loadData(csv);
+}
+
+// ══════════════════════════════════════════════
+// TABLE RENDERING
+// ══════════════════════════════════════════════
+function renderTable() {
+  const thead = document.getElementById('table-head');
+  const tbody = document.getElementById('table-body');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  // Show only selected x and y columns plus index
+  thead.innerHTML = `<th>#</th><th>${xCol}</th><th>${yCol}</th>`;
+
+  rawData.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td>${row[xCol]}</td><td>${row[yCol]}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('table-title').textContent = `✏️ Messdaten (N=${rawData.length})`;
+  document.getElementById('data-info').textContent = `${rawData.length} Datenpunkte · X: ${xCol} · Y: ${yCol}`;
+}
+
+// ══════════════════════════════════════════════
+// p5.js CHART
+// ══════════════════════════════════════════════
+function initChart() {
+  if (p5Instance) p5Instance.remove();
+
+  const container = document.getElementById('chart-container');
+  container.innerHTML = '';
+
+  p5Instance = new p5(sk => {
+    sk.setup = function () {
+      sk.createCanvas(CHART_W, CHART_H).parent(container);
+      sk.textFont('IBM Plex Sans');
+      sk.noLoop();
+    };
+
+    sk.draw = function () {
+      sk.background(255);
+
+      if (xData.length === 0) return;
+
+      const xMin = Math.min(...xData);
+      const xMax = Math.max(...xData);
+      const yMin = Math.min(...yData);
+      const yMax = Math.max(...yData);
+      const xPad = (xMax - xMin) * 0.1 || 1;
+      const yPad = (yMax - yMin) * 0.1 || 1;
+      const xLo = xMin - xPad, xHi = xMax + xPad;
+      const yLo = yMin - yPad, yHi = yMax + yPad;
+
+      const plotL = PAD.l, plotR = CHART_W - PAD.r;
+      const plotT = PAD.t, plotB = CHART_H - PAD.b;
+
+      function mapX(v) { return sk.map(v, xLo, xHi, plotL, plotR); }
+      function mapY(v) { return sk.map(v, yLo, yHi, plotB, plotT); }
+
+      // Grid
+      sk.stroke(230);
+      sk.strokeWeight(1);
+      const nTicksX = 6, nTicksY = 6;
+      for (let i = 0; i <= nTicksX; i++) {
+        const v = xLo + (xHi - xLo) * i / nTicksX;
+        const px = mapX(v);
+        sk.line(px, plotT, px, plotB);
+        sk.noStroke();
+        sk.fill(120);
+        sk.textAlign(sk.CENTER, sk.TOP);
+        sk.textSize(10);
+        sk.text(niceNum(v), px, plotB + 6);
+        sk.stroke(230);
+      }
+      for (let i = 0; i <= nTicksY; i++) {
+        const v = yLo + (yHi - yLo) * i / nTicksY;
+        const py = mapY(v);
+        sk.line(plotL, py, plotR, py);
+        sk.noStroke();
+        sk.fill(120);
+        sk.textAlign(sk.RIGHT, sk.CENTER);
+        sk.textSize(10);
+        sk.text(niceNum(v), plotL - 6, py);
+        sk.stroke(230);
+      }
+
+      // Axes
+      sk.stroke(60);
+      sk.strokeWeight(1.5);
+      sk.line(plotL, plotB, plotR, plotB);
+      sk.line(plotL, plotT, plotL, plotB);
+
+      // Axis labels
+      sk.noStroke();
+      sk.fill(30);
+      sk.textAlign(sk.CENTER, sk.TOP);
+      sk.textSize(12);
+      sk.textStyle(sk.BOLD);
+      sk.text(xCol, (plotL + plotR) / 2, plotB + 26);
+
+      sk.push();
+      sk.translate(14, (plotT + plotB) / 2);
+      sk.rotate(-sk.HALF_PI);
+      sk.textAlign(sk.CENTER, sk.CENTER);
+      sk.text(yCol, 0, 0);
+      sk.pop();
+      sk.textStyle(sk.NORMAL);
+
+      // Regression line (if training or trained)
+      if (isTraining || model.trained) {
+        const lineXLo = xLo;
+        const lineXHi = xHi;
+        const lineYLo = animM * lineXLo + animB;
+        const lineYHi = animM * lineXHi + animB;
+
+        sk.stroke(model.trained ? '#1565C0' : '#E65100');
+        sk.strokeWeight(2.5);
+        sk.drawingContext.setLineDash(model.trained ? [] : [6, 4]);
+        sk.line(mapX(lineXLo), mapY(lineYLo), mapX(lineXHi), mapY(lineYHi));
+        sk.drawingContext.setLineDash([]);
+
+        // Error lines during training
+        if (isTraining) {
+          sk.stroke(200, 60, 60, 80);
+          sk.strokeWeight(1);
+          for (let i = 0; i < xData.length; i++) {
+            const pred = animM * xData[i] + animB;
+            sk.line(mapX(xData[i]), mapY(yData[i]), mapX(xData[i]), mapY(pred));
+          }
+        }
+      }
+
+      // Data points
+      sk.noStroke();
+      for (let i = 0; i < xData.length; i++) {
+        const px = mapX(xData[i]);
+        const py = mapY(yData[i]);
+        sk.fill(21, 101, 192, 40);
+        sk.ellipse(px, py, 16, 16);
+        sk.fill(21, 101, 192);
+        sk.ellipse(px, py, 8, 8);
+      }
+    };
+  });
+}
+
+function niceNum(v) {
+  if (Math.abs(v) >= 1000) return v.toFixed(0);
+  if (Math.abs(v) >= 10) return v.toFixed(1);
+  if (Math.abs(v) >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+// ══════════════════════════════════════════════
+// LINEAR REGRESSION (analytical for target)
+// ══════════════════════════════════════════════
+function computeRegression(xs, ys) {
+  const n = xs.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += xs[i]; sumY += ys[i];
+    sumXY += xs[i] * ys[i];
+    sumX2 += xs[i] * xs[i];
+    sumY2 += ys[i] * ys[i];
+  }
+  const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const b = (sumY - m * sumX) / n;
+
+  // Correlation
+  const denom = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+  const r = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+
+  return { m, b, r, r2: r * r };
+}
+
+// ══════════════════════════════════════════════
+// GRADIENT DESCENT ANIMATION
+// ══════════════════════════════════════════════
+function startTraining() {
+  if (isTraining) return;
+
+  updateColumns();
+  if (xData.length < 2) { alert('Mindestens 2 Datenpunkte benötigt.'); return; }
+
+  // Calculate target analytically
+  const result = computeRegression(xData, yData);
+  targetM = result.m;
+  targetB = result.b;
+
+  // Normalize data for gradient descent
+  const xMean = xData.reduce((a, b) => a + b, 0) / xData.length;
+  const yMean = yData.reduce((a, b) => a + b, 0) / yData.length;
+  const xStd = Math.sqrt(xData.reduce((s, v) => s + (v - xMean) ** 2, 0) / xData.length) || 1;
+  const yStd = Math.sqrt(yData.reduce((s, v) => s + (v - yMean) ** 2, 0) / yData.length) || 1;
+  const xNorm = xData.map(v => (v - xMean) / xStd);
+  const yNorm = yData.map(v => (v - yMean) / yStd);
+
+  // GD in normalized space
+  let gdM = (Math.random() - 0.5) * 2;
+  let gdB = (Math.random() - 0.5) * 2;
+  const lr = 0.05;
+  const n = xNorm.length;
+
+  // Start from a visually wrong line
+  animM = gdM * yStd / xStd;
+  animB = yMean - animM * xMean;
+
+  // Total steps for ~2.5s at 60fps
+  totalSteps = 150;
+  trainingStep = 0;
+  isTraining = true;
+  model.trained = false;
+
+  // UI
+  document.getElementById('train-btn').textContent = '⏳ Training...';
+  document.getElementById('train-btn').classList.add('training');
+  document.getElementById('train-btn').disabled = true;
+  document.getElementById('training-bar-wrap').classList.remove('hidden');
+  document.getElementById('results-section').classList.remove('hidden');
+  document.getElementById('inference-section').classList.add('hidden');
+  document.getElementById('formula-display').textContent = 'Training läuft...';
+  document.getElementById('m-slope').textContent = '...';
+  document.getElementById('m-intercept').textContent = '...';
+  document.getElementById('m-corr').textContent = '...';
+  document.getElementById('m-r2').textContent = '...';
+  document.getElementById('m-iters').textContent = '0';
+
+  // Precompute all GD steps
+  const steps = [];
+  for (let s = 0; s < totalSteps; s++) {
+    // Gradient
+    let dM = 0, dB = 0;
+    for (let i = 0; i < n; i++) {
+      const pred = gdM * xNorm[i] + gdB;
+      const err = pred - yNorm[i];
+      dM += err * xNorm[i];
+      dB += err;
+    }
+    dM /= n; dB /= n;
+    gdM -= lr * dM;
+    gdB -= lr * dB;
+
+    // Convert back to original space
+    const realM = gdM * yStd / xStd;
+    const realB = yMean + gdB * yStd - realM * xMean;
+    steps.push({ m: realM, b: realB });
+  }
+
+  // Animate
+  function tick() {
+    if (trainingStep < totalSteps) {
+      const s = steps[trainingStep];
+      animM = s.m;
+      animB = s.b;
+      trainingStep++;
+
+      // Update progress
+      const pct = (trainingStep / totalSteps * 100).toFixed(0);
+      document.getElementById('training-bar').style.width = pct + '%';
+      document.getElementById('training-status').textContent =
+        `Iteration ${trainingStep}/${totalSteps} · m=${animM.toFixed(4)} · b=${animB.toFixed(4)} · Fehler minimieren...`;
+      document.getElementById('m-iters').textContent = trainingStep;
+
+      if (p5Instance) p5Instance.redraw();
+      trainingRAF = requestAnimationFrame(tick);
+    } else {
+      // Done - snap to exact analytical result
+      animM = targetM;
+      animB = targetB;
+      model.m = targetM;
+      model.b = targetB;
+      model.trained = true;
+      isTraining = false;
+
+      document.getElementById('training-bar').style.width = '100%';
+      document.getElementById('training-status').textContent = '✅ Training abgeschlossen!';
+      document.getElementById('train-btn').textContent = '▶ Modell trainieren';
+      document.getElementById('train-btn').classList.remove('training');
+      document.getElementById('train-btn').disabled = false;
+
+      // Show results
+      const rr = computeRegression(xData, yData);
+      const mStr = rr.m >= 0 ? rr.m.toFixed(4) : '(' + rr.m.toFixed(4) + ')';
+      const bStr = rr.b >= 0 ? ' + ' + rr.b.toFixed(4) : ' − ' + Math.abs(rr.b).toFixed(4);
+      document.getElementById('formula-display').textContent = `${yCol} = ${mStr} · ${xCol}${bStr}`;
+      document.getElementById('m-slope').textContent = rr.m.toFixed(4);
+      document.getElementById('m-intercept').textContent = rr.b.toFixed(4);
+
+      const corrEl = document.getElementById('m-corr');
+      corrEl.textContent = rr.r.toFixed(4);
+      corrEl.className = 'm-value ' + (Math.abs(rr.r) > 0.8 ? 'good' : Math.abs(rr.r) > 0.5 ? 'warn' : 'bad');
+
+      const r2El = document.getElementById('m-r2');
+      r2El.textContent = rr.r2.toFixed(4);
+      r2El.className = 'm-value ' + (rr.r2 > 0.7 ? 'good' : rr.r2 > 0.4 ? 'warn' : 'bad');
+
+      document.getElementById('m-iters').textContent = totalSteps;
+
+      // Show inference
+      document.getElementById('inference-section').classList.remove('hidden');
+      document.getElementById('inf-x-label').textContent = `${xCol} eingeben:`;
+      document.getElementById('inf-y-label').textContent = `→ Vorhergesagter ${yCol}-Wert`;
+      document.getElementById('inf-input').value = '';
+      document.getElementById('inf-result').textContent = '—';
+
+      if (p5Instance) p5Instance.redraw();
+    }
+  }
+
+  trainingRAF = requestAnimationFrame(tick);
+}
+
+// ══════════════════════════════════════════════
+// INFERENCE
+// ══════════════════════════════════════════════
+function doInference() {
+  if (!model.trained) return;
+  const input = document.getElementById('inf-input');
+  const result = document.getElementById('inf-result');
+  const val = parseFloat(input.value);
+  if (isNaN(val)) { result.textContent = '—'; return; }
+  const pred = model.m * val + model.b;
+  result.textContent = pred.toFixed(2);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz: Mittelwert vs. Erwartungswert</title>
+  <style>
+    :root { --pad: 16px; --radius: 14px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: #f6f7fb; color: #111; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 24px; }
+    header { display:flex; gap: 12px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .card { background: #fff; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.06); padding: var(--pad); }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .pill { background: #eef2ff; padding: 8px 10px; border-radius: 999px; font-size: .9rem; }
+    .muted { color: #555; font-size: .95rem; }
+    .question { font-size: 1.1rem; line-height: 1.35; margin: 8px 0 14px; }
+    .choices { display:grid; gap: 10px; margin: 10px 0 6px; }
+    button.choice {
+      text-align: left; padding: 12px 12px; border-radius: 12px; border: 1px solid #d7dbe7;
+      background: #fff; cursor:pointer; transition: transform .02s ease, box-shadow .15s ease;
+    }
+    button.choice:hover { box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+    button.choice:active { transform: translateY(1px); }
+    button.choice[disabled] { cursor: not-allowed; opacity: .85; }
+    .good { border-color: #1b9e5a !important; background: #ecfff3 !important; }
+    .bad { border-color: #d64545 !important; background: #fff1f1 !important; }
+    .controls { display:flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .btn {
+      padding: 10px 12px; border-radius: 12px; border: 1px solid #cfd5e6; background:#fff;
+      cursor:pointer;
+    }
+    .btn.primary { background:#111; color:#fff; border-color:#111; }
+    .btn.secondary { background:#eef2ff; border-color:#d6dcff; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; }
+    .explain { margin-top: 12px; padding: 12px; border-radius: 12px; background: #f7f7fb; border: 1px solid #eceef7; }
+    .explain h3 { margin: 0 0 6px; font-size: 1rem; }
+    .progress { height: 10px; background: #e9ecf7; border-radius: 999px; overflow: hidden; }
+    .bar { height: 10px; width: 0%; background: #111; transition: width .2s ease; }
+    .split { display:grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
+    @media (max-width: 860px){ .split { grid-template-columns: 1fr; } }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+           background: #f1f1f1; border: 1px solid #ddd; padding: 2px 6px; border-radius: 8px; font-size: .9rem; }
+    .tiny { font-size: .85rem; color:#666; }
+    input[type="text"]{
+      padding: 10px 12px; border-radius: 12px; border: 1px solid #d7dbe7; width: min(360px, 100%);
+      font-size: 1rem;
+    }
+    .tag { display:inline-block; margin: 4px 6px 0 0; padding: 4px 8px; border-radius: 999px; background:#f1f4ff; font-size: .85rem; }
+    details { margin-top: 10px; }
+
+    /* Simple math styling (offline-friendly) */
+    .formula { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background:#fff; }
+    .frac { display:inline-block; vertical-align: middle; text-align:center; }
+    .frac > span { display:block; padding: 0 2px; }
+    .frac .top { border-bottom: 1px solid #333; }
+    .frac .bottom { margin-top: 1px; }
+    .sum { font-family: "Times New Roman", Times, serif; font-size: 1.2em; }
+    .int { font-family: "Times New Roman", Times, serif; font-size: 1.2em; }
+    .small { font-size: .95em; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Interaktives Quiz: Mittelwert vs. Erwartungswert</h1>
+        <div class="muted">Klick dich durch – mit Feedback, Erklärungen, Zufallsmischung und Ergebnisübersicht.</div>
+      </div>
+      <div class="row">
+        <div class="pill">Tastatur: <span class="kbd">1</span>–<span class="kbd">4</span>, <span class="kbd">Enter</span>, <span class="kbd">N</span></div>
+      </div>
+    </header>
+
+    <div class="split" style="margin-top:16px;">
+      <section class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div class="row">
+            <div class="pill" id="meta">Frage 1 / 1</div>
+            <div class="pill">Punkte: <b id="score">0</b></div>
+          </div>
+          <div class="row">
+            <label class="tiny"><input type="checkbox" id="shuffle" checked> Zufallsreihenfolge</label>
+            <label class="tiny"><input type="checkbox" id="showHints"> Hinweise anzeigen</label>
+            <label class="tiny"><input type="checkbox" id="strict"> Strenger Modus (keine Lösung markieren)</label>
+          </div>
+        </div>
+
+        <div class="progress" aria-label="Fortschritt" style="margin: 12px 0 14px;">
+          <div class="bar" id="bar"></div>
+        </div>
+
+        <div class="tiny" id="tags"></div>
+        <div class="question" id="qText">…</div>
+
+        <div id="interaction"></div>
+
+        <div class="controls">
+          <button class="btn secondary" id="btnPrev">Zurück</button>
+          <button class="btn" id="btnSkip">Überspringen</button>
+          <button class="btn primary" id="btnNext">Weiter</button>
+          <button class="btn" id="btnRestart">Neu starten</button>
+        </div>
+
+        <div id="explain" class="explain" style="display:none;"></div>
+
+        <details>
+          <summary class="tiny">Formelsammlung (lesbar im Browser, offline)</summary>
+          <div class="tiny small" style="margin-top:8px; line-height:1.55;">
+            <div>
+              <b>Stichprobenmittel:</b>
+              <span class="formula">x̄ = </span>
+              <span class="formula frac">
+                <span class="top">1</span>
+                <span class="bottom">n</span>
+              </span>
+              <span class="formula"> · </span>
+              <span class="formula"><span class="sum">∑</span><sub>i=1</sub><sup>n</sup> x<sub>i</sub></span>
+            </div>
+            <div style="margin-top:6px;">
+              <b>Erwartungswert (diskret):</b>
+              <span class="formula">E[X] = <span class="sum">∑</span> x · p(x)</span>
+            </div>
+            <div style="margin-top:6px;">
+              <b>Erwartungswert (stetig):</b>
+              <span class="formula">E[X] = <span class="int">∫</span><sub>−∞</sub><sup>∞</sup> x · f(x) dx</span>
+            </div>
+            <div style="margin-top:6px;">
+              <b>Unverzerrtheit (typischer Standardfall):</b>
+              <span class="formula">E[X̄] = μ</span>
+              <span class="tiny"> (wenn die Messwerte als <i>unabhängig</i> und <i>gleich verteilt</i> modelliert werden)</span>
+            </div>
+            <div style="margin-top:6px;">
+              <b>Gesetz der großen Zahlen (informell):</b>
+              <span class="formula">X̄ → μ</span>
+              <span class="tiny"> für n → ∞ (unter üblichen Voraussetzungen)</span>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <aside class="card">
+        <h2 style="margin:0 0 10px; font-size:1.05rem;">Ergebnis & Review</h2>
+        <div class="muted" id="status">Beantworte die Fragen – hier erscheint deine Übersicht.</div>
+        <div style="margin-top:12px;" id="review"></div>
+      </aside>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const QUESTIONS = [
+    {
+      id: "q1",
+      type: "mc",
+      tags: ["Definition", "Begriffe"],
+      text: "Welche Aussage trifft den Unterschied am präzisesten?",
+      choices: [
+        "Mittelwert ist modellbasiert; Erwartungswert ist aus Daten berechnet.",
+        "Mittelwert ist aus beobachteten Daten berechnet; Erwartungswert ist Eigenschaft einer Verteilung/eines Modells.",
+        "Beides ist immer identisch, wenn n ≥ 30.",
+        "Erwartungswert ist der Median; Mittelwert ist der Modus."
+      ],
+      answer: 1,
+      explain: "Der Stichprobenmittelwert x̄ ist eine Kennzahl realisierter Daten. Der Erwartungswert E[X] ist eine theoretische Größe der Zufallsvariable/Verteilung."
+    },
+    {
+      id: "q2",
+      type: "tf",
+      tags: ["Interpretation"],
+      text: "Der Erwartungswert muss ein Wert sein, den die Zufallsvariable tatsächlich annehmen kann.",
+      answer: false,
+      explain: "Nein. Beispiel: fairer Würfel, E[X]=3,5 – die Variable nimmt nur 1,…,6 an."
+    },
+    {
+      id: "q3",
+      type: "mc",
+      tags: ["Rechnen", "Stichprobe"],
+      text: "Gegeben sind Daten: 2, 3, 4, 3, 8. Wie groß ist der Mittelwert?",
+      choices: ["3", "4", "4,5", "20"],
+      answer: 1,
+      explain: "(2+3+4+3+8)/5 = 20/5 = 4."
+    },
+    {
+      id: "q4",
+      type: "mc",
+      tags: ["Rechnen", "Diskret"],
+      text: "Ein fairer Würfel. Was ist E[X]?",
+      choices: ["3", "3,5", "4", "21"],
+      answer: 1,
+      explain: "E[X]=(1+2+3+4+5+6)/6=3,5."
+    },
+    {
+      id: "q5",
+      type: "mc",
+      tags: ["Modell vs. Daten"],
+      text: "Was ist typischerweise eine Eigenschaft der Population/Verteilung (nicht der konkreten Stichprobe)?",
+      choices: ["x̄ (Stichprobenmittelwert)", "E[X] (Erwartungswert)", "n (Stichprobengröße)", "Maximalwert der Stichprobe"],
+      answer: 1,
+      explain: "E[X] gehört zum Modell/der Verteilung; x̄ gehört zur konkreten Stichprobe."
+    },
+    {
+      id: "q6",
+      type: "mc",
+      tags: ["Schätzer", "Modellannahmen"],
+      text: "Angenommen, die Messwerte X₁,…,Xₙ sind (1) unabhängig voneinander und (2) stammen alle aus derselben Verteilung (gleiche Verteilung). Wenn außerdem E[X]=μ gilt, was folgt dann für den Stichprobenmittelwert X̄?",
+      choices: [
+        "E[X̄] = 0",
+        "E[X̄] = μ (der Stichprobenmittelwert ist dann ein unverzerrter Schätzer für μ)",
+        "X̄ ist konstant und nicht zufällig",
+        "μ hängt von der konkreten Stichprobe ab"
+      ],
+      answer: 1,
+      explain: "Unter den Annahmen „unabhängig und gleich verteilt“ (oft als Standardmodell) gilt E[X̄]=μ."
+    },
+    {
+      id: "q7",
+      type: "tf",
+      tags: ["Gesetz der großen Zahlen"],
+      text: "Wenn man sehr oft misst (n groß) und die üblichen Voraussetzungen gelten, dann liegt der Stichprobenmittelwert X̄ typischerweise nahe am Erwartungswert μ.",
+      answer: true,
+      explain: "Das ist die Kernaussage des Gesetzes der großen Zahlen: X̄ nähert sich für großes n dem Populationsmittel μ an."
+    },
+    {
+      id: "q8",
+      type: "mc",
+      tags: ["Konzept"],
+      text: "Welche Größe ist (bei zufälliger Stichprobe) selbst eine Zufallsvariable?",
+      choices: ["E[X]", "μ (Populationsmittel)", "X̄ (Stichprobenmittel)", "p(x) (Wahrscheinlichkeit)"],
+      answer: 2,
+      explain: "Weil die Stichprobe zufällig ist, ist auch der daraus berechnete Mittelwert X̄ zufällig."
+    },
+    {
+      id: "q9",
+      type: "mc",
+      tags: ["Existenz", "Fallstricke"],
+      text: "Welche Aussage ist korrekt?",
+      choices: [
+        "Der Erwartungswert existiert für jede Verteilung immer.",
+        "Es gibt Verteilungen, bei denen E[X] nicht existiert oder nicht endlich ist (z.B. Cauchy).",
+        "Wenn E[X] nicht existiert, kann man keinen Mittelwert aus Daten berechnen.",
+        "Wenn E[X] nicht existiert, ist x̄ immer exakt 0."
+      ],
+      answer: 1,
+      explain: "E[X] kann nicht existieren oder unendlich sein. Einen Stichprobenmittelwert kann man trotzdem berechnen – er hat dann aber keine stabile Zielgröße."
+    },
+    {
+      id: "q10",
+      type: "mc",
+      tags: ["Begriffe", "Sprache präzisieren"],
+      text: "Welche Formulierung ist in Statistik-Klausuren am präzisesten?",
+      choices: [
+        "Der Mittelwert ist der Erwartungswert.",
+        "Der Mittelwert (aus Daten) schätzt den Erwartungswert / Populationsmittelwert.",
+        "Der Erwartungswert ist der Mittelwert der Daten.",
+        "Beide Begriffe sind austauschbar."
+      ],
+      answer: 1,
+      explain: "Typisch: X̄ ist ein Schätzer für μ=E[X]. Gleichsetzen ohne Bedingungen ist unsauber."
+    },
+    {
+      id: "q11",
+      type: "num",
+      tags: ["Rechnen", "Gewichteter Erwartungswert"],
+      text: "Diskrete Zufallsvariable: X nimmt 0 mit Wahrscheinlichkeit 0,7 und 10 mit Wahrscheinlichkeit 0,3 an. Gib E[X] ein.",
+      validator: (raw) => {
+        const x = parseFloat(String(raw).replace(",", "."));
+        return Number.isFinite(x) && Math.abs(x - 3) < 1e-9;
+      },
+      solutionText: "3",
+      explain: "E[X]=0·0,7 + 10·0,3 = 3."
+    },
+    {
+      id: "q12",
+      type: "mc",
+      tags: ["Interpretation", "Langfristig"],
+      text: "Was bedeutet 'Erwartungswert' im häufigsten (nicht-missverständlichen) Sinn?",
+      choices: [
+        "Der Wert, der am wahrscheinlichsten ist (Modus).",
+        "Der Durchschnitt über sehr viele Wiederholungen (gewichteter Mittelwert der Verteilung).",
+        "Immer der Median.",
+        "Das arithmetische Mittel einer einzigen Stichprobe."
+      ],
+      answer: 1,
+      explain: "Erwartungswert ist ein gewichteter Durchschnitt gemäß der Verteilung; nicht Modus oder Median per se."
+    },
+    {
+      id: "q13",
+      type: "tf",
+      tags: ["Modellannahmen"],
+      text: "Ohne ein Wahrscheinlichkeitsmodell (Verteilung/Wahrscheinlichkeiten) ist der Erwartungswert nicht definierbar, der Mittelwert aus Daten aber schon.",
+      answer: true,
+      explain: "E[X] braucht ein Modell. x̄ ist rein datenbasiert."
+    },
+    {
+      id: "q14",
+      type: "mc",
+      tags: ["Fehlerquellen"],
+      text: "Welche Situation führt am ehesten dazu, dass x̄ eine schlechte Annäherung an μ ist?",
+      choices: [
+        "n ist sehr groß und die Verteilung hat endlichen Erwartungswert",
+        "Die Daten sind unabhängig und gleich verteilt und ohne Ausreißer",
+        "Sehr kleines n und/oder starke Heavy-Tails bzw. extreme Ausreißer",
+        "Die Zufallsvariable ist konstant"
+      ],
+      answer: 2,
+      explain: "Mit kleinem n ist die Streuung groß; bei Heavy-Tails/Ausreißern kann der Mittelwert stark schwanken."
+    },
+    {
+      id: "q15",
+      type: "mc",
+      tags: ["Begriffstest", "Zuordnung"],
+      text: "Welche Zuordnung ist korrekt?",
+      choices: [
+        "Mittelwert → Eigenschaft der Verteilung, Erwartungswert → Kennzahl der Stichprobe",
+        "Mittelwert → Kennzahl der Stichprobe, Erwartungswert → Eigenschaft der Verteilung",
+        "Beides → Kennzahl der Stichprobe",
+        "Beides → Eigenschaft der Verteilung"
+      ],
+      answer: 1,
+      explain: "Genau: x̄ kommt aus Daten, E[X] kommt aus der Verteilung."
+    }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    order: [],
+    i: 0,
+    score: 0,
+    answered: new Map(),
+    skipped: new Set(),
+    strict: false
+  };
+
+  function shuffleArray(a){
+    const arr = a.slice();
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function buildOrder(){
+    const ids = QUESTIONS.map(q => q.id);
+    state.order = $("shuffle").checked ? shuffleArray(ids) : ids;
+    state.i = 0;
+    state.score = 0;
+    state.answered.clear();
+    state.skipped.clear();
+    render();
+    renderReview();
+  }
+
+  function currentQ(){
+    const id = state.order[state.i];
+    return QUESTIONS.find(q => q.id === id);
+  }
+
+  function setMeta(){
+    $("meta").textContent = `Frage ${state.i + 1} / ${state.order.length}`;
+    $("score").textContent = String(state.score);
+    const pct = ((state.i) / (state.order.length)) * 100;
+    $("bar").style.width = `${pct}%`;
+  }
+
+  function setTags(q){
+    $("tags").innerHTML = (q.tags || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+  }
+
+  function escapeHtml(s){
+    return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+  }
+
+  function showExplain(q, correct, extra = ""){
+    const box = $("explain");
+    box.style.display = "block";
+    const headline = correct ? "✅ Richtig" : "❌ Nicht ganz";
+    const hint = $("showHints").checked && extra ? `<div class="tiny" style="margin-top:6px;">${extra}</div>` : "";
+    box.innerHTML = `
+      <h3>${headline}</h3>
+      <div>${escapeHtml(q.explain || "")}</div>
+      ${hint}
+    `;
+  }
+
+  function clearExplain(){
+    $("explain").style.display = "none";
+    $("explain").innerHTML = "";
+  }
+
+  function disableInteraction(disabled=true){
+    const root = $("interaction");
+    root.querySelectorAll("button, input").forEach(el => el.disabled = disabled);
+  }
+
+  function render(){
+    const q = currentQ();
+    state.strict = $("strict").checked;
+    setMeta();
+    setTags(q);
+    $("qText").textContent = q.text;
+    clearExplain();
+
+    $("btnPrev").disabled = state.i === 0;
+    $("btnNext").disabled = state.i === state.order.length - 1;
+    $("btnSkip").disabled = false;
+
+    const root = $("interaction");
+    root.innerHTML = "";
+
+    const already = state.answered.get(q.id);
+
+    if(q.type === "mc"){
+      const wrap = document.createElement("div");
+      wrap.className = "choices";
+      q.choices.forEach((c, idx) => {
+        const b = document.createElement("button");
+        b.className = "choice";
+        b.type = "button";
+        b.innerHTML = `${idx+1}. ${escapeHtml(c)}`;
+        b.addEventListener("click", () => answerMC(q, idx));
+        wrap.appendChild(b);
+      });
+      root.appendChild(wrap);
+
+      if(already) lockAndMark(q, already.given);
+    }
+
+    if(q.type === "tf"){
+      const wrap = document.createElement("div");
+      wrap.className = "choices";
+      ["Wahr", "Falsch"].forEach((label, idx) => {
+        const b = document.createElement("button");
+        b.className = "choice";
+        b.type = "button";
+        b.innerHTML = `${idx+1}. ${label}`;
+        b.addEventListener("click", () => {
+          const given = (idx === 0);
+          answerTF(q, given);
+        });
+        wrap.appendChild(b);
+      });
+      root.appendChild(wrap);
+
+      if(already) lockAndMarkTF(q, already.given);
+    }
+
+    if(q.type === "num"){
+      const holder = document.createElement("div");
+      holder.className = "row";
+      holder.style.alignItems = "flex-end";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Antwort eingeben (z.B. 3 oder 3,5)";
+      input.autocomplete = "off";
+
+      const btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.textContent = "Antwort prüfen (Enter)";
+      btn.addEventListener("click", () => answerNUM(q, input.value));
+      input.addEventListener("keydown", (e) => {
+        if(e.key === "Enter"){ e.preventDefault(); answerNUM(q, input.value); }
+      });
+
+      holder.appendChild(input);
+      holder.appendChild(btn);
+      root.appendChild(holder);
+
+      const sol = document.createElement("div");
+      sol.className = "tiny";
+      sol.style.marginTop = "8px";
+      sol.textContent = "Tipp: Dezimaltrennzeichen ',' oder '.' ist ok.";
+      root.appendChild(sol);
+
+      if(already){
+        input.value = already.given;
+        input.disabled = true;
+        btn.disabled = true;
+        showExplain(q, already.correct, `Lösung: ${q.solutionText}`);
+      }
+    }
+
+    updateStatusText();
+  }
+
+  function updateStatusText(){
+    const total = state.order.length;
+    const done = state.answered.size;
+    const correct = [...state.answered.values()].filter(x => x.correct).length;
+    const skipped = state.skipped.size;
+
+    $("status").innerHTML = `
+      <div><b>Fortschritt:</b> ${done}/${total} beantwortet</div>
+      <div><b>Richtig:</b> ${correct}</div>
+      <div><b>Übersprungen:</b> ${skipped}</div>
+      <div class="tiny" style="margin-top:8px;">Tipp: Du kannst Fragen anklicken, um zu ihnen zu springen.</div>
+    `;
+  }
+
+  function lockAndMark(q, givenIdx){
+    const buttons = [...$("interaction").querySelectorAll("button.choice")];
+    buttons.forEach((b, idx) => {
+      b.disabled = true;
+      if(!state.strict){
+        if(idx === q.answer) b.classList.add("good");
+        if(idx === givenIdx && givenIdx !== q.answer) b.classList.add("bad");
+      }
+    });
+    const correct = (givenIdx === q.answer);
+    const extra = `Richtige Antwort: ${q.choices[q.answer]}`;
+    showExplain(q, correct, extra);
+  }
+
+  function lockAndMarkTF(q, givenBool){
+    const buttons = [...$("interaction").querySelectorAll("button.choice")];
+    const ansBool = !!q.answer;
+    buttons.forEach((b, idx) => {
+      b.disabled = true;
+      const val = (idx === 0);
+      if(!state.strict){
+        if(val === ansBool) b.classList.add("good");
+        if(val === givenBool && givenBool !== ansBool) b.classList.add("bad");
+      }
+    });
+    const correct = (givenBool === ansBool);
+    const extra = `Richtige Antwort: ${ansBool ? "Wahr" : "Falsch"}`;
+    showExplain(q, correct, extra);
+  }
+
+  function answerMC(q, idx){
+    if(state.answered.has(q.id)) return;
+    const correct = (idx === q.answer);
+    state.answered.set(q.id, { correct, given: idx });
+    if(correct) state.score += 1;
+    lockAndMark(q, idx);
+    renderReview();
+    updateStatusText();
+    $("score").textContent = String(state.score);
+  }
+
+  function answerTF(q, givenBool){
+    if(state.answered.has(q.id)) return;
+    const correct = (givenBool === !!q.answer);
+    state.answered.set(q.id, { correct, given: givenBool });
+    if(correct) state.score += 1;
+    lockAndMarkTF(q, givenBool);
+    renderReview();
+    updateStatusText();
+    $("score").textContent = String(state.score);
+  }
+
+  function answerNUM(q, raw){
+    if(state.answered.has(q.id)) return;
+    const given = String(raw).trim();
+    const correct = q.validator ? q.validator(given) : false;
+    state.answered.set(q.id, { correct, given });
+    if(correct) state.score += 1;
+
+    disableInteraction(true);
+    const extra = `Lösung: ${q.solutionText}`;
+    showExplain(q, correct, extra);
+    renderReview();
+    updateStatusText();
+    $("score").textContent = String(state.score);
+  }
+
+  function renderReview(){
+    const root = $("review");
+    root.innerHTML = "";
+
+    const list = document.createElement("div");
+    list.style.display = "grid";
+    list.style.gap = "8px";
+
+    state.order.forEach((id, idx) => {
+      const q = QUESTIONS.find(x => x.id === id);
+      const a = state.answered.get(id);
+
+      const item = document.createElement("button");
+      item.className = "btn";
+      item.style.textAlign = "left";
+      item.innerHTML = `
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:baseline;">
+          <div><b>${idx+1}.</b> ${escapeHtml(q.text.slice(0, 58))}${q.text.length>58?"…":""}</div>
+          <div class="tiny">${a ? (a.correct ? "✅" : "❌") : (state.skipped.has(id) ? "⏭️" : "•")}</div>
+        </div>
+      `;
+      item.addEventListener("click", () => { state.i = idx; render(); });
+      list.appendChild(item);
+    });
+
+    root.appendChild(list);
+
+    if(state.answered.size === state.order.length){
+      const correct = [...state.answered.values()].filter(x => x.correct).length;
+      const total = state.order.length;
+      const pct = Math.round((correct/total)*100);
+      const box = document.createElement("div");
+      box.className = "explain";
+      box.style.marginTop = "12px";
+      box.innerHTML = `
+        <h3>🏁 Fertig!</h3>
+        <div>Ergebnis: <b>${correct}/${total}</b> richtig (${pct}%).</div>
+        <div class="tiny" style="margin-top:6px;">Tipp: Wiederhole im Zufallsmodus und aktiviere „Strenger Modus“, um ohne Markierung zu üben.</div>
+      `;
+      root.appendChild(box);
+      $("bar").style.width = "100%";
+    }
+  }
+
+  $("btnPrev").addEventListener("click", () => { if(state.i>0){ state.i--; render(); } });
+  $("btnNext").addEventListener("click", () => { if(state.i<state.order.length-1){ state.i++; render(); } });
+  $("btnSkip").addEventListener("click", () => {
+    const q = currentQ();
+    state.skipped.add(q.id);
+    if(state.i < state.order.length-1) state.i++;
+    render();
+    renderReview();
+  });
+  $("btnRestart").addEventListener("click", () => buildOrder());
+
+  $("shuffle").addEventListener("change", () => buildOrder());
+  $("showHints").addEventListener("change", () => render());
+  $("strict").addEventListener("change", () => render());
+
+  document.addEventListener("keydown", (e) => {
+    const q = currentQ();
+    if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+
+    if(q.type === "mc" || q.type === "tf"){
+      const k = e.key;
+      if(["1","2","3","4"].includes(k)){
+        const idx = parseInt(k,10) - 1;
+        const buttons = [...$("interaction").querySelectorAll("button.choice")];
+        if(buttons[idx] && !buttons[idx].disabled) buttons[idx].click();
+      }
+    }
+    if(e.key.toLowerCase() === "n"){
+      $("btnNext").click();
+    }
+  });
+
+  buildOrder();
+})();
+</script>
+</body>
+</html>
