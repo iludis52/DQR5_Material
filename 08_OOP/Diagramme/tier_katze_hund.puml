@@ -1,0 +1,23 @@
+@startuml
+
+class Tier {
+    + lebendig : bool
+    + __init__()
+    + spricht() : String
+    + getLebendig() : bool
+}
+
+class Katze {
+    + __init__()
+    + spricht() : String
+}
+
+class Hund {
+    + __init__()
+    + spricht() : String
+}
+
+Tier <|-- Katze
+Tier <|-- Hund
+
+@enduml

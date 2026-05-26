@@ -1,0 +1,18 @@
+
+@startuml
+class Zaehler {
+  - stand: int
+  + __init__()
+  + klick(): int
+}
+@enduml
+
+
+@startuml
+class Tasse {
+  - volumen: int
+  + __init__()
+  + trinken()
+  + hineingiessen()
+}
+@enduml

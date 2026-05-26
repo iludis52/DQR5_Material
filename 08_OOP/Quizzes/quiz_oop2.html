@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vererbung Wissens-Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixierte Statusleiste -->
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Grundlagen der Vererbung</h1>
+
+<!-- Hier werden alle Fragen dynamisch reingeladen -->
+<div class="quiz-container" id="quiz-container"></div>
+
+<!-- Abschlussmeldung -->
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was ist das Hauptziel der Vererbung in der objektorientierten Programmierung?",
+            options: [
+                "Um jede Klasse möglichst komplex zu gestalten.",
+                "Um Code-Duplikation zu vermeiden und gemeinsames Verhalten in einer Basisklasse zu definieren.",
+                "Um sicherzustellen, dass alle Klassen unabhängig voneinander arbeiten.",
+                "Um den Speicherverbrauch zu maximieren."
+            ],
+            correct: 1,
+            explanation: "Richtig! Vererbung ermöglicht es, gemeinsame Eigenschaften und Methoden in einer Basisklasse zu definieren, die dann von Unterklassen wiederverwendet werden können."
+        },
+        {
+            text: "Welche Aussage über eine Basisklasse (auch Elternklasse genannt) ist korrekt?",
+            options: [
+                "Sie kann niemals Instanzen erzeugen.",
+                "Sie enthält spezifisches Verhalten, das nur eine Unterklasse benötigt.",
+                "Sie definiert gemeinsame Eigenschaften und Methoden für ihre Unterklassen.",
+                "Sie muss immer abstrakt sein."
+            ],
+            correct: 2,
+            explanation: "Genau! Die Basisklasse fasst gemeinsames Verhalten und Daten zusammen, das von mehreren Unterklassen genutzt wird."
+        },
+        {
+            text: "Was passiert, wenn eine Unterklasse eine Methode mit demselben Namen wie in der Basisklasse definiert?",
+            options: [
+                "Die Methode der Basisklasse wird gelöscht.",
+                "Beide Methoden werden gleichzeitig ausgeführt.",
+                "Die Methode der Unterklasse überschreibt die der Basisklasse (Methodenüberschreibung).",
+                "Python wirft einen Fehler, weil Namen nicht doppelt vorkommen dürfen."
+            ],
+            correct: 2,
+            explanation: "Korrekt! Dies nennt man Methodenüberschreibung (engl. method overriding). Die Unterklasse stellt ihre eigene Version der Methode bereit."
+        },
+        {
+            text: "Wofür wird das Schlüsselwort `super()` in Python typischerweise verwendet?",
+            options: [
+                "Um eine neue Klasse zu erstellen.",
+                "Um auf Attribute globaler Variablen zuzugreifen.",
+                "Um den Konstruktor oder Methoden der Basisklasse aufzurufen.",
+                "Um die Leistung des Programms zu steigern."
+            ],
+            correct: 2,
+            explanation: "Richtig! `super()` ermöglicht den Aufruf von Methoden oder dem Konstruktor der Elternklasse – besonders wichtig im `__init__` einer Unterklasse."
+        },
+        {
+            text: "Warum ruft man in der `__init__`-Methode einer Unterklasse oft `super().__init__()` auf?",
+            options: [
+                "Damit die Unterklasse nicht von der Basisklasse erben muss.",
+                "Um sicherzustellen, dass der Konstruktor der Basisklasse ausgeführt wird und geerbte Attribute initialisiert werden.",
+                "Weil Python sonst abstürzt.",
+                "Um die Methode `spricht()` automatisch zu überschreiben."
+            ],
+            correct: 1,
+            explanation: "Genau! Ohne `super().__init__()` würde die Initialisierung der Basisklasse übersprungen – geerbte Attribute wären nicht gesetzt."
+        },
+        {
+            text: "Was beschreibt der Begriff 'Generalisierung' im Kontext der Vererbung?",
+            options: [
+                "Die Umwandlung einer Unterklasse in eine Basisklasse durch Hinzufügen spezifischer Details.",
+                "Die Zusammenfassung gemeinsamer Merkmale mehrerer Klassen in einer neuen, allgemeineren Basisklasse.",
+                "Die Erstellung von möglichst vielen Unterklassen.",
+                "Die Überschreibung aller Methoden einer Basisklasse."
+            ],
+            correct: 1,
+            explanation: "Richtig! Generalisierung bedeutet, gemeinsame Eigenschaften zu abstrahieren und in einer übergeordneten Klasse zu definieren."
+        },
+        {
+            text: "Kann eine Unterklasse auf Methoden der Basisklasse zugreifen, die sie nicht überschreibt?",
+            options: [
+                "Nein, sie hat nur Zugriff auf ihre eigenen Methoden.",
+                "Ja, automatisch – solange sie nicht überschrieben wurden.",
+                "Nur wenn die Methoden als 'public' markiert sind.",
+                "Nur über den Klassennamen direkt."
+            ],
+            correct: 1,
+            explanation: "Exakt! Geerbte Methoden stehen der Unterklasse zur Verfügung, es sei denn, sie werden explizit überschrieben."
+        },
+        {
+            text: "Welche Beziehung beschreibt Vererbung am besten?",
+            options: [
+                "Hat-ein („has-a“)",
+                "Ist-ein („is-a“)",
+                "Benutzt-ein („uses-a“)",
+                "Kann-ein („can-a“)"
+            ],
+            correct: 1,
+            explanation: "Richtig! Eine Katze „ist ein“ Tier – das ist die klassische „is-a“-Beziehung, die Vererbung ausdrückt."
+        },
+        {
+            text: "Was ist eine Unterklasse (auch Kindklasse genannt)?",
+            options: [
+                "Eine Klasse, die keine Methoden enthält.",
+                "Eine Klasse, die von einer anderen Klasse erbt und deren Verhalten spezialisiert.",
+                "Eine Kopie der Basisklasse.",
+                "Eine Klasse, die nur statische Methoden hat."
+            ],
+            correct: 1,
+            explanation: "Genau! Die Unterklasse erbt von der Basisklasse und fügt oft spezifisches Verhalten hinzu oder überschreibt bestehendes."
+        },
+        {
+            text: "Angenommen, `Tier` ist eine Basisklasse mit einer Methode `spricht()`, und `Hund` ist eine Unterklasse, die `spricht()` überschreibt. Was gibt `Tier().spricht()` zurück, wenn `Tier.spricht()` '...' zurückgibt?",
+            options: [
+                "'Wuff'",
+                "Einen Fehler, weil nur Unterklassen Methoden haben dürfen.",
+                "'...'",
+                "Nichts (None)"
+            ],
+            correct: 2,
+            explanation: "Korrekt! Die Basisklasse behält ihr eigenes Verhalten bei. Die Überschreibung in `Hund` beeinflusst `Tier` nicht."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

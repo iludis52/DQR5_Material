@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OOP Grundlagen Wissens-Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>OOP Grundlagen: Klassen & Objekte</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was ist der Unterschied zwischen einer Klasse und einem Objekt?",
+            options: [
+                "Die Klasse ist der abstrakte Bauplan, das Objekt ist das konkrete Gebilde, das nach diesem Bauplan erstellt wurde.",
+                "Das Objekt ist der Bauplan, die Klasse ist das daraus erstellte Gebilde.",
+                "Es gibt keinen Unterschied, die Begriffe bedeuten in Python exakt dasselbe.",
+                "Eine Klasse enthält nur Methoden (Funktionen), ein Objekt enthält nur Attribute (Variablen)."
+            ],
+            correct: 0,
+            explanation: "Richtig! Die Klasse 'Tasse' definiert nur, wie eine Tasse aussehen soll und was sie kann. Das Objekt 'my_cup' ist eine konkrete, nutzbare Tasse im Speicher."
+        },
+        {
+            text: "Was bedeutet der Begriff 'Instanz' in der Objektorientierung?",
+            options: [
+                "Eine Fehlermeldung, die beim Ausführen des Codes entsteht.",
+                "Ein Synonym für ein konkretes Objekt, das aus einer Klasse 'instanziiert' (erzeugt) wurde.",
+                "Die Zeitspanne, wie lange ein Programm im Arbeitsspeicher läuft.",
+                "Ein spezielles, unveränderbares Attribut einer Klasse."
+            ],
+            correct: 1,
+            explanation: "Genau! 'Instanz' und 'Objekt' werden oft synonym verwendet. `my_cup` ist eine Instanz der Klasse `Tasse`."
+        },
+        {
+            text: "Was beschreibt ein 'Attribut' in der Objektorientierung?",
+            options: [
+                "Eine Aktion oder Tätigkeit, die ein Objekt ausführen kann.",
+                "Eine Verknüpfung zwischen zwei verschiedenen Klassen.",
+                "Eine Eigenschaft oder einen Zustand eines Objekts (z. B. das Volumen einer Tasse oder der Stand eines Zählers).",
+                "Einen Fehler im Klassendiagramm."
+            ],
+            correct: 2,
+            explanation: "Korrekt! Attribute sind die Variablen, die zu einem Objekt gehören. Sie definieren seinen aktuellen Zustand, wie `self.stand = 0`."
+        },
+        {
+            text: "Welche Funktion hat eine 'Methode'?",
+            options: [
+                "Sie ist eine Funktion, die an ein Objekt gebunden ist und dessen Verhalten definiert (z.B. 'trinken' oder 'klick').",
+                "Sie ist ein Synonym für die Klasse selbst.",
+                "Sie formatiert den Python-Code, damit er lesbarer wird.",
+                "Sie speichert statische Daten dauerhaft auf der Festplatte."
+            ],
+            correct: 0,
+            explanation: "Richtig! Methoden sind Funktionen, die innerhalb einer Klasse definiert sind. Sie bestimmen, was die Objekte dieser Klasse tun können."
+        },
+        {
+            text: "Was passiert im Hintergrund, wenn der Code 'my_cup = Tasse(250)' ausgeführt wird?",
+            options: [
+                "Die Klasse wird dauerhaft in 'my_cup' umbenannt.",
+                "Das Objekt wird gelöscht, um Platz für 250 neue Tassen zu machen.",
+                "Die Variable 'my_cup' speichert das komplette Objekt als direkte Kopie.",
+                "Es wird ein neues Tassen-Objekt im Speicher erstellt und 'my_cup' speichert eine Referenz (einen Verweis/Zeiger) darauf."
+            ],
+            correct: 3,
+            explanation: "Exakt! Variablen in Python enthalten bei Objekten nur die 'Adresse' (Referenz) im Speicher, wo das Objekt tatsächlich liegt."
+        },
+        {
+            text: "Wofür steht das Schlüsselwort 'self' in den Methoden einer Python-Klasse?",
+            options: [
+                "Es beendet die Methode sofort.",
+                "Es ist eine Referenz auf die konkrete, aktuelle Instanz, die diese Methode gerade aufruft.",
+                "Es erzeugt automatisch ein neues Objekt.",
+                "Es macht ein Attribut für andere Klassen unsichtbar."
+            ],
+            correct: 1,
+            explanation: "Genau! Wenn man `my_cup.drink()` aufruft, übergibt Python automatisch `my_cup` als erstes Argument (`self`). So weiß die Methode, mit wessen Daten sie arbeiten soll."
+        },
+        {
+            text: "Welche Aufgabe hat die spezielle Methode '__init__'?",
+            options: [
+                "Sie löscht das Objekt aus dem Speicher, wenn es nicht mehr gebraucht wird.",
+                "Sie berechnet die maximale Größe der Klasse im Arbeitsspeicher.",
+                "Sie ist der Konstruktor und wird einmalig aufgerufen, um ein frisch erstelltes Objekt zu initialisieren (Startzustand setzen).",
+                "Sie muss vor jedem Methodenaufruf manuell vom Programmierer aufgerufen werden."
+            ],
+            correct: 2,
+            explanation: "Richtig! Die `__init__`-Methode bereitet das Objekt vor, indem sie z.B. die anfänglichen Attributwerte (wie `initial_volume`) zuweist."
+        },
+        {
+            text: "Was passiert mit dem Zustand (den Attributen) eines Objekts, wenn eine Methode ihn verändert (wie bei 'klick()')?",
+            options: [
+                "Nur der Zustand dieser einen speziellen Instanz wird im Speicher aktualisiert.",
+                "Die Klasse selbst ändert sich dauerhaft für alle zukünftig erstellten Objekte.",
+                "Python wirft einen Fehler, da Objekte nach der Erstellung niemals verändert werden dürfen.",
+                "Es wird automatisch eine komplett neue Kopie des Objekts mit dem neuen Zustand erstellt."
+            ],
+            correct: 0,
+            explanation: "Korrekt! Objekte haben einen veränderbaren Zustand (State). `z.klick()` erhöht nur den Stand des speziellen Zähler-Objekts `z`, ohne andere Zähler zu beeinflussen."
+        },
+        {
+            text: "Wie kennzeichnet man in Python ein Attribut, das im UML-Diagramm als 'privat' markiert ist (Kapselung)?",
+            options: [
+                "Durch das Schlüsselwort 'private' vor dem Attributnamen.",
+                "Durch ein rotes Quadrat im Python-Code.",
+                "Man nutzt die Konvention, dem Namen einen Unterstrich voranzustellen (z. B. '_volumen').",
+                "Das ist in Python unmöglich, jedes Attribut ist immer zwingend öffentlich."
+            ],
+            correct: 2,
+            explanation: "Richtig! Python erzwingt 'private' nicht technisch, sondern vertraut auf die Konvention des Unterstrichs als Warnung für andere Programmierer: 'Das ist intern, greif nicht direkt darauf zu!'"
+        },
+        {
+            text: "Man erstellt zwei Zähler: 'z1 = Zaehler()' und 'z2 = Zaehler()'. Dann führt man 'z1.klick()' aus. Welchen Stand hat 'z2' danach?",
+            options: [
+                "1, weil sich die Klasse für alle geändert hat.",
+                "0, weil 'z1' und 'z2' unabhängige Objekte (Instanzen) mit eigenen Speicherbereichen (Referenzen) sind.",
+                "Das Programm stürzt ab, weil zwei Objekte der gleichen Klasse existieren.",
+                "Der Stand ist undefiniert."
+            ],
+            correct: 1,
+            explanation: "Exakt! Jede Instanz hält ihre eigenen Daten. Das Ändern des Zustands von `z1` hat absolut keine Auswirkungen auf `z2`."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
