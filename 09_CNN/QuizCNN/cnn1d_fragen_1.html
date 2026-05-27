@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch Quiz: Zeitreihenanalyse</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        h2 {
+             text-align: center;
+             color: #34495e;
+             font-weight: 400;
+             margin-top: 0;
+             margin-bottom: 30px;
+        }
+        .question-block {
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 25px;
+            margin-bottom: 25px;
+        }
+        .question-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        h3 {
+            color: #2980b9;
+            font-size: 1.4em;
+        }
+        .options {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .options li {
+            background-color: #ecf0f1;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 5px solid #bdc3c7;
+        }
+        .toggle-button {
+            background-color: #3498db;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+        }
+        .toggle-button:hover {
+            background-color: #2980b9;
+        }
+        .answer {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #e8f6f3;
+            border-left: 5px solid #1abc9c;
+            border-radius: 5px;
+        }
+        .answer strong {
+            color: #16a085;
+            font-size: 1.1em;
+        }
+        code {
+            background-color: #e0e0e0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: "Courier New", Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-container">
+        <h1>Quiz: Dein Weg zum PyTorch-Profi 🤓</h1>
+        <h2>Verstehe das Skript zur Zeitreihenvorhersage Schritt für Schritt.</h2>
+
+        <div class="question-block">
+            <h3>Frage 1 von 5</h3>
+            <p>Im <strong>Schritt 2</strong> des Skripts wird der <code>MinMaxScaler</code> verwendet. Was ist der Hauptgrund für seinen Einsatz?</p>
+            <ul class="options">
+                <li>A) Er beschleunigt die Berechnungen, indem er die Daten komprimiert.</li>
+                <li>B) Er wandelt die Daten in ganze Zahlen (Integers) um.</li>
+                <li>C) Er entfernt die saisonalen Schwankungen aus der Zeitreihe.</li>
+                <li>D) Er skaliert alle Daten auf einen einheitlichen Bereich (0 bis 1), um dem neuronalen Netz das Lernen zu erleichtern.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer('answer1')">Antwort anzeigen</button>
+            <div id="answer1" class="answer">
+                <p><strong>Die richtige Antwort ist D! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Neuronale Netze arbeiten am besten mit Werten, die in einem kleinen, festen Bereich liegen. Große Zahlenunterschiede (z.B. von 112 bis 622 Passagiere) können dazu führen, dass das Training instabil wird. Der <code>MinMaxScaler</code> normalisiert die Daten, was zu einem stabileren und oft schnelleren Lernprozess führt.</p>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 2 von 5</h3>
+            <p>Schauen wir uns <strong>Schritt 3</strong> und die Funktion <code>create_sequences</code> an. Stell dir vor, deine Eingabedaten sind <code>[10, 20, 30, 40, 50]</code> und die <code>window_size</code> ist <strong>3</strong>. Was ist das <strong>zweite</strong> Paar (<code>X</code>, <code>y</code>), das von der Funktion erzeugt wird?</p>
+            <ul class="options">
+                <li>A) <code>X = [[20, 30, 40]]</code>, <code>y = [50]</code></li>
+                <li>B) <code>X = [[10, 20, 30]]</code>, <code>y = [40]</code></li>
+                <li>C) <code>X = [[30, 40, 50]]</code>, <code>y = [None]</code></li>
+                <li>D) <code>X = [[10, 20]]</code>, <code>y = [30]</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer('answer2')">Antwort anzeigen</button>
+            <div id="answer2" class="answer">
+                <p><strong>Die richtige Antwort ist A! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Die Funktion arbeitet wie ein "rollierendes Fenster":</p>
+                <ol>
+                    <li><strong>Erstes Paar:</strong> Nimm die ersten 3 Werte für X und den 4. für y. &rarr; <code>X=[[10, 20, 30]]</code>, <code>y=[40]</code></li>
+                    <li><strong>Zweites Paar:</strong> Schiebe das Fenster einen Schritt weiter. &rarr; <code>X=[[20, 30, 40]]</code>, <code>y=[50]</code></li>
+                </ol>
+                <p>So lernt das Modell, aus einer Sequenz von 3 Monaten den Folgemonat vorherzusagen.</p>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 3 von 5</h3>
+            <p>In <strong>Schritt 4</strong> findet eine wichtige Dimensionsänderung statt: <code>X_tensor.permute(0, 2, 1)</code>. Warum ist dieser Schritt für eine <code>nn.Conv1d</code>-Schicht in PyTorch absolut notwendig?</p>
+            <ul class="options">
+                <li>A) Es ist nur eine Konvention und hat keine technischen Auswirkungen.</li>
+                <li>B) Die <code>permute</code>-Funktion ist schneller als andere Methoden zur Formänderung.</li>
+                <li>C) Die <code>Conv1d</code>-Schicht erwartet die Eingabe im Format <code>[Batch-Größe, Kanäle, Sequenzlänge]</code>.</li>
+                <li>D) Damit wird die Anzahl der Trainingsbeispiele erhöht.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer('answer3')">Antwort anzeigen</button>
+            <div id="answer3" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Das ist ein zentraler Punkt! Man kann sich die Dimensionen so vorstellen:</p>
+                <ul>
+                    <li><b>Batch-Größe:</b> Wie viele Sequenzen schauen wir uns gleichzeitig an? (hier 131)</li>
+                    <li><b>Kanäle:</b> Wie viele verschiedene Features hat jeder Zeitpunkt? (hier nur 1: die Passagierzahl)</li>
+                    <li><b>Sequenzlänge:</b> Wie viele Zeitschritte hat eine Sequenz? (hier 12 Monate)</li>
+                </ul>
+                <p>Unsere Daten liegen nach der Sequenzbildung natürlich als <code>[Batch, Sequenzlänge, Kanäle]</code> vor. Die <code>Conv1d</code>-Schicht von PyTorch will es aber in der Reihenfolge <code>[Batch, Kanäle, Sequenzlänge]</code>. Der <code>permute</code>-Befehl tauscht einfach die letzten beiden Dimensionen, um das zu korrigieren.</p>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 4 von 5</h3>
+            <p>Das Modell in <strong>Schritt 6</strong> endet mit einer <code>nn.Linear(window_size * 64, 1)</code>-Schicht. Wie kommt die Zahl <strong>64</strong> in der Berechnung der Eingabegröße (<code>window_size * 64</code>) zustande?</p>
+            <ul class="options">
+                <li>A) Sie ist die <code>kernel_size</code> (5) plus die Anzahl der Epochen (900), geteilt durch 15.</li>
+                <li>B) Es ist die Anzahl der <code>out_channels</code> der zweiten <code>Conv1d</code>-Schicht.</li>
+                <li>C) Sie ist zufällig gewählt und könnte auch 32 oder 128 sein.</li>
+                <li>D) Sie entspricht der Batch-Größe während des Trainings.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer('answer4')">Antwort anzeigen</button>
+            <div id="answer4" class="answer">
+                <p><strong>Die richtige Antwort ist B! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Die Daten durchlaufen das Netz so:</p>
+                <ol>
+                    <li><b>Eingabe:</b> Eine Sequenz der Länge 12 mit 1 Kanal.</li>
+                    <li><b>Nach <code>Conv1d(1, 32, ...)</code>:</b> Die Sequenz hat jetzt 32 Kanäle (oder "Features").</li>
+                    <li><b>Nach <code>Conv1d(32, 64, ...)</code>:</b> Die Sequenz wird weiterverarbeitet und hat nun 64 Kanäle. Die Länge bleibt wegen <code>padding=2</code> bei 12.</li>
+                    <li><b>Nach <code>Flatten()</code>:</b> Die Struktur <code>[12, 64]</code> (Länge x Kanäle) wird zu einem einzigen langen Vektor "plattgedrückt". Seine Größe ist daher <code>12 * 64</code>.</li>
+                </ol>
+                <p>Dieser Vektor wird dann von der <code>nn.Linear</code>-Schicht auf einen einzigen Ausgabewert reduziert.</p>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 5 von 5</h3>
+            <p>Zuletzt ein Blick auf den Trainingszyklus in <strong>Schritt 8</strong>. Jede Epoche beginnt mit <code>optimizer.zero_grad()</code>. Was würde passieren, wenn man diese Zeile Code weglässt?</p>
+            <ul class="options">
+                <li>A) Das Training würde viel schneller ablaufen.</li>
+                <li>B) Nichts, der Befehl ist nur zur Sicherheit da.</li>
+                <li>C) Die Gradienten aus jedem Trainingsschritt würden sich aufsummieren, was zu völlig falschen Modell-Updates führen würde.</li>
+                <li>D) Nur der erste Trainingsschritt würde korrekt ausgeführt werden, danach würde das Programm abstürzen.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer('answer5')">Antwort anzeigen</button>
+            <div id="answer5" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> PyTorch akkumuliert (summiert) die Gradienten bei jedem <code>loss.backward()</code>-Aufruf. Das ist in manchen fortgeschrittenen Szenarien nützlich. Für ein Standard-Training müssen wir aber vor jeder neuen Berechnung sicherstellen, dass die alten Gradienten gelöscht sind. Sonst würden die Modellgewichte basierend auf einer Mischung aus alten und neuen Fehlerinformationen aktualisiert – und das Modell würde nichts Sinnvolles lernen.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleAnswer(id) {
+            const answerElement = document.getElementById(id);
+            const button = answerElement.previousElementSibling;
+            
+            if (answerElement.style.display === 'none' || answerElement.style.display === '') {
+                answerElement.style.display = 'block';
+                button.textContent = 'Antwort verbergen';
+            } else {
+                answerElement.style.display = 'none';
+                button.textContent = 'Antwort anzeigen';
+            }
+        }
+    </script>
+
+</body>
+</html>

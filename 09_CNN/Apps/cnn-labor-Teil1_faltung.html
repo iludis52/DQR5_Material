@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNN-Labor: Faltung erkunden</title>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --panel-border: #d0d5dd;
+  --accent: #2e75b6;
+  --accent-dark: #1b3a5c;
+  --text: #1a1a1a;
+  --text-dim: #6b7280;
+  --highlight: #f5a623;
+  --highlight-bg: rgba(245,166,35,0.15);
+  --relu-dot: #d32f2f;
+  --cell-border: #c0c6cf;
+  --btn: #2e75b6;
+  --btn-hover: #1b5a9e;
+  --btn-text: #fff;
+  --select-bg: #fff;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+/* Header */
+.header {
+  text-align: center;
+  padding: 16px 20px 10px;
+  border-bottom: 2px solid var(--accent);
+  background: #fff;
+}
+.header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+.header h1 span { color: var(--accent); }
+.header p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+/* Controls */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--panel-border);
+  align-items: center;
+}
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ctrl-group label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-weight: 600;
+}
+select, button {
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  padding: 5px 10px;
+  background: var(--select-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+select:hover { border-color: var(--accent); }
+button {
+  background: var(--btn);
+  color: var(--btn-text);
+  border-color: var(--btn);
+  font-weight: 600;
+}
+button:hover { background: var(--btn-hover); }
+button.secondary {
+  background: #fff;
+  border-color: var(--panel-border);
+  color: var(--text);
+  font-weight: 500;
+}
+button.secondary:hover { background: #f0f0f0; }
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toggle-label input { accent-color: var(--accent); width: 16px; height: 16px; }
+/* Main layout: three columns with calc in the middle column */
+.main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px 8px;
+  min-height: 400px;
+}
+.grid-panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.grid-panel h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.grid-hint {
+  margin-top: 5px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.arrow {
+  font-size: 26px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  user-select: none;
+}
+/* Middle column: kernel + calc stacked */
+.middle-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+/* Grid cells */
+.grid-container {
+  display: inline-grid;
+  gap: 1px;
+  background: var(--cell-border);
+  border: 2px solid var(--cell-border);
+  border-radius: 3px;
+}
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 600;
+  cursor: default;
+  position: relative;
+  transition: outline 0.12s;
+}
+.cell.editable { cursor: pointer; }
+.cell.editable:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  z-index: 2;
+}
+.cell.highlighted {
+  outline: 2px solid var(--highlight) !important;
+  outline-offset: -1px;
+  z-index: 3;
+  background-color: var(--highlight-bg) !important;
+}
+.cell.active-output {
+  outline: 3px solid var(--highlight) !important;
+  outline-offset: -1px;
+  z-index: 4;
+}
+.cell.clickable { cursor: pointer; }
+.cell.clickable:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  z-index: 2;
+}
+/* ReLU dot */
+.relu-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--relu-dot);
+}
+/* Calculation panel (now between kernel and feature map) */
+.calc-panel {
+  background: #fafbfc;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  width: 100%;
+  max-width: 260px;
+  min-height: 50px;
+}
+.calc-panel h4 {
+  font-size: 11px;
+  color: var(--accent);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+.calc-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 2px 6px;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.calc-grid .term { white-space: nowrap; }
+.calc-grid .term-right { text-align: right; }
+.calc-grid .term-left { text-align: left; }
+.calc-grid .val-pos { color: #1565c0; }
+.calc-grid .val-neg { color: #c62828; }
+.calc-result {
+  font-size: 14px;
+  font-weight: 700;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+.calc-result .val-pos { color: #1565c0; }
+.calc-result .val-neg { color: #c62828; }
+.calc-result .relu-strike {
+  text-decoration: line-through;
+  color: #c62828;
+  opacity: 0.6;
+}
+.calc-pos {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.calc-placeholder {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.4;
+}
+/* Animation controls */
+.anim-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 20px 14px;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-top: 1px solid var(--panel-border);
+}
+.speed-slider {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.speed-slider label { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.speed-slider input[type=range] { width: 90px; accent-color: var(--accent); }
+/* Legend */
+.legend {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  padding: 6px 20px;
+  font-size: 10px;
+  color: var(--text-dim);
+  background: #fff;
+  border-bottom: 1px solid var(--panel-border);
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-swatch {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  border: 1px solid var(--panel-border);
+}
+/* Kernel edit overlay */
+.cell-input {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  color: #000;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  font-family: 'Consolas', monospace;
+  font-size: inherit;
+  font-weight: 700;
+  text-align: center;
+  z-index: 10;
+  outline: none;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>CNN-Labor</span> · Faltung erkunden</h1>
+  <p>Wie erkennt ein Computer Muster in Bildern? Experimentiere mit Filtern und beobachte, was passiert.</p>
+</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label>Bildgröße:</label>
+    <select id="sizeSelect">
+      <option value="8" selected>8 × 8</option>
+      <option value="10">10 × 10</option>
+      <option value="12">12 × 12</option>
+      <option value="16">16 × 16</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Vorlage:</label>
+    <select id="presetImage">
+      <option value="hbar">Horizontaler Balken</option>
+      <option value="vbar">Vertikaler Balken</option>
+      <option value="cross">Kreuz</option>
+      <option value="diag">Diagonale</option>
+      <option value="frame">Rahmen</option>
+      <option value="gradient">Verlauf</option>
+      <option value="clear">Leer (Schwarz)</option>
+    </select>
+  </div>
+  <button class="secondary" id="btnClear" title="Bild löschen">✕ Löschen</button>
+  <div class="ctrl-group">
+    <label>Filter:</label>
+    <select id="presetKernel">
+      <option value="edgeH">Kante horizontal</option>
+      <option value="edgeV">Kante vertikal</option>
+      <option value="edgeAll">Kante allseitig</option>
+      <option value="sharpen">Schärfen</option>
+      <option value="blur">Weichzeichner</option>
+      <option value="emboss">Prägung</option>
+      <option value="identity">Identität</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Padding:</label>
+    <select id="paddingSelect">
+      <option value="valid">Kein (Valid)</option>
+      <option value="same">Same</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Stride:</label>
+    <select id="strideSelect">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+    </select>
+  </div>
+  <label class="toggle-label">
+    <input type="checkbox" id="reluToggle"> ReLU
+  </label>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#111"></div> Dunkel = niedriger Wert</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#999"></div> Mittelgrau = Null</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f0f0f0;border-color:#bbb"></div> Hell = hoher Wert</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--highlight);opacity:0.7"></div> Aktives Fenster</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-color:#bbb;position:relative"><span style="position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:var(--relu-dot)"></span></div> ReLU aktiv</div>
+</div>
+
+<div class="main" id="mainArea">
+  <!-- Input image -->
+  <div class="grid-panel">
+    <h3>Eingabebild</h3>
+    <div class="grid-container" id="inputGrid"></div>
+    <div class="grid-hint">Klick = Weiß · Rechtsklick = Schwarz</div>
+  </div>
+
+  <div class="arrow">✱</div>
+
+  <!-- Middle: Kernel + Calculation stacked -->
+  <div class="middle-col">
+    <div class="grid-panel">
+      <h3>Filter (Kernel)</h3>
+      <div class="grid-container" id="kernelGrid"></div>
+      <div class="grid-hint">Klick auf Zelle zum Bearbeiten</div>
+    </div>
+    <div class="calc-panel" id="calcPanel">
+      <h4>Berechnung</h4>
+      <div id="calcContent">
+        <div class="calc-placeholder">Klicke auf eine Zelle in der Feature Map oder starte die Animation.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">=</div>
+
+  <!-- Feature map -->
+  <div class="grid-panel">
+    <h3 id="fmapTitle">Feature Map</h3>
+    <div class="grid-container" id="outputGrid"></div>
+    <div class="grid-hint" id="fmapInfo"></div>
+  </div>
+</div>
+
+<div class="anim-controls">
+  <button id="btnCompute">Berechnen</button>
+  <button id="btnAnimate">▶ Animieren</button>
+  <button class="secondary" id="btnStep">Schritt →</button>
+  <button class="secondary" id="btnReset">Zurücksetzen</button>
+  <div class="speed-slider">
+    <label>Tempo:</label>
+    <input type="range" id="speedSlider" min="1" max="10" value="5">
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const S = {
+  size: 8,
+  image: [],
+  kernel: [],
+  output: [],
+  outputRaw: [],
+  padding: 'valid',
+  stride: 1,
+  relu: false,
+  animating: false,
+  animPos: null,
+  animTimer: null,
+  highlightCells: [],
+  activeOut: null,
+  revealed: null,  // 2D bool array — which output cells are visible during animation
+};
+
+// ═══════════════════════════════════════════
+// PRESETS
+// ═══════════════════════════════════════════
+const KERNELS = {
+  edgeH:    [[-1,-1,-1],[ 0, 0, 0],[ 1, 1, 1]],
+  edgeV:    [[-1, 0, 1],[-1, 0, 1],[-1, 0, 1]],
+  edgeAll:  [[-1,-1,-1],[-1, 8,-1],[-1,-1,-1]],
+  sharpen:  [[ 0,-1, 0],[-1, 5,-1],[ 0,-1, 0]],
+  blur:     [[1,1,1],[1,1,1],[1,1,1]].map(r => r.map(v => +(v/9).toFixed(2))),
+  emboss:   [[-2,-1, 0],[-1, 1, 1],[ 0, 1, 2]],
+  identity: [[ 0, 0, 0],[ 0, 1, 0],[ 0, 0, 0]],
+};
+
+function makePresetImage(key, n) {
+  const img = Array.from({length: n}, () => Array(n).fill(0));
+  const mid = Math.floor(n / 2);
+  switch (key) {
+    case 'hbar':
+      for (let c = 0; c < n; c++) { img[mid-1][c] = 1; img[mid][c] = 1; }
+      break;
+    case 'vbar':
+      for (let r = 0; r < n; r++) { img[r][mid-1] = 1; img[r][mid] = 1; }
+      break;
+    case 'cross':
+      for (let i = 0; i < n; i++) {
+        img[mid-1][i] = 1; img[mid][i] = 1;
+        img[i][mid-1] = 1; img[i][mid] = 1;
+      }
+      break;
+    case 'diag':
+      for (let i = 0; i < n; i++) { img[i][i] = 1; }
+      if (n > 8) for (let i = 0; i < n-1; i++) img[i][i+1] = 0.5;
+      break;
+    case 'frame':
+      for (let i = 0; i < n; i++) { img[0][i]=1; img[n-1][i]=1; img[i][0]=1; img[i][n-1]=1; }
+      break;
+    case 'gradient':
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          img[r][c] = +(c / (n-1)).toFixed(2);
+      break;
+    case 'clear': break;
+  }
+  return img;
+}
+
+// ═══════════════════════════════════════════
+// CONVOLUTION
+// ═══════════════════════════════════════════
+function convolve(image, kernel, padding, stride) {
+  const n = image.length, k = kernel.length;
+  const pad = padding === 'same' ? Math.floor(k/2) : 0;
+  const outSizeFull = padding === 'same' ? n : n - k + 1;
+  const outSize = Math.ceil(outSizeFull / stride);
+  const out = [];
+  for (let or = 0; or < outSize; or++) {
+    out[or] = [];
+    for (let oc = 0; oc < outSize; oc++) {
+      const r = or * stride, c = oc * stride;
+      let sum = 0;
+      for (let kr = 0; kr < k; kr++)
+        for (let kc = 0; kc < k; kc++) {
+          const ir = r - pad + kr, ic = c - pad + kc;
+          const val = (ir >= 0 && ir < n && ic >= 0 && ic < n) ? image[ir][ic] : 0;
+          sum += val * kernel[kr][kc];
+        }
+      out[or][oc] = +sum.toFixed(4);
+    }
+  }
+  return out;
+}
+
+function computeOutput() {
+  S.outputRaw = convolve(S.image, S.kernel, S.padding, S.stride);
+  S.output = S.relu ? S.outputRaw.map(r => r.map(v => Math.max(0, v))) : S.outputRaw.map(r => [...r]);
+}
+
+// ═══════════════════════════════════════════
+// COLOR MAPPING — all grayscale
+// ═══════════════════════════════════════════
+
+// Input: 0 → black, 1 → white (simple grayscale)
+function inputColor(v) {
+  const c = Math.round(v * 240 + 10); // 10..250
+  return `rgb(${c},${c},${c})`;
+}
+function inputTextColor(v) {
+  return v > 0.45 ? '#111' : '#eee';
+}
+
+// Diverging grayscale: min → black, 0 → mid-gray, max → white
+// Used for both kernel and feature map
+function divergingGray(v, minVal, maxVal) {
+  // Map v to 0..1 where 0=minVal, 1=maxVal, 0.5 = 0
+  if (minVal >= 0 && maxVal >= 0) {
+    // All non-negative: simple 0→dark, max→bright
+    const t = maxVal > 0 ? v / maxVal : 0.5;
+    const c = Math.round(30 + t * 220);
+    return `rgb(${c},${c},${c})`;
+  }
+  if (minVal < 0 && maxVal <= 0) {
+    // All non-positive: min→dark, 0→bright
+    const t = minVal < 0 ? v / minVal : 0.5; // t=1 at minVal, t=0 at 0
+    const c = Math.round(250 - t * 220);
+    return `rgb(${c},${c},${c})`;
+  }
+  // Mixed: symmetric around 0
+  const absMax = Math.max(Math.abs(minVal), Math.abs(maxVal));
+  if (absMax === 0) return 'rgb(140,140,140)';
+  // -absMax → black(20), 0 → midgray(140), +absMax → white(250)
+  const t = (v + absMax) / (2 * absMax); // 0..1
+  const c = Math.round(20 + t * 230);
+  return `rgb(${c},${c},${c})`;
+}
+
+function divergingGrayText(v, minVal, maxVal) {
+  const absMax = Math.max(Math.abs(minVal), Math.abs(maxVal), 0.01);
+  const t = (v + absMax) / (2 * absMax);
+  return t > 0.45 ? '#111' : '#eee';
+}
+
+function gridRange(data) {
+  let min = Infinity, max = -Infinity;
+  for (const row of data)
+    for (const v of row) { if (v < min) min = v; if (v > max) max = v; }
+  return { min, max };
+}
+
+// ═══════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════
+function cellSize() {
+  if (S.size <= 8) return 50;
+  if (S.size <= 10) return 44;
+  if (S.size <= 12) return 38;
+  return 30;
+}
+function fontSize() {
+  if (S.size <= 8) return 12;
+  if (S.size <= 10) return 11;
+  if (S.size <= 12) return 10;
+  return 9;
+}
+
+function fmtVal(v) {
+  if (v === 0) return '0';
+  if (v === 1) return '1';
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(1);
+}
+function fmtKernel(v) {
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(2);
+}
+
+function renderGrid(container, data, type) {
+  const n = data.length;
+  const cols = data[0].length;
+  const sz = type === 'kernel' ? 56 : cellSize();
+  const fsz = type === 'kernel' ? 14 : fontSize();
+
+  container.style.gridTemplateColumns = `repeat(${cols}, ${sz}px)`;
+  container.style.gridTemplateRows = `repeat(${n}, ${sz}px)`;
+  container.innerHTML = '';
+
+  const range = (type !== 'input') ? gridRange(data) : null;
+
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = data[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.width = sz + 'px';
+      cell.style.height = sz + 'px';
+      cell.style.fontSize = fsz + 'px';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+
+      if (type === 'input') {
+        cell.style.background = inputColor(v);
+        cell.style.color = inputTextColor(v);
+        cell.classList.add('editable');
+        cell.addEventListener('click', onInputClick);
+        cell.addEventListener('contextmenu', onInputRightClick);
+      } else if (type === 'kernel') {
+        cell.style.background = divergingGray(v, range.min, range.max);
+        cell.style.color = divergingGrayText(v, range.min, range.max);
+        cell.classList.add('editable');
+        cell.addEventListener('click', onKernelClick);
+      } else { // output
+        const isRevealed = !S.revealed || (S.revealed[r] && S.revealed[r][c]);
+        if (isRevealed) {
+          cell.style.background = divergingGray(v, range.min, range.max);
+          cell.style.color = divergingGrayText(v, range.min, range.max);
+          cell.classList.add('clickable');
+          cell.addEventListener('click', onOutputClick);
+
+          // ReLU dot: show if relu is on AND raw value was negative
+          if (S.relu && S.outputRaw[r] && S.outputRaw[r][c] < 0) {
+            const dot = document.createElement('span');
+            dot.className = 'relu-dot';
+            dot.title = `Originalwert: ${S.outputRaw[r][c].toFixed(2)} → ReLU → 0`;
+            cell.appendChild(dot);
+          }
+        } else {
+          cell.style.background = '#e8eaed';
+          cell.style.color = '#e8eaed';
+        }
+      }
+
+      // Highlights
+      if (type === 'input' && S.highlightCells.some(h => h.r === r && h.c === c)) {
+        cell.classList.add('highlighted');
+      }
+      if (type === 'output' && S.activeOut && S.activeOut.r === r && S.activeOut.c === c) {
+        cell.classList.add('active-output');
+      }
+
+      const txt = document.createTextNode(type === 'kernel' ? fmtKernel(v) : fmtVal(v));
+      cell.appendChild(txt);
+      container.appendChild(cell);
+    }
+  }
+}
+
+function renderAll() {
+  renderGrid(document.getElementById('inputGrid'), S.image, 'input');
+  renderGrid(document.getElementById('kernelGrid'), S.kernel, 'kernel');
+  if (S.output.length > 0) {
+    renderGrid(document.getElementById('outputGrid'), S.output, 'output');
+    const os = S.output.length;
+    document.getElementById('fmapInfo').textContent = `${os} × ${os}`;
+  } else {
+    document.getElementById('outputGrid').innerHTML = '';
+    document.getElementById('fmapInfo').textContent = '';
+  }
+  document.getElementById('fmapTitle').textContent = S.relu ? 'Feature Map (+ ReLU)' : 'Feature Map';
+}
+
+// ═══════════════════════════════════════════
+// CALCULATION DETAIL
+// ═══════════════════════════════════════════
+function showCalcForPosition(outR, outC) {
+  const pad = S.padding === 'same' ? 1 : 0;
+  const stride = S.stride;
+  const k = S.kernel.length, n = S.image.length;
+  const startR = outR * stride, startC = outC * stride;
+  const el = document.getElementById('calcContent');
+
+  let html = '<div class="calc-grid">';
+  let sum = 0;
+
+  for (let kr = 0; kr < k; kr++) {
+    for (let kc = 0; kc < k; kc++) {
+      const ir = startR - pad + kr, ic = startC - pad + kc;
+      const imgV = (ir >= 0 && ir < n && ic >= 0 && ic < n) ? S.image[ir][ic] : 0;
+      const kV = S.kernel[kr][kc];
+      const prod = imgV * kV;
+      sum += prod;
+      const cls = prod >= 0 ? 'val-pos' : 'val-neg';
+      html += `<div class="term term-right">${fmtVal(imgV)} × ${fmtKernel(kV)}</div>`;
+      html += `<div class="term">=</div>`;
+      html += `<div class="term term-left ${cls}">${prod >= 0 ? '+' : ''}${prod.toFixed(2)}</div>`;
+    }
+  }
+  html += '</div>';
+
+  sum = +sum.toFixed(4);
+  const sumCls = sum >= 0 ? 'val-pos' : 'val-neg';
+
+  html += '<div class="calc-result">';
+  if (S.relu && sum < 0) {
+    html += `Σ = <span class="relu-strike">${sum.toFixed(2)}</span> → ReLU → <span class="val-pos">0.00</span>`;
+  } else if (S.relu) {
+    html += `Σ = <span class="${sumCls}">${sum.toFixed(2)}</span> → ReLU → <span class="${sumCls}">${sum.toFixed(2)}</span>`;
+  } else {
+    html += `Σ = <span class="${sumCls}">${sum.toFixed(2)}</span>`;
+  }
+  html += '</div>';
+  html += `<div class="calc-pos">Position [${outR}, ${outC}]` + (stride > 1 ? ` · Stride ${stride}` : '') + `</div>`;
+  el.innerHTML = html;
+
+  // Update highlights
+  S.highlightCells = [];
+  for (let kr = 0; kr < k; kr++)
+    for (let kc = 0; kc < k; kc++) {
+      const ir = startR - pad + kr, ic = startC - pad + kc;
+      if (ir >= 0 && ir < n && ic >= 0 && ic < n)
+        S.highlightCells.push({ r: ir, c: ic });
+    }
+  S.activeOut = { r: outR, c: outC };
+  renderAll();
+}
+
+function clearCalc() {
+  document.getElementById('calcContent').innerHTML =
+    '<div class="calc-placeholder">Klicke auf eine Zelle in der Feature Map oder starte die Animation.</div>';
+  S.highlightCells = [];
+  S.activeOut = null;
+}
+
+// ═══════════════════════════════════════════
+// EVENT HANDLERS
+// ═══════════════════════════════════════════
+function onInputClick(e) {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const r = +cell.dataset.r, c = +cell.dataset.c;
+  // Cycle: 0 → 1 → 0.5 → 0
+  const cur = S.image[r][c];
+  S.image[r][c] = cur === 0 ? 1 : cur === 1 ? 0.5 : cur === 0.5 ? 0 : 1;
+  if (S.output.length > 0) computeOutput();
+  renderAll();
+}
+
+function onInputRightClick(e) {
+  e.preventDefault();
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const r = +cell.dataset.r, c = +cell.dataset.c;
+  S.image[r][c] = 0;
+  if (S.output.length > 0) computeOutput();
+  renderAll();
+}
+
+function onKernelClick(e) {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const r = +cell.dataset.r, c = +cell.dataset.c;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'cell-input';
+  input.value = S.kernel[r][c];
+  cell.style.position = 'relative';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+  const finish = () => {
+    const val = parseFloat(input.value);
+    if (!isNaN(val)) {
+      S.kernel[r][c] = +val.toFixed(2);
+      if (S.output.length > 0) computeOutput();
+    }
+    if (input.parentNode) input.remove();
+    renderAll();
+  };
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') finish();
+    if (ev.key === 'Escape') { input.remove(); renderAll(); }
+  });
+}
+
+function onOutputClick(e) {
+  const cell = e.target.closest('.cell');
+  if (!cell || S.output.length === 0) return;
+  showCalcForPosition(+cell.dataset.r, +cell.dataset.c);
+}
+
+// ═══════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════
+function stopAnim() {
+  S.animating = false;
+  if (S.animTimer) { clearTimeout(S.animTimer); S.animTimer = null; }
+  document.getElementById('btnAnimate').textContent = '▶ Animieren';
+}
+
+function getSpeed() {
+  return 620 - (+document.getElementById('speedSlider').value) * 58;
+}
+
+function animStep() {
+  if (!S.animating) return;
+  const os = S.output.length;
+  if (!S.animPos) S.animPos = { r: 0, c: 0 };
+  if (S.revealed) S.revealed[S.animPos.r][S.animPos.c] = true;
+  showCalcForPosition(S.animPos.r, S.animPos.c);
+  let nr = S.animPos.r, nc = S.animPos.c + 1;
+  if (nc >= os) { nc = 0; nr++; }
+  if (nr >= os) { stopAnim(); return; }
+  S.animPos = { r: nr, c: nc };
+  S.animTimer = setTimeout(animStep, getSpeed());
+}
+
+function startAnim() {
+  if (S.animating) { stopAnim(); S.revealed = null; renderAll(); return; }
+  computeOutput();
+  const os = S.output.length;
+  S.revealed = Array.from({length: os}, () => Array(os).fill(false));
+  S.animating = true;
+  S.animPos = { r: 0, c: 0 };
+  renderAll();
+  document.getElementById('btnAnimate').textContent = '⏸ Stopp';
+  animStep();
+}
+
+function stepForward() {
+  if (S.output.length === 0) {
+    computeOutput();
+    const os = S.output.length;
+    S.revealed = Array.from({length: os}, () => Array(os).fill(false));
+  }
+  if (!S.animPos) S.animPos = { r: 0, c: 0 };
+  if (S.revealed) S.revealed[S.animPos.r][S.animPos.c] = true;
+  showCalcForPosition(S.animPos.r, S.animPos.c);
+  const os = S.output.length;
+  let nr = S.animPos.r, nc = S.animPos.c + 1;
+  if (nc >= os) { nc = 0; nr++; }
+  if (nr >= os) { S.animPos = { r: 0, c: 0 }; S.revealed = null; renderAll(); return; }
+  S.animPos = { r: nr, c: nc };
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function initState() {
+  stopAnim();
+  S.size = +document.getElementById('sizeSelect').value;
+  S.padding = document.getElementById('paddingSelect').value;
+  S.stride = +document.getElementById('strideSelect').value;
+  S.relu = document.getElementById('reluToggle').checked;
+  S.image = makePresetImage(document.getElementById('presetImage').value, S.size);
+  S.kernel = KERNELS[document.getElementById('presetKernel').value].map(r => [...r]);
+  S.output = []; S.outputRaw = [];
+  S.highlightCells = []; S.activeOut = null; S.animPos = null; S.revealed = null;
+  clearCalc();
+  renderAll();
+}
+
+// Wiring
+document.getElementById('sizeSelect').addEventListener('change', initState);
+document.getElementById('presetImage').addEventListener('change', () => {
+  S.image = makePresetImage(document.getElementById('presetImage').value, S.size);
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
+document.getElementById('presetKernel').addEventListener('change', () => {
+  S.kernel = KERNELS[document.getElementById('presetKernel').value].map(r => [...r]);
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
+document.getElementById('paddingSelect').addEventListener('change', () => {
+  S.padding = document.getElementById('paddingSelect').value;
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
+document.getElementById('strideSelect').addEventListener('change', () => {
+  S.stride = +document.getElementById('strideSelect').value;
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
+document.getElementById('reluToggle').addEventListener('change', () => {
+  S.relu = document.getElementById('reluToggle').checked;
+  if (S.output.length > 0) computeOutput();
+  renderAll();
+});
+document.getElementById('btnClear').addEventListener('click', () => {
+  S.image = Array.from({length: S.size}, () => Array(S.size).fill(0));
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
+document.getElementById('btnCompute').addEventListener('click', () => {
+  computeOutput(); S.revealed = null; clearCalc(); renderAll();
+});
+document.getElementById('btnAnimate').addEventListener('click', startAnim);
+document.getElementById('btnStep').addEventListener('click', stepForward);
+document.getElementById('btnReset').addEventListener('click', () => {
+  stopAnim(); S.output = []; S.outputRaw = []; S.revealed = null;
+  S.animPos = null; clearCalc(); renderAll();
+});
+
+initState();
+</script>
+</body>
+</html>

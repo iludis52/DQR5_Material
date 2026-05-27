@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch Quiz (Fortgeschritten): Tensor-Dimensionen</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #c0392b;
+            margin-bottom: 10px;
+        }
+        h2 {
+             text-align: center;
+             color: #34495e;
+             font-weight: 400;
+             margin-top: 0;
+             margin-bottom: 30px;
+        }
+        .question-block {
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 25px;
+            margin-bottom: 25px;
+        }
+        .question-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        h3 {
+            color: #d35400;
+            font-size: 1.4em;
+        }
+        .options {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .options li {
+            background-color: #ecf0f1;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 5px solid #bdc3c7;
+        }
+        .toggle-button {
+            background-color: #e67e22;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+        }
+        .toggle-button:hover {
+            background-color: #d35400;
+        }
+        .answer {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #fef5e7;
+            border-left: 5px solid #f39c12;
+            border-radius: 5px;
+        }
+        .answer strong {
+            color: #d35400;
+            font-size: 1.1em;
+        }
+        code {
+            background-color: #e0e0e0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: "Courier New", Courier, monospace;
+        }
+        .formula {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-container">
+        <h1>Quiz für Fortgeschrittene 🧠</h1>
+        <h2>Tensor-Dimensionen und Modell-Architektur im Detail.</h2>
+
+        <div class="question-block">
+            <h3>Frage 1 von 5</h3>
+            <p>Betrachten wir den Trainingsdatensatz <code>X_train</code>, dessen Dimension <code>[106, 1, 12]</code> ist. Welche exakte Dimension hat der Tensor, nachdem er die <strong>erste</strong> <code>nn.Conv1d</code>-Schicht <em>und</em> die direkt darauffolgende <code>nn.ReLU()</code>-Aktivierung durchlaufen hat?</p>
+            <ul class="options">
+                <li>A) <code>[106, 32, 8]</code></li>
+                <li>B) <code>[106, 32, 12]</code></li>
+                <li>C) <code>[106, 1, 12]</code></li>
+                <li>D) <code>[106, 32, 5]</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer1')">Antwort anzeigen</button>
+            <div id="answer1" class="answer">
+                <p><strong>Die richtige Antwort ist B! ✅</strong></p>
+                <p><strong>Erklärung:</strong></p>
+                <ol>
+                    <li>Die <code>nn.Conv1d</code>-Schicht transformiert die Eingabe. Die Anzahl der <code>out_channels</code> ist auf <strong>32</strong> gesetzt, daher ändert sich die zweite Dimension von 1 auf 32.</li>
+                    <li>Die Länge der Sequenz (dritte Dimension) wird durch die Formel <code>(W - K + 2P) / S + 1</code> bestimmt, wobei W=Sequenzlänge, K=Kernel-Größe, P=Padding, S=Stride ist.
+                    <div class="formula">L_out = (12 - 5 + 2*2) / 1 + 1 = 12</div>
+                    Dank <code>padding=2</code> bleibt die Sequenzlänge also <strong>12</strong>.</li>
+                    <li>Die <code>nn.ReLU()</code>-Aktivierungsfunktion wird elementweise angewendet. Sie verändert die Werte im Tensor, aber <strong>niemals seine Dimension</strong>.</li>
+                </ol>
+                <p>Die resultierende Dimension ist daher <code>[Batch-Größe, Out-Channels, Sequenzlänge]</code> &rarr; <code>[106, 32, 12]</code>.</p>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 2 von 5</h3>
+            <p>Was wäre die Dimension des Tensors nach der <strong>zweiten</strong> <code>Conv1d</code>-Schicht, wenn wir in <strong>beiden</strong> Faltungsschichten den Parameter <code>padding</code> auf <strong>0</strong> setzen würden?</p>
+            <ul class="options">
+                <li>A) <code>[106, 64, 12]</code></li>
+                <li>B) <code>[106, 64, 2]</code></li>
+                <li>C) <code>[106, 64, 4]</code></li>
+                <li>D) Das Programm würde einen Fehler werfen, weil die Sequenz zu kurz wird.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer2')">Antwort anzeigen</button>
+            <div id="answer2" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Wir müssen die Formel für die Ausgabelänge zweimal anwenden:</p>
+                <ul>
+                    <li><strong>Nach der 1. Conv-Schicht (mit padding=0):</strong>
+                        <div class="formula">L_out1 = (12 - 5 + 2*0) / 1 + 1 = 8</div>
+                        Die Dimension wäre also <code>[106, 32, 8]</code>.</li>
+                    <li><strong>Nach der 2. Conv-Schicht (mit padding=0):</strong>
+                        Die neue Eingabelänge ist 8.
+                        <div class="formula">L_out2 = (8 - 5 + 2*0) / 1 + 1 = 4</div>
+                        Die finale Dimension wäre <code>[106, 64, 4]</code>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 3 von 5</h3>
+            <p>Wie viele trainierbare Parameter (Gewichte und Biases) hat die <strong>erste</strong> Convolutional-Layer <code>nn.Conv1d(in_channels=1, out_channels=32, kernel_size=5)</code> insgesamt?</p>
+            <ul class="options">
+                <li>A) 160</li>
+                <li>B) 192</li>
+                <li>C) 37</li>
+                <li>D) 32</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer3')">Antwort anzeigen</button>
+            <div id="answer3" class="answer">
+                <p><strong>Die richtige Antwort ist B! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Die Anzahl der Parameter setzt sich aus Gewichten und Biases zusammen.</p>
+                <ul>
+                    <li><strong>Gewichte:</strong> Jeder der 32 Ausgabe-Kanäle (Filter) hat eine Kernel-Größe von 5, die auf 1 Eingabe-Kanal angewendet wird.
+                        <div class="formula">Anzahl Gewichte = in_channels * out_channels * kernel_size
+= 1 * 32 * 5 = 160</div>
+                    </li>
+                    <li><strong>Biases:</strong> Jeder Ausgabe-Kanal (Filter) hat genau einen zusätzlichen Bias-Term.
+                        <div class="formula">Anzahl Biases = out_channels = 32</div>
+                    </li>
+                    <li><strong>Gesamt:</strong>
+                        <div class="formula">Gesamtparameter = 160 + 32 = 192</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 4 von 5</h3>
+            <p>Die <code>nn.Flatten()</code>-Schicht wandelt den Tensor von der Form <code>[106, 64, 12]</code> in <code>[106, 768]</code> um (da 64 * 12 = 768). Welche strukturelle Information geht durch diesen "Plättungsprozess" verloren und warum ist das für die nachfolgende <code>nn.Linear</code>-Schicht akzeptabel?</p>
+            <ul class="options">
+                <li>A) Es geht die Information über die Batch-Größe verloren.</li>
+                <li>B) Die explizite <strong>zeitliche Abfolge</strong> der extrahierten Merkmale geht verloren. Dies ist akzeptabel, da die CNN bereits positionsinvariante Muster (wie Trends, Peaks) erkannt hat.</li>
+                <li>C) Es gehen keine Informationen verloren, die Daten werden nur neu angeordnet.</li>
+                <li>D) Es geht die Information über die Anzahl der Kanäle (64) verloren. Dies ist nicht akzeptabel und ein Nachteil des Modells.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer4')">Antwort anzeigen</button>
+            <div id="answer4" class="answer">
+                <p><strong>Die richtige Antwort ist B! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Vor dem Flattening hat der Tensor eine klare zeitliche Struktur: Es gibt 12 Zeitschritte, und für jeden Schritt gibt es 64 extrahierte Merkmale.</p>
+                <p>Nach dem Flattening existiert nur noch ein langer Vektor. Die Information, dass "Merkmal-Set 1" vor "Merkmal-Set 2" kam, ist nicht mehr explizit vorhanden. Das ist jedoch der Sinn einer CNN: Die Faltungsschichten haben die Aufgabe, die relevanten lokalen, zeitlichen Muster (z.B. "ein Anstieg über 3 Monate") zu erkennen und als Aktivierung in den Kanälen zu kodieren, <strong>unabhängig davon, wo genau in der Sequenz</strong> sie auftreten. Die nachfolgende lineare Schicht muss dann nur noch auf Basis der <i>Anwesenheit</i> dieser erkannten Muster eine Entscheidung treffen, nicht mehr auf Basis ihrer exakten zeitlichen Position.</p>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 5 von 5</h3>
+            <p>Angenommen, das Ziel wäre nicht nur die Vorhersage des nächsten Monats, sondern eine Vorhersage für die nächsten <strong>drei Monate</strong> auf einmal. Welche einzelne Schicht im Modell müsste <i>mindestens</i> geändert werden und wie?</p>
+            <ul class="options">
+                <li>A) Die erste <code>nn.Conv1d</code>-Schicht: <code>out_channels</code> müsste auf 3 erhöht werden.</li>
+                <li>B) Die <code>window_size</code> müsste auf 3 reduziert werden.</li>
+                <li>C) Die letzte <code>nn.Linear</code>-Schicht: Der zweite Parameter (<code>out_features</code>) müsste von 1 auf 3 geändert werden.</li>
+                <li>D) Der <code>optimizer</code>: Die Lernrate müsste verdreifacht werden.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer5')">Antwort anzeigen</button>
+            <div id="answer5" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Die Architektur des Modells ist darauf ausgelegt, Merkmale aus der Eingabesequenz zu extrahieren. Dieser Teil kann unverändert bleiben.</p>
+                <p>Die entscheidende Änderung betrifft die Ausgabe. Die letzte Schicht, <code>nn.Linear(window_size * 64, 1)</code>, nimmt den Vektor der extrahierten Merkmale und bildet ihn auf <strong>einen einzigen Wert</strong> ab (die Vorhersage für den nächsten Monat).</p>
+                <p>Um <strong>drei Werte</strong> vorherzusagen (für die nächsten drei Monate), muss diese Schicht den Merkmalsvektor auf drei Zahlen abbilden. Das erreicht man, indem man die Anzahl der <code>out_features</code> anpasst:</p>
+                <div class="formula">nn.Linear(window_size * 64, 3)</div>
+                <p>Zusätzlich müsste die <code>create_sequences</code>-Funktion angepasst werden, sodass <code>y</code> nicht nur einen, sondern die nächsten drei Werte enthält.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleAnswer(button, answerId) {
+            const answerElement = document.getElementById(answerId);
+            // Statt den inline-Style zu prüfen, wird der berechnete CSS-Style geprüft.
+            const currentDisplay = window.getComputedStyle(answerElement).display;
+            
+            if (currentDisplay === 'none') {
+                answerElement.style.display = 'block';
+                button.textContent = 'Antwort verbergen';
+            } else {
+                answerElement.style.display = 'none';
+                button.textContent = 'Antwort anzeigen';
+            }
+        }
+    </script>
+
+</body>
+</html>

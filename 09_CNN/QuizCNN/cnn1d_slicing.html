@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Tensor-Tricks in NumPy & PyTorch</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f8ff; /* AliceBlue */
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 25px 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #005a9c;
+            margin-bottom: 10px;
+        }
+        h2 {
+             text-align: center;
+             color: #333;
+             font-weight: 400;
+             margin-top: 0;
+             margin-bottom: 30px;
+        }
+        .question-block {
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 25px;
+            margin-bottom: 25px;
+        }
+        .question-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        h3 {
+            color: #007bff;
+            font-size: 1.4em;
+        }
+        .options {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .options li {
+            background-color: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 5px solid #b0c4de; /* LightSteelBlue */
+        }
+        .toggle-button {
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+        }
+        .toggle-button:hover {
+            background-color: #0056b3;
+        }
+        .answer {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #e7f5ff;
+            border-left: 5px solid #007bff;
+            border-radius: 5px;
+        }
+        .answer strong {
+            color: #0056b3;
+            font-size: 1.1em;
+        }
+        code {
+            background-color: #e9ecef;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: "Courier New", Courier, monospace;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="quiz-container">
+        <h1>Quiz: Tensor-Tricks 💡</h1>
+        <h2>Grundlagen von Slicing, Reshape und Permute einfach erklärt.</h2>
+
+        <div class="question-block">
+            <h3>Frage 1 von 5 (Array-Slicing)</h3>
+            <p>Gegeben ist ein NumPy-Array: <code>x = np.array([10, 20, 30, 40, 50, 60])</code>.</p>
+            <p>Was ist das Ergebnis des Befehls <code>x[2:5]</code>?</p>
+            <ul class="options">
+                <li>A) <code>[20, 30, 40]</code></li>
+                <li>B) <code>[30, 40, 50, 60]</code></li>
+                <li>C) <code>[30, 40, 50]</code></li>
+                <li>D) <code>[20, 30, 40, 50]</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer1')">Antwort anzeigen</button>
+            <div id="answer1" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Beim Slicing in Python und NumPy startet man beim <strong>Start-Index</strong> (hier <code>2</code>, also das Element <code>30</code>) und geht bis zum <strong>End-Index</strong> (hier <code>5</code>), wobei der End-Index selbst <strong>nicht</strong> mehr eingeschlossen ist.</p>
+                <ul>
+                    <li>Index 0: <code>10</code></li>
+                    <li>Index 1: <code>20</code></li>
+                    <li><strong>Index 2: <code>30</code> (Start)</strong></li>
+                    <li><strong>Index 3: <code>40</code></strong></li>
+                    <li><strong>Index 4: <code>50</code> (letztes Element)</strong></li>
+                    <li>Index 5: <code>60</code> (wird nicht mehr genommen)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 2 von 5 (2D-Slicing)</h3>
+            <p>Du hast eine 2D-Matrix: <code>data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])</code>.</p>
+            <p>Welcher Befehl wählt die <strong>komplette zweite Spalte</strong> aus, also <code>[2, 5, 8]</code>?</p>
+            <ul class="options">
+                <li>A) <code>data[1, :]</code></li>
+                <li>B) <code>data[:, 1]</code></li>
+                <li>C) <code>data[2]</code></li>
+                <li>D) <code>data[0:2, 1]</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer2')">Antwort anzeigen</button>
+            <div id="answer2" class="answer">
+                <p><strong>Die richtige Antwort ist B! ✅</strong></p>
+                <p><strong>Erklärung:</strong> In 2D-Arrays steht vor dem Komma die Auswahl für die Zeilen und danach die für die Spalten.</p>
+                <ul>
+                    <li>Der Doppelpunkt <code>:</code> bedeutet "wähle alle aus".</li>
+                    <li><code>data[:, 1]</code> liest sich also als: "Nimm mir aus <strong>allen Zeilen</strong> (<code>:</code>) das Element am <strong>Index 1</strong> der Spalten."</li>
+                    <li><code>data[1, :]</code> würde hingegen die zweite Zeile auswählen: <code>[4, 5, 6]</code>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="question-block">
+            <h3>Frage 3 von 5 (Reshape)</h3>
+            <p>Ein flaches Array <code>a = np.arange(6)</code> enthält die Werte <code>[0, 1, 2, 3, 4, 5]</code>.</p>
+            <p>Du möchtest es in eine Matrix mit 2 Zeilen und 3 Spalten umwandeln. Welcher Befehl ist der richtige?</p>
+            <ul class="options">
+                <li>A) <code>a.reshape(3, 2)</code></li>
+                <li>B) <code>a.reshape(6, 1)</code></li>
+                <li>C) <code>a.reshape(3, 3)</code></li>
+                <li>D) <code>a.reshape(2, 3)</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer3')">Antwort anzeigen</button>
+            <div id="answer3" class="answer">
+                <p><strong>Die richtige Antwort ist D! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Der Befehl <code>reshape(zeilen, spalten)</code> formt ein Array um. Die neue Form muss exakt die gleiche Anzahl von Elementen enthalten wie das Original (hier 6). Nur <code>2 * 3 = 6</code> passt.</p>
+                <p>Das Ergebnis von <code>a.reshape(2, 3)</code> wäre:</p>
+                <code>[[0, 1, 2],<br>[3, 4, 5]]</code>
+                <p><code>a.reshape(3, 2)</code> würde hingegen eine Matrix mit 3 Zeilen und 2 Spalten erzeugen.</p>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 4 von 5 (Der "-1"-Trick)</h3>
+            <p>Du hast einen PyTorch-Tensor <code>t</code> mit der Form <code>[10, 3, 32, 32]</code> (10 Bilder, 3 Farbkanäle, 32x32 Pixel).</p>
+            <p>Du willst jedes Bild "plattdrücken", um es an eine lineare Schicht zu übergeben. Die Ziel-Form ist <code>[10, 3072]</code> (da 3*32*32=3072). Welcher Befehl ist dafür am praktischsten?</p>
+            <ul class="options">
+                <li>A) <code>t.reshape(10, 3072)</code></li>
+                <li>B) <code>t.reshape(10, -1)</code></li>
+                <li>C) <code>t.reshape(-1)</code></li>
+                <li>D) Sowohl A als auch B sind korrekt und praktisch.</li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer4')">Antwort anzeigen</button>
+            <div id="answer4" class="answer">
+                <p><strong>Die richtige Antwort ist D! ✅</strong></p>
+                <p><strong>Erklärung:</strong> Beide Befehle führen zum richtigen Ergebnis. Der Befehl <code>t.reshape(10, -1)</code> ist jedoch oft praktischer und weniger fehleranfällig.</p>
+                <p>Die <code>-1</code> ist ein Platzhalter, der PyTorch oder NumPy anweist: "Behalte die erste Dimension bei 10 und berechne die zweite Dimension automatisch so, dass alle Elemente des Original-Tensors verwendet werden." Man muss also nicht selbst <code>3*32*32</code> ausrechnen. Das macht den Code flexibler und lesbarer.</p>
+            </div>
+        </div>
+        
+        <div class="question-block">
+            <h3>Frage 5 von 5 (Permute)</h3>
+            <p>Stell dir vor, du hast Zeitreihendaten in einem Tensor mit der Form <code>[Batch, Sequenzlänge, Features]</code>, z.B. <code>[100, 50, 12]</code>.</p>
+            <p>Eine Bibliothek (wie die <code>Conv1d</code>-Schicht in PyTorch) erwartet aber das Format <code>[Batch, Features, Sequenzlänge]</code>. Du musst also die letzten beiden Dimensionen vertauschen.</p>
+            <p>Welcher Befehl macht das?</p>
+            <ul class="options">
+                <li>A) <code>t.reshape(100, 12, 50)</code></li>
+                <li>B) <code>t.permute(2, 1, 0)</code></li>
+                <li>C) <code>t.permute(0, 2, 1)</code></li>
+                <li>D) <code>t.slice(0, 2, 1)</code></li>
+            </ul>
+            <button class="toggle-button" onclick="toggleAnswer(this, 'answer5')">Antwort anzeigen</button>
+            <div id="answer5" class="answer">
+                <p><strong>Die richtige Antwort ist C! ✅</strong></p>
+                <p><strong>Erklärung:</strong> <code>permute</code> ordnet die Dimensionen neu an. Man übergibt die <strong>Indizes der alten Dimensionen</strong> in der <strong>neuen gewünschten Reihenfolge</strong>.</p>
+                <ul>
+                    <li>Original: Dimension 0 (Batch), Dimension 1 (Sequenz), Dimension 2 (Features)</li>
+                    <li>Ziel: Dimension 0 (Batch), Dimension 2 (Features), Dimension 1 (Sequenz)</li>
+                </ul>
+                <p>Der Befehl <code>t.permute(0, 2, 1)</code> bedeutet also: "Die neue 1. Dimension soll die alte 0. sein. Die neue 2. Dimension soll die alte 2. sein. Die neue 3. Dimension soll die alte 1. sein."</p>
+                <p><strong>Wichtig:</strong> <code>reshape</code> ist hier falsch, da es die Daten einfach linear neu anordnet und dabei die logische Struktur (welcher Wert zu welchem Zeitschritt gehört) zerstören würde.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleAnswer(button, answerId) {
+            const answerElement = document.getElementById(answerId);
+            const currentDisplay = window.getComputedStyle(answerElement).display;
+            
+            if (currentDisplay === 'none') {
+                answerElement.style.display = 'block';
+                button.textContent = 'Antwort verbergen';
+            } else {
+                answerElement.style.display = 'none';
+                button.textContent = 'Antwort anzeigen';
+            }
+        }
+    </script>
+
+</body>
+</html>
