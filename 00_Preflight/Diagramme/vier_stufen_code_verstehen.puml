@@ -1,0 +1,132 @@
+@startuml vier_stufen_code_verstehen
+
+' ============================================================
+'  Die vier Stufen des Code-Verstehens
+'  Nach: Golo Roden, heise online (2026)
+'  "Code lesen statt Code schreiben"
+' ============================================================
+
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 12
+
+skinparam rectangle {
+  FontSize 14
+  BorderThickness 2
+}
+
+skinparam note {
+  FontSize 12
+  BorderColor #BBBBBB
+  BackgroundColor #FFFFF0
+}
+
+skinparam arrow {
+  Color #555555
+  Thickness 2
+}
+
+title <size:22><b>Die vier Stufen des Code-Verstehens</b></size>\n<size:14><color:#666666>Nach Golo Roden – „Code lesen statt Code schreiben" (heise, 2026)</color></size>
+
+' ── Stufe 1 ──────────────────────────────────────────────────
+rectangle "<b>Stufe 1 – Syntaktisch-mechanische Ebene</b>\n<i>„Was steht da?"</i>" as S1 #E3F2FD {
+}
+
+note right of S1
+  <b>Schlüsselaspekte</b>
+  ● Kontrollfluss nachvollziehen
+    (welche Funktion ruft welche auf?)
+  ● Variablenbelegungen verfolgen
+  ● Rückgabewerte und Datentypen erkennen
+  ● Reine **Form** des Codes erfassen
+  ....
+  <color:#1565C0><b>Kompetenz:</b> Werkzeugbenutzung</color>
+  <color:#C62828><b>Risiko:</b> Wer hier stehen bleibt,
+  liest nur Buchstaben, nicht Bedeutung.</color>
+end note
+
+' ── Stufe 2 ──────────────────────────────────────────────────
+rectangle "<b>Stufe 2 – Semantische Ebene</b>\n<i>„Was bewirkt der Code?"</i>" as S2 #E8F5E9 {
+}
+
+note right of S2
+  <b>Schlüsselaspekte</b>
+  ● Zustandsänderungen identifizieren
+  ● Invarianten erkennen
+    (was muss immer gelten?)
+  ● Abgedeckte Fehlerfälle prüfen
+  ● Stillschweigend ignorierte Fälle aufspüren
+  ● **Wirkung** statt nur Form verstehen
+  ....
+  <color:#2E7D32><b>Kompetenz:</b> Verstehend lesen</color>
+  <color:#C62828><b>Risiko:</b> Ohne diese Ebene werden
+  Bugs übersehen und Reviews oberflächlich.</color>
+end note
+
+' ── Stufe 3 ──────────────────────────────────────────────────
+rectangle "<b>Stufe 3 – Intentionsebene</b>\n<i>„Warum wurde es so gelöst?"</i>" as S3 #FFF3E0 {
+}
+
+note right of S3
+  <b>Schlüsselaspekte</b>
+  ● Bewusste Trade-offs rekonstruieren
+  ● Verworfene Alternativen erkennen
+  ● Zugrunde liegende Annahmen hinterfragen
+  ● Quellen: Tests, Kommentare,
+    Commit-Messages, PR-Diskussionen
+  ● Selten explizit dokumentiert!
+  ....
+  <color:#E65100><b>Kompetenz:</b> Kritisch lesen</color>
+  <color:#C62828><b>Risiko:</b> Ohne Intentionsverständnis
+  werden sinnvolle Entscheidungen
+  „wegrefactored".</color>
+end note
+
+' ── Stufe 4 ──────────────────────────────────────────────────
+rectangle "<b>Stufe 4 – Geschichtsebene</b>\n<i>„Wie ist der Code geworden?"</i>" as S4 #F3E5F5 {
+}
+
+note right of S4
+  <b>Schlüsselaspekte</b>
+  ● Evolution der Codebasis nachvollziehen
+  ● Bewusste Schnitte vs. Workarounds
+    unterscheiden
+  ● Organisches Wachstum vs.
+    nachträglich „Angeklebtes" erkennen
+  ● Git-Historie & Blame als
+    archäologisches Werkzeug nutzen
+  ....
+  <color:#6A1B9A><b>Kompetenz:</b> Code-Archäologie</color>
+  <color:#C62828><b>Risiko:</b> Wer die Geschichte nicht
+  kennt, repariert Symptome statt
+  Ursachen – und tappt in alte Fallen.</color>
+end note
+
+' ── Verbindungen (aufsteigend) ──────────────────────────────
+S1 -[#1565C0,bold]down-> S2 : <color:#555>Vertiefung:\nvon **Form**\nzu **Wirkung**>
+S2 -[#2E7D32,bold]down-> S3 : <color:#555>Vertiefung:\nvon **Was**\nzu **Warum**>
+S3 -[#E65100,bold]down-> S4 : <color:#555>Vertiefung:\nvon **Absicht**\nzu **Kontext**>
+
+' ── Fazit-Box ───────────────────────────────────────────────
+rectangle "<b><size:15>Senior-Niveau = alle vier Ebenen gleichzeitig</size></b>\n\n<i>„Wer nur die erste beherrscht, ist Werkzeugbenutzer.\nWer alle vier integriert, ist Entwickler im eigentlichen Sinne."</i>\n— Golo Roden" as FAZIT #ECEFF1
+
+S4 -[#555555,bold]down-> FAZIT
+
+' ── LLM-Kontext ─────────────────────────────────────────────
+rectangle "<size:13><b>Kontext: LLM-generierter Code</b></size>\n\nGenerieren ist billig – Verstehen bleibt teuer.\nDie Lesegeschwindigkeit des Menschen ist konstant,\ndie Codebasis wächst exponentiell.\n**→ Code-Lesen wird zur entscheidenden Engpass-Kompetenz.**" as LLM #FBE9E7
+
+FAZIT -[#555555,dashed]down-> LLM
+
+' ── Legende ─────────────────────────────────────────────────
+legend bottom left
+  <b>Fünf Übungsansätze nach Golo Roden</b>
+  1. Open-Source-Code lesen, ohne etwas zu ändern
+  2. Fremde Pull Requests nachvollziehen
+  3. Lesemodi bewusst wechseln (scannend / verstehend / kritisch)
+  4. LLM-generierten Code aktiv prüfen statt abnicken
+  5. Eigenen Code nach 6 Monaten erneut lesen
+endlegend
+
+@enduml
