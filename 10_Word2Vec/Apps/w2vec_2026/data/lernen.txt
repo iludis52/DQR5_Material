@@ -1,0 +1,1 @@
+['student', 'lernen', 'jeden', 'tag', 'fleißig', 'üben', 'wissen', 'wächst', 'lernen', 'macht', 'klug', 'prüfung', 'bestehen', 'üben', 'wiederholen', 'verstehen', 'wissen', 'teilen', 'lernen', 'gemeinsam']

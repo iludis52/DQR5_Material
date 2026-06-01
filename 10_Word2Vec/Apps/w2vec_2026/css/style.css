@@ -1,0 +1,324 @@
+/*
+ * ============================================================================
+ *  w2vec_2026 — Layout & Stil
+ * ----------------------------------------------------------------------------
+ *  Zentrale Layout-Variablen stehen in :root, damit sich Abstände, Farben und
+ *  Tabellenhöhen mühelos anpassen lassen. Layout über CSS-Grid/Flexbox, damit
+ *  spätere Umstellungen ohne Strukturänderung möglich sind.
+ * ============================================================================
+ */
+:root {
+  --gap: 10px;
+  --radius: 8px;
+  --panel-bg: #ffffff;
+  --page-bg: #eef1f5;
+  --border: #d4d9e0;
+  --accent: #2c6cbf;
+  --accent-dark: #1f4f8f;
+  --train: #2e8b57;
+  --warn: #b5651d;
+  --text: #222;
+  --muted: #667;
+  --controls-width: 350px;    /* feste Breite der Steuerungs-Spalte */
+  /* Höhenverhältnis der beiden Layout-Zeilen (Zeile 2 mit dem Netz höher) */
+  --row1-grow: 1;
+  --row2-grow: 1.35;
+}
+
+* { box-sizing: border-box; }
+
+/* [hidden] muss auch dann greifen, wenn ein Element per Klasse display:flex
+   bekommt (z. B. .loss-vis) — sonst bliebe die Loss-Kurve immer sichtbar. */
+[hidden] { display: none !important; }
+
+/* Die App füllt exakt das Browserfenster; gescrollt wird NUR innerhalb der
+   einzelnen Tabellen/Boxen, nie die ganze Seite. */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--page-bg);
+  color: var(--text);
+  line-height: 1.3;
+  padding: 0 var(--gap) var(--gap);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- Kopfzeile (Titel links, Text-Buttons rechts) ----------------------- */
+.app-header {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--gap);
+  padding: 6px 0 4px;
+}
+.header-titles { flex: 1 1 auto; min-width: 0; }
+.app-header h1 { margin: 0 0 1px; color: var(--accent-dark); font-size: 1.2rem; }
+.subtitle {
+  margin: 0; color: var(--muted); font-size: 0.82rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;  /* eine Zeile */
+}
+.header-actions {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;   /* Buttons nebeneinander */
+}
+
+/* --- Steuerung (rechte Spalte, feste Breite, vertikal gestapelt) -------- */
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  background: #f7f9fc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  overflow: auto;          /* falls doch zu hoch: hier scrollen */
+}
+.controls h3 { margin: 0 0 2px; }
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;       /* Label + Slider + Wert in einer Zeile */
+}
+.ctrl-group > label { font-weight: 600; color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+/* Slider nutzt die restliche Spaltenbreite */
+.ctrl-group input[type="range"] { flex: 1 1 auto; min-width: 60px; }
+.ctrl-label { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
+/* Trainings-Buttons: alle drei nebeneinander in einer Zeile */
+.ctrl-actions { display: flex; gap: 6px; flex-wrap: nowrap; }
+.ctrl-actions .btn { flex: 1 1 0; padding: 6px 4px; white-space: nowrap; }
+
+.btn {
+  font: inherit;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn-link { background: #fff; color: var(--accent); }
+.btn-train { background: var(--train); border-color: var(--train); }
+.btn-warn { background: var(--warn); border-color: var(--warn); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-mini {
+  font-size: 0.72rem; padding: 2px 8px; margin-left: 8px;
+  background: #fff; color: var(--accent); vertical-align: middle;
+}
+
+input[type="range"] { vertical-align: middle; }
+.slider-value {
+  display: inline-block;
+  min-width: 1.5em;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+.slider-range, .word-count { color: var(--muted); font-size: 0.9rem; }
+.word-count { font-weight: 600; }
+
+/* --- Statuszeile --------------------------------------------------------- */
+.status {
+  flex: 0 0 auto;
+  min-height: 1.1em;
+  padding: 1px 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.status.error { color: #c0392b; font-weight: 600; }
+
+/* --- Panels (zwei Layout-Zeilen mit fester, bildschirmfüllender Höhe) ---- */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px var(--gap);
+  margin-bottom: var(--gap);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;            /* erlaubt inneres Scrollen statt Wachsen */
+}
+.panel:last-of-type { margin-bottom: 0; }
+.panel:nth-of-type(1) { flex: var(--row1-grow) 1 0; }   /* Layout-Zeile 1 */
+.panel:nth-of-type(2) { flex: var(--row2-grow) 1 0; }   /* Layout-Zeile 2 */
+.panel h2 {
+  flex: 0 0 auto;
+  margin: 0 0 6px; font-size: 0.95rem; color: var(--accent-dark);
+}
+.panel h3 {
+  flex: 0 0 auto;
+  margin: 0 0 5px; font-size: 0.82rem; color: var(--muted); font-weight: 600;
+}
+.h2-note { font-size: 0.76rem; font-weight: 400; color: var(--muted); }
+
+/* --- Scroll-Container (Tabellen) ----------------------------------------
+   Füllen die Höhe ihrer Spalte und scrollen, wenn der Inhalt höher wird. */
+.scroll-box {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fbfcfe;
+}
+/* Datensatz-Tabelle: nur so breit wie nötig, gedeckelt auf die berechnete
+   Maximalbreite für maxWords (--onehot-max-width, gesetzt in app.js). */
+.onehot-box { width: 100%; max-width: var(--onehot-max-width, 728px); }
+
+/* --- One-Hot-Tabelle ----------------------------------------------------- */
+.onehot-table {
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.onehot-table th, .onehot-table td {
+  border: 1px solid #e3e7ec;
+  padding: 3px 6px;
+  text-align: center;
+}
+.onehot-table thead { position: sticky; top: 0; }
+.onehot-table .corner,
+.onehot-table .group,
+.onehot-table .vocab-col {
+  position: sticky; top: 0;
+  background: #eef2f8;
+  z-index: 2;
+}
+.onehot-table .group-context { background: #fbe6cf; color: var(--warn); }
+/* schmale Spalten mit senkrechter Beschriftung -> definierte Breite */
+.onehot-table .vocab-col {
+  background: #fbe6cf;
+  width: 24px; min-width: 24px; max-width: 24px;
+  padding: 4px 0; vertical-align: bottom;
+}
+.vocab-vertical {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  display: inline-block; white-space: nowrap;
+  font-size: 0.66rem; font-weight: 600; color: var(--warn);
+}
+.onehot-table td.word {
+  text-align: left; font-weight: 600;
+  position: sticky; left: 0; background: #f4f7fb; white-space: nowrap;
+}
+.onehot-table td.on  { background: #cdeccd; font-weight: 700; }
+.onehot-table td.off { color: #c4c9d0; }
+
+/* --- Zeile 1: Beispieltext (links) · Datensatz (Mitte, 2×) · Steuerung -- */
+/* Breitenverhältnis Datensatz : Beispieltext = 2 : 1; Steuerung feste Breite. */
+.data-row {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 2fr var(--controls-width);
+  grid-template-rows: minmax(0, 1fr);   /* Zeile füllt die volle Panel-Höhe */
+  gap: var(--gap);
+}
+
+/* --- Zeile 2: Netz (groß) · Vektor-Datenbank · Projektion (klein) ------- */
+.viz-row {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 1.0fr) minmax(0, 0.8fr);
+  grid-template-rows: minmax(0, 1fr);   /* Zeile füllt die volle Panel-Höhe */
+  gap: var(--gap);
+}
+@media (max-width: 1000px) {
+  /* Auf schmalen Schirmen: stapeln und Seite scrollen lassen */
+  body { height: auto; overflow: auto; }
+  .panel:nth-of-type(1), .panel:nth-of-type(2) { flex: none; }
+  .data-row, .viz-row { grid-template-columns: 1fr; }
+}
+
+/* Alle Spalten sind Flex-Container: Überschrift fix, Inhalt füllt die Höhe. */
+.text-col, .data-col, .nn-col, .vecdb-col, .pca-col {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+}
+.data-row h3, .viz-row h3 { margin-top: 0; }
+
+/* Netz & Projektion füllen die Spaltenhöhe vollständig aus. */
+.nn-vis, .pca-vis { flex: 1 1 0; min-height: 0; }
+.nn-svg, .pca-svg { width: 100%; height: 100%; display: block; }
+.onehot-wrap { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+
+/* --- Datensatz-Overlay (Erklärung bei Hover über die Tabelle) ----------- */
+.onehot-wrap { position: relative; }
+.onehot-overlay {
+  position: absolute; top: 0; left: 0; right: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 12px; margin: 0;
+  font-size: 0.82rem; color: var(--text);
+  opacity: 0; pointer-events: none;            /* Scrollen bleibt möglich */
+  transition: opacity 0.15s; z-index: 5;
+}
+.onehot-wrap:hover .onehot-overlay { opacity: 1; }
+
+/* --- Beispieltext-Ansicht (Token-Chips) --------------------------------- */
+.text-box { padding: 8px; }
+.token-list { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.token-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #eef2f8; border: 1px solid var(--border);
+  border-radius: 12px; padding: 2px 8px; font-size: 0.85rem;
+}
+.token-pos {
+  font-size: 0.68rem; color: var(--muted);
+  background: #fff; border-radius: 8px; padding: 0 5px;
+}
+.token-word { font-weight: 600; }
+
+/* --- Vektor-Datenbank-Tabelle ------------------------------------------- */
+.vecdb-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+.vecdb-table th, .vecdb-table td {
+  border: 1px solid #e3e7ec;
+  padding: 5px 8px;
+  text-align: left;
+}
+.vecdb-table thead, .vecdb-table th {
+  position: sticky; top: 0;
+  background: #eef2f8; color: var(--accent-dark);
+}
+.vecdb-table td.word { font-weight: 600; white-space: nowrap; }
+.vecdb-table td.vec  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #334; font-size: 0.78rem; }
+
+/* --- Barcode-Modus der Vektor-Datenbank (PuOr) -------------------------- */
+.vecdb-table td.barcode { padding: 3px 6px; }
+.barcode-row { display: flex; height: 18px; border: 1px solid #ccc; border-radius: 3px; overflow: hidden; }
+.barcode-seg { flex: 1 1 0; min-width: 6px; }
+.barcode-legend {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 6px; font-size: 0.72rem; color: var(--muted);
+}
+.barcode-legend .legend-bar { display: flex; flex: 1; height: 12px; border: 1px solid #ccc; border-radius: 3px; overflow: hidden; }
+.barcode-legend .legend-bar span { flex: 1; }
+.barcode-legend .legend-end { font-family: ui-monospace, monospace; }
+
+/* --- PCA + Loss-Kurve (füllen die Spaltenhöhe, entweder/oder) ----------- */
+.pca-svg { background: #fbfcfe; border-radius: var(--radius); }
+.loss-vis { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.loss-title { flex: 0 0 auto; font-size: 0.78rem; font-weight: 600; color: var(--accent-dark); margin-bottom: 4px; }
+.loss-chart { flex: 1 1 0; min-height: 0; }
+.loss-svg { width: 100%; height: 100%; display: block; background: #fbfcfe; border: 1px solid var(--border); border-radius: var(--radius); }
+
+/* --- Schwebendes Tooltip (Token-Sparse-Vektoren) ------------------------ */
+.float-tip {
+  position: fixed; z-index: 1000; max-width: 360px;
+  background: #1f2733; color: #fff; border-radius: 6px;
+  padding: 8px 10px; font-size: 0.78rem; box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+.float-tip .tip-title { font-weight: 700; margin-bottom: 2px; }
+.float-tip .tip-sub { color: #b8c4d6; margin-bottom: 4px; }
+.float-tip .tip-vec { font-family: ui-monospace, monospace; word-break: break-word; }
+.token-chip { cursor: help; }

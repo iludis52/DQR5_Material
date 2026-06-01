@@ -1,0 +1,1 @@
+['london', 'hauptstadt', 'england', 'paris', 'hauptstadt', 'frankreich', 'london', 'themse', 'fluss', 'paris', 'seine', 'fluss', 'england', 'königreich', 'frankreich', 'republik', 'london', 'paris', 'städte', 'europa', 'england', 'frankreich', 'nachbarn', 'reisen', 'europa']

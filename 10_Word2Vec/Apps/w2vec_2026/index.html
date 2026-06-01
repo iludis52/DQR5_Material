@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>w2vec_2026 — Word2Vec Lernhilfe (Skip-Gram)</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="header-titles">
+      <h1>Word2Vec-Simulation: Skipgram</h1>
+      <p class="subtitle">Interaktive Visualisierung des <strong>Skip-Gram</strong>-Verfahrens — von der Textvorverarbeitung über den One-Hot-Datensatz und das neuronale Netz bis zur Vektor-Datenbank und PCA-Projektion.</p>
+    </div>
+    <!-- Text-Upload/Download (rechts in der Kopfzeile, nebeneinander) -->
+    <div id="header-actions" class="header-actions"></div>
+  </header>
+
+  <div id="status" class="status"></div>
+
+  <!-- 1) Beispieltext (links) · Datensatz (Mitte, 2×) · Steuerung (rechts, fest) -->
+  <section class="panel">
+    <h2>1 · Beispieltext · aufbereiteter Datensatz · Steuerung
+      <span class="h2-note">— Token: Hover für Sparse-Vektor · Datensatz-Tabelle: Hover für Erklärung</span>
+    </h2>
+    <div class="data-row">
+      <div class="text-col">
+        <h3>Beispieltext</h3>
+        <div id="text" class="scroll-box text-box"></div>
+      </div>
+      <div class="data-col">
+        <h3>Aufbereiteter Datensatz</h3>
+        <div class="onehot-wrap">
+          <div id="onehot" class="scroll-box onehot-box"></div>
+          <div class="onehot-overlay">
+            Jede <strong>Zeile</strong> ist ein Trainingsbeispiel (eine Textposition):
+            links das Ziel-Wort, rechts sein <strong>Kontext-Vektor als Zeilenvektor</strong>
+            der Länge&nbsp;=&nbsp;Vokabulargröße; jede <strong>Spalte</strong> steht für ein
+            Vokabelwort. Bei Fenstergröße&nbsp;&gt;&nbsp;1 werden die dünn besetzten
+            Kontext-One-Hot-Vektoren aufsummiert. Tabelle nicht veränderbar, scrollbar.
+          </div>
+        </div>
+      </div>
+      <!-- Steuerung: Parameter-Slider, Trainings-Buttons (dynamisch aus CONFIG) -->
+      <section id="controls" class="controls"></section>
+    </div>
+  </section>
+
+  <!-- 2) Neuronales Netz + Vektor-Datenbank + Projektion nebeneinander -->
+  <section class="panel">
+    <h2>2 · Neuronales Netz · Vektor-Datenbank · Projektion
+      <span class="h2-note">— Netz: Hover über ein Neuron zeigt die Verbindungsgewichte · PCA/Loss live je Epoche</span>
+    </h2>
+    <div class="viz-row">
+      <div class="nn-col">
+        <h3>Netzwerk · Eingabe: one-hot · versteckt: linear · Ausgabe: Softmax</h3>
+        <div id="nn" class="nn-vis"></div>
+      </div>
+      <div class="vecdb-col">
+        <h3>Vektor-Datenbank
+          <button id="toggle-vecdb" class="btn btn-mini">▦ Barcode</button>
+        </h3>
+        <div id="vecdb" class="scroll-box vecdb-box"></div>
+      </div>
+      <div class="pca-col">
+        <h3>Projektion
+          <button id="toggle-loss" class="btn btn-mini">→ Loss-Kurve</button>
+        </h3>
+        <div id="pca" class="pca-vis"></div>
+        <div id="loss" class="loss-vis" hidden>
+          <div class="loss-title">Verlustfunktion: Kreuzentropie (Cross-Entropy)</div>
+          <div id="loss-chart" class="loss-chart"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reihenfolge wichtig: erst Konfiguration & Kern, dann Darstellung & App -->
+  <script src="js/config.js"></script>
+  <script src="js/word2vec.js"></script>
+  <script src="js/pca.js"></script>
+  <script src="js/viz.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

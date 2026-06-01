@@ -1,0 +1,1 @@
+['wolf', 'lief', 'durch', 'dunklen', 'wald', 'suchte', 'hungrig', 'kleine', 'geißlein', 'versteckten', 'angst', 'hinter', 'großen', 'baum', 'mutter', 'rief', 'laut', 'kinder', 'bleibt', 'still', 'wolf', 'kam', 'näher', 'fand', 'wald']

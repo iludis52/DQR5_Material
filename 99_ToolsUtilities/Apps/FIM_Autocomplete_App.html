@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>FIM Autocomplete</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f6f8;
+    --bg3: #edeef1;
+    --panel: #eaebee;
+    --panel2: #e0e2e7;
+    --border: #d0d3db;
+    --border2: #b8bcc8;
+    --accent: #2d6be4;
+    --accent2: #1a56c4;
+    --ghost: #7a9fd4;
+    --text: #1a1d26;
+    --text2: #4a5068;
+    --text3: #8b90a8;
+    --green: #1a9e60;
+    --red: #c0392b;
+    --orange: #c47a1a;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    --ui: 'Inter', system-ui, sans-serif;
+    --status-dot: #1a9e60;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg3);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  #app {
+    display: grid;
+    grid-template-rows: 36px 1fr;
+    grid-template-columns: 300px 1fr;
+    width: 100vw; height: 100vh;
+    min-width: 900px;
+  }
+
+  /* ── Titlebar ── */
+  #titlebar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 10px;
+    user-select: none;
+  }
+  #titlebar .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  #titlebar .sep { flex: 1; }
+  #titlebar .status {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text3);
+  }
+  #statusDot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--status-dot);
+    transition: background 0.3s;
+  }
+  #statusDot.loading { background: var(--orange); }
+  #statusDot.error   { background: var(--red); }
+  #statusLabel { font-size: 11px; color: var(--text3); }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-section {
+    padding: 14px 14px 0;
+  }
+  .sidebar-section + .sidebar-section {
+    margin-top: 4px;
+  }
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  .field-row { margin-bottom: 7px; }
+  .field-row label {
+    display: block;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 3px;
+  }
+  .field-row input, .field-row select {
+    width: 100%;
+    height: 28px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 0 8px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field-row input:focus, .field-row select:focus {
+    border-color: var(--accent);
+  }
+  .field-row input::placeholder { color: var(--text3); font-style: italic; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 14px;
+  }
+
+  /* sliders / params */
+  .param-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+  .param-row label {
+    font-size: 11px;
+    color: var(--text2);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .param-row input[type=range] {
+    flex: 1;
+    height: 3px;
+    accent-color: var(--accent);
+    background: transparent;
+    cursor: pointer;
+  }
+  .param-row .val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* trigger row */
+  .trigger-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+  .trigger-row label {
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .trigger-row input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 14px; height: 14px;
+    cursor: pointer;
+  }
+
+  /* buttons */
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--panel2);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+  }
+  .btn:hover { background: var(--border); border-color: var(--accent); }
+  .btn.primary {
+    background: var(--accent2);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: var(--accent); }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: rgba(224,90,90,0.12); }
+
+  .btn-row {
+    padding: 10px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* sidebar spacer */
+  .sidebar-flex { flex: 1; }
+
+  /* ── Main editor area ── */
+  #main {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-rows: 28px 1fr 28px 160px;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  /* tab bar */
+  #tabbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: stretch;
+    padding: 0 0 0 4px;
+    gap: 0;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text3);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+  .tab.active {
+    color: var(--text);
+    background: var(--bg);
+  }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+  .tab .lang-badge {
+    font-size: 9px;
+    background: var(--panel);
+    color: var(--text3);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: var(--mono);
+  }
+
+  /* editor wrapper */
+  #editorWrap {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* line numbers */
+  #lineNumbers {
+    width: 42px;
+    flex-shrink: 0;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 0;
+    overflow: hidden;
+    user-select: none;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--text3);
+    text-align: right;
+    padding-right: 10px;
+  }
+
+  /* code area */
+  #codeArea {
+    position: relative;
+    flex: 1;
+    overflow: auto;
+  }
+
+  /* actual textarea */
+  #editor {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--text);
+    caret-color: var(--accent);
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow: auto;
+    z-index: 2;
+  }
+
+  /* ghost overlay */
+  #ghostOverlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 20px;
+    color: transparent;
+    white-space: pre;
+    overflow-wrap: normal;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+  }
+  #ghostOverlay .ghost-text {
+    color: var(--ghost);
+    opacity: 0.8;
+    font-style: italic;
+  }
+
+  /* editor copy button */
+  #editorCopyBtn {
+    position: absolute;
+    top: 8px;
+    right: 20px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--text2);
+    font-size: 10px;
+    font-family: var(--ui);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  #editorCopyBtn:hover { background: var(--border); color: var(--text); }
+  #editorCopyBtn svg { width: 11px; height: 11px; }
+
+  /* hint bar */
+  #hintBar {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 16px;
+  }
+  .hint-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    padding: 1px 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    min-width: 20px;
+  }
+  #charInfo {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  /* output panel */
+  #outputPanel {
+    display: grid;
+    grid-template-rows: 26px 1fr;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    overflow: hidden;
+  }
+  #outputTabbar {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    padding: 0 0 0 4px;
+    gap: 0;
+  }
+  .out-tab {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 10px;
+    color: var(--text3);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    gap: 5px;
+  }
+  .out-tab.active { color: var(--text2); }
+  .out-tab .badge {
+    background: var(--accent2);
+    color: #fff;
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 8px;
+    display: none;
+  }
+  .out-tab .badge.show { display: inline; }
+
+  #outputContent {
+    overflow: auto;
+    position: relative;
+  }
+  #responseBox {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--text2);
+    white-space: pre-wrap;
+    overflow: auto;
+  }
+  #outputCopyBtn {
+    position: absolute;
+    top: 6px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--text2);
+    font-size: 10px;
+    font-family: var(--ui);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #outputCopyBtn:hover { background: var(--border); color: var(--text); }
+  #outputCopyBtn svg { width: 11px; height: 11px; }
+
+  /* spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 10px; height: 10px;
+    border: 1.5px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  .spinner.show { display: inline-block; }
+
+  /* tooltip */
+  .copied-flash {
+    font-size: 10px;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .copied-flash.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Titlebar -->
+  <div id="titlebar">
+    <span class="logo">FIM · Autocomplete</span>
+    <span class="sep"></span>
+    <div class="status">
+      <span id="spinner" class="spinner"></span>
+      <span id="statusDot"></span>
+      <span id="statusLabel">Bereit</span>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+
+    <div class="sidebar-section">
+      <div class="section-label">LLM-Verbindung</div>
+      <div class="field-row">
+        <label>API Base URL</label>
+        <input type="text" id="apiBase" value="https://api.mistral.ai/v1" placeholder="https://api.mistral.ai/v1" />
+      </div>
+      <div class="field-row">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-…" autocomplete="off" />
+      </div>
+      <div class="field-row">
+        <label>Modell</label>
+        <input type="text" id="modelName" value="codestral-latest" placeholder="codestral-latest" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sidebar-section">
+      <div class="section-label">FIM-Parameter</div>
+      <div class="param-row">
+        <label>Max Tokens</label>
+        <input type="range" id="maxTokens" min="16" max="512" step="8" value="128"
+               oninput="document.getElementById('maxTokensVal').textContent=this.value" />
+        <span class="val" id="maxTokensVal">128</span>
+      </div>
+      <div class="param-row">
+        <label>Temperature</label>
+        <input type="range" id="temperature" min="0" max="1" step="0.05" value="0.2"
+               oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(2)" />
+        <span class="val" id="tempVal">0.20</span>
+      </div>
+      <div class="param-row">
+        <label>Debounce (ms)</label>
+        <input type="range" id="debounce" min="200" max="1500" step="100" value="700"
+               oninput="document.getElementById('debounceVal').textContent=this.value" />
+        <span class="val" id="debounceVal">700</span>
+      </div>
+      <!-- nach dem Debounce param-row, vor dem </div> der "FIM-Parameter"-Section -->
+      <div class="param-row">
+        <label>Max Zeilen</label>
+        <input type="range" id="maxLines" min="1" max="20" step="1" value="3"
+              oninput="document.getElementById('maxLinesVal').textContent=this.value" />
+        <span class="val" id="maxLinesVal">3</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Verhalten</div>
+      <div class="trigger-row">
+        <label>Auto-Trigger (nach Tipp-Pause)</label>
+        <input type="checkbox" id="autoTrigger" checked />
+      </div>
+      <div class="trigger-row">
+        <label>Suffix senden</label>
+        <input type="checkbox" id="sendSuffix" checked />
+      </div>
+    </div>
+
+    <div class="sidebar-flex"></div>
+
+    <div class="divider"></div>
+    <div style="padding: 4px 14px; font-size: 10px; color: var(--text3); line-height: 1.6;">
+      LM Studio: Base URL auf <br>
+      <code style="color:var(--text2);">http://localhost:1234/v1</code><br>
+      CORS in LM Studio aktivieren.
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="triggerFIM()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="4,6 8,10 12,6"/></svg>
+        FIM ausführen
+      </button>
+      <button class="btn danger" onclick="clearAll()">Leeren</button>
+    </div>
+
+  </div>
+
+  <!-- Main editor -->
+  <div id="main">
+
+    <!-- Tab bar -->
+    <div id="tabbar">
+      <div class="tab active">
+        editor.py
+        <span class="lang-badge">Python</span>
+      </div>
+    </div>
+
+    <!-- Editor wrap -->
+    <div id="editorWrap">
+      <div id="lineNumbers"></div>
+      <div id="codeArea">
+        <div id="ghostOverlay" aria-hidden="true"></div>
+        <textarea id="editor"
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          placeholder="# Code hier eingeben …"
+        ></textarea>
+        <button id="editorCopyBtn" onclick="copyEditor()" title="Editor-Inhalt kopieren">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M2 11V2h9"/></svg>
+          <span id="editorCopyFlash" class="copied-flash">Kopiert</span>
+          Kopieren
+        </button>
+      </div>
+    </div>
+
+    <!-- Hint bar -->
+    <div id="hintBar">
+      <div class="hint-item">
+        <span class="kbd">Tab</span> Vorschlag übernehmen
+      </div>
+      <div class="hint-item">
+        <span class="kbd">Esc</span> Verwerfen
+      </div>
+      <div class="hint-item">
+        <span class="kbd">Ctrl</span><span class="kbd">Space</span> Manuell auslösen
+      </div>
+      <div class="hint-item">
+        <span class="kbd">Ctrl</span><span class="kbd">Z</span> Rückgängig
+      </div>
+      <span id="charInfo">Ln 1, Col 1</span>
+    </div>
+
+    <!-- Output panel -->
+    <div id="outputPanel">
+      <div id="outputTabbar">
+        <div class="out-tab active">
+          Letzter FIM-Response
+          <span id="responseBadge" class="badge">1</span>
+        </div>
+      </div>
+      <div id="outputContent">
+        <div id="responseBox"><span style="color:var(--text3); font-style:italic;">// Noch kein Response. Tippe Code und warte auf Auto-Trigger, oder drücke Ctrl+Space.</span></div>
+        <button id="outputCopyBtn" onclick="copyOutput()" title="Response kopieren">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M2 11V2h9"/></svg>
+          <span id="outputCopyFlash" class="copied-flash">Kopiert</span>
+          Kopieren
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /#main -->
+
+</div><!-- /#app -->
+
+<script>
+const editor      = document.getElementById('editor');
+const ghost       = document.getElementById('ghostOverlay');
+const lineNums    = document.getElementById('lineNumbers');
+const responseBox = document.getElementById('responseBox');
+const statusDot   = document.getElementById('statusDot');
+const statusLabel = document.getElementById('statusLabel');
+const spinner     = document.getElementById('spinner');
+const badge       = document.getElementById('responseBadge');
+const charInfo    = document.getElementById('charInfo');
+
+let pendingGhost = '';
+let debounceTimer = null;
+let responseCount = 0;
+let isLoading = false;
+
+/* ── Line numbers ── */
+function updateLineNumbers() {
+  const lines = editor.value.split('\n');
+  lineNums.innerHTML = lines.map((_, i) => i + 1).join('\n');
+}
+
+/* ── Ghost text display ── */
+function showGhost(prefix, completion) {
+  pendingGhost = completion;
+  const escaped = escapeHtml(prefix) +
+    '<span class="ghost-text">' + escapeHtml(completion) + '</span>';
+  ghost.innerHTML = escaped;
+}
+
+function clearGhost() {
+  pendingGhost = '';
+  ghost.innerHTML = '';
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/* ── Cursor info ── */
+function updateCursorInfo() {
+  const val = editor.value;
+  const pos = editor.selectionStart;
+  const before = val.substring(0, pos);
+  const lines = before.split('\n');
+  const ln = lines.length;
+  const col = lines[lines.length - 1].length + 1;
+  charInfo.textContent = `Ln ${ln}, Col ${col}  |  ${val.length} Z.`;
+}
+
+/* ── Status ── */
+function setStatus(state, msg) {
+  statusLabel.textContent = msg;
+  statusDot.className = state === 'loading' ? 'loading' : state === 'error' ? 'error' : '';
+  if (state === 'loading') {
+    spinner.classList.add('show');
+  } else {
+    spinner.classList.remove('show');
+  }
+  isLoading = state === 'loading';
+}
+
+/* ── FIM API call ── */
+async function triggerFIM() {
+  if (isLoading) return;
+  clearGhost();
+
+  const base  = document.getElementById('apiBase').value.replace(/\/$/, '');
+  const key   = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('modelName').value.trim();
+  const maxT  = parseInt(document.getElementById('maxTokens').value);
+  const temp  = parseFloat(document.getElementById('temperature').value);
+  const useSuffix = document.getElementById('sendSuffix').checked;
+
+  if (!base || !model) {
+    setStatus('error', 'API Base / Modell fehlt');
+    return;
+  }
+
+  const pos    = editor.selectionStart;
+  const val    = editor.value;
+  const prefix = val.substring(0, pos);
+  const suffix = useSuffix ? val.substring(pos) : '';
+
+  if (!prefix.trim()) {
+    setStatus('error', 'Kein Prefix-Inhalt');
+    return;
+  }
+
+  setStatus('loading', 'Anfrage läuft…');
+
+  const maxLines = parseInt(document.getElementById('maxLines').value);
+  const stopSeqs = ['\n'.repeat(maxLines + 1)];
+
+  const body = {
+    model,
+    prompt: prefix,
+    suffix: suffix,
+    max_tokens: maxT,
+    temperature: temp,
+    stop: stopSeqs,
+    stream: false
+  };
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (key) headers['Authorization'] = 'Bearer ' + key;
+
+    const res = await fetch(base + '/fim/completions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const errMsg = data?.error?.message || data?.message || res.statusText;
+      setStatus('error', 'Fehler: ' + errMsg);
+      responseBox.textContent = 'HTTP ' + res.status + '\n' + JSON.stringify(data, null, 2);
+      return;
+    }
+
+    const completion = data?.choices?.[0]?.delta?.content
+                    ?? data?.choices?.[0]?.message?.content
+                    ?? data?.choices?.[0]?.text
+                    ?? '';
+
+    if (!completion) {
+      setStatus('', 'Leere Antwort');
+      responseBox.textContent = JSON.stringify(data, null, 2);
+      return;
+    }
+
+    showGhost(prefix, completion);
+    responseBox.textContent = completion;
+    responseCount++;
+    badge.textContent = responseCount;
+    badge.classList.add('show');
+    setStatus('', 'Vorschlag bereit — Tab übernehmen');
+
+  } catch (err) {
+    setStatus('error', err.message);
+    responseBox.textContent = err.toString();
+  }
+}
+
+/* ── Accept ghost ── */
+function acceptGhost() {
+  if (!pendingGhost) return false;
+  const pos = editor.selectionStart;
+  const val = editor.value;
+  const newVal = val.substring(0, pos) + pendingGhost + val.substring(pos);
+  editor.value = newVal;
+  editor.selectionStart = editor.selectionEnd = pos + pendingGhost.length;
+  clearGhost();
+  updateLineNumbers();
+  updateCursorInfo();
+  setStatus('', 'Übernommen');
+  return true;
+}
+
+/* ── Keyboard handling ── */
+editor.addEventListener('keydown', function(e) {
+  if (e.key === 'Tab') {
+    if (acceptGhost()) { e.preventDefault(); return; }
+    // Normal tab
+    e.preventDefault();
+    const s = this.selectionStart;
+    const v = this.value;
+    this.value = v.substring(0, s) + '    ' + v.substring(s);
+    this.selectionStart = this.selectionEnd = s + 4;
+    updateLineNumbers();
+    updateCursorInfo();
+    return;
+  }
+  if (e.key === 'Escape') {
+    clearGhost();
+    setStatus('', 'Verworfen');
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+    e.preventDefault();
+    triggerFIM();
+    return;
+  }
+  // Any other key clears ghost
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+    clearGhost();
+  }
+});
+
+/* ── Auto-trigger on input ── */
+editor.addEventListener('input', function() {
+  updateLineNumbers();
+  updateCursorInfo();
+  clearGhost();
+
+  if (!document.getElementById('autoTrigger').checked) return;
+  if (debounceTimer) clearTimeout(debounceTimer);
+
+  const delay = parseInt(document.getElementById('debounce').value);
+  debounceTimer = setTimeout(() => {
+    if (!isLoading) triggerFIM();
+  }, delay);
+});
+
+editor.addEventListener('keyup', updateCursorInfo);
+editor.addEventListener('click', updateCursorInfo);
+editor.addEventListener('scroll', function() {
+  lineNums.scrollTop = this.scrollTop;
+  ghost.scrollTop    = this.scrollTop;
+  ghost.scrollLeft   = this.scrollLeft;
+});
+
+/* ── Copy buttons ── */
+function flashCopied(flashId) {
+  const el = document.getElementById(flashId);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1200);
+}
+
+function copyEditor() {
+  navigator.clipboard.writeText(editor.value).then(() => flashCopied('editorCopyFlash'));
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(responseBox.textContent).then(() => flashCopied('outputCopyFlash'));
+}
+
+/* ── Clear ── */
+function clearAll() {
+  editor.value = '';
+  clearGhost();
+  responseBox.innerHTML = '<span style="color:var(--text3); font-style:italic;">// Geleert.</span>';
+  updateLineNumbers();
+  updateCursorInfo();
+  setStatus('', 'Bereit');
+  if (debounceTimer) clearTimeout(debounceTimer);
+}
+
+/* ── Init ── */
+updateLineNumbers();
+updateCursorInfo();
+
+/* handle debounce slider live */
+document.getElementById('debounce').addEventListener('input', function() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+});
+</script>
+</body>
+</html>
