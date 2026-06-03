@@ -1,0 +1,67 @@
+## Fachtermini
+
+- LangGraph-Agent
+- LLM-basierter Agent
+- StateGraph-Orchestrierung
+- programmatische Qualitätskontrolle
+- kontextbewusste Prompt-Engineering
+- langgraph.graph.StateGraph
+- StateGraph
+- nodes
+- edges
+- State
+- QuizState
+- TypedDict
+- Loop
+- route_full
+- quality
+- render
+- rewrite_script
+- rewrite_quiz
+- analyze_notebook
+- nbformat
+- Grounding
+- Halluzinationen
+- node_script
+- Temperatur
+- node_termini
+- Fachbegriffe
+- node_quiz
+- Bloom-Taxonomie
+- Wortzahl-Balance
+- node_quality
+- programmatische Checks
+- LLM-Bewertung
+- Checker-Modell
+- fachliche Plausibilität
+- node_render
+- HTML-Template
+- JSON-Variable
+- CORS-Probleme
+- Grounding gegen Halluzinationen
+- generierter Text
+- faktenbasierter Text
+- STRIKTES GROUNDING
+- API-Signaturen
+- Reflexions-Schleife
+- Self-Correction
+- script_feedback
+- quiz_feedback
+- Maximale Iterationen
+- Anti-Dubletten
+- run_regen
+- avoid_topics
+- Kontextuelle Abwechslung
+- Fachtermini
+- Provider-Agnostizität
+- OpenAI-kompatible Schnittstelle
+- base_url
+- LM Studio
+- OpenRouter
+- DeepInfra
+- Token-Tracking
+- TOKENS
+- Usage-Daten
+- JSON-Robustheit
+- extract_json
+- Code-Fences
