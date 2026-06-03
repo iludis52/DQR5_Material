@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperparameter‑Tuning mit Optuna – Theorie hinter dem Code</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .mistakes { color: #dc3545; }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Hyperparameter‑Tuning mit Optuna – Theorie hinter dem Code</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 24px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Welcher Mechanismus von Optuna spart Rechenzeit, indem er Trials frühzeitig abbricht?",
+                "options": [
+                        "TPESampler",
+                        "MedianPruner",
+                        "Early Stopping",
+                        "Objective‑Funktion"
+                ],
+                "correct": 1,
+                "explanation": "Der MedianPruner vergleicht den aktuellen Loss eines Trials mit dem Median aller bisherigen Trials und schneidet schlechte Trials ab."
+        },
+        {
+                "text": "Was ist die Hauptfunktion einer \"Trial\" in Optuna?",
+                "options": [
+                        "Speichern der besten Gewichte",
+                        "Durchführen eines Trainingslaufs mit einem Satz Hyperparameter",
+                        "Erstellen des Optimierungsplans",
+                        "Generieren von Plots zur Visualisierung"
+                ],
+                "correct": 1,
+                "explanation": "Eine Trial ist eine einzelne Ausführung, die ein Modell mit spezifischen Hyperparametern trainiert und bewertet."
+        },
+        {
+                "text": "Welche Bibliothek wird in der Notebook‑Codebasis verwendet, um den Lernrate-Suchraum zu definieren?",
+                "options": [
+                        "scikit-learn",
+                        "torch.optim",
+                        "optuna.samplers.TPESampler",
+                        "joblib"
+                ],
+                "correct": 2,
+                "explanation": "TPESampler von Optuna bestimmt, welche Lernraten im Bayesian‑Optimierungsprozess vorgeschlagen werden."
+        },
+        {
+                "text": "Warum wird nach der Optimierung ein separates finales Training durchgeführt?",
+                "options": [
+                        "Um die Hyperparameter erneut zu optimieren",
+                        "Damit das Modell stabile Gewichte erhält und nicht von einem abgebrochenen Trial stammt",
+                        "Zur Erzeugung zusätzlicher Visualisierungen",
+                        "Um die GPU freizugeben"
+                ],
+                "correct": 1,
+                "explanation": "Optuna speichert nur Hyperparameter; ein neues Training mit diesen Parametern liefert stabile Gewichte."
+        },
+        {
+                "text": "Welcher Schritt im \"objective\"‑Funktion-Loop sorgt für das frühzeitige Beenden eines Trials, wenn die Leistung nicht besser wird?",
+                "options": [
+                        "trial.report",
+                        "optimizer.step",
+                        "patience_counter",
+                        "train_loader"
+                ],
+                "correct": 2,
+                "explanation": "Der `patience_counter` implementiert Early Stopping innerhalb eines Trials."
+        },
+        {
+                "text": "Welche Bibliothek liefert die Plot‑Funktionen für Optuna‑Visualisierungen?",
+                "options": [
+                        "matplotlib",
+                        "plotly",
+                        "optuna.visualization",
+                        "torchvision"
+                ],
+                "correct": 2,
+                "explanation": "Die Funktionen `plot_optimization_history` und `plot_param_importances` stammen aus `optuna.visualization`."
+        },
+        {
+                "text": "Was passiert, wenn `trial.should_prune()` True zurückgibt?",
+                "options": [
+                        "Der aktuelle Epoch wird übersprungen",
+                        "Der Trial wird abgebrochen und ein Fehler ausgelöst",
+                        "Die Lernrate wird automatisch reduziert",
+                        "Ein neuer Trial wird gestartet"
+                ],
+                "correct": 1,
+                "explanation": "`should_prune()` führt zu einer `TrialPruned`‑Ausnahme, die den aktuellen Trial beendet."
+        },
+        {
+                "text": "Welche Aufgabe hat der `set_seed(42)`-Aufruf im Notebook?",
+                "options": [
+                        "Initialisiert das Modell",
+                        "Stellt Reproduzierbarkeit sicher",
+                        "Wählt das Gerät für Training aus",
+                        "Generiert die DataLoader"
+                ],
+                "correct": 1,
+                "explanation": "Durch Setzen der Seed‑Werte wird garantiert, dass Zufallsprozesse deterministisch sind."
+        },
+        {
+                "text": "Welcher Hyperparameter wird in der Notebook‑Codebasis mit `trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)` definiert?",
+                "options": [
+                        "Gewichtungsabnahme",
+                        "Dropout‑Rate",
+                        "Lernrate",
+                        "Hidden Dimension"
+                ],
+                "correct": 0,
+                "explanation": "`weight_decay` ist die Regularisierungskomponente des Optimierers."
+        },
+        {
+                "text": "Welche Klasse stellt im Notebook das neuronale Netz dar?",
+                "options": [
+                        "torch.nn.Module",
+                        "nn.Sequential",
+                        "torchvision.models.ResNet",
+                        "torch.optim.AdamW"
+                ],
+                "correct": 1,
+                "explanation": "`create_model` erstellt ein `nn.Sequential`‑Modell mit Linear‑, ReLU‑ und optional Dropout‑Schichten."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+        if (card.classList.contains('completed')) return;
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

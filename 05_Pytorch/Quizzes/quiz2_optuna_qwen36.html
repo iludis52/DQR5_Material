@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optuna-basiertes Hyperparameter-Tuning: Theorie & Praxis</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .mistakes { color: #dc3545; }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Optuna-basiertes Hyperparameter-Tuning: Theorie & Praxis</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 24px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Wie beeinflusst der Parameter `log=True` bei `trial.suggest_float` die Stichprobenziehung für die Lernrate?",
+                "options": [
+                        "Er erzwingt eine lineare Verteilung der Werte im Suchraum.",
+                        "Er priorisiert exponentielle Verteilung für feinere Auflösung.",
+                        "Er ignoriert kleine Werte zugunsten großer Konvergenzraten.",
+                        "Er begrenzt die Suche auf ganzzahlige Potenzen von zwei."
+                ],
+                "correct": 1,
+                "explanation": "Laut Text wirkt sich die Lernrate logarithmisch aus. `log=True` sorgt dafür, dass der Suchraum gleichmäßiger erkundet wird, da Änderungen um eine Größenordnung (z.B. 0.01 vs 0.001) wichtiger sind als lineare Schritte. Dies entspricht einer exponentiellen/logarithmischen Priorisierung im unteren Bereich."
+        },
+        {
+                "text": "Welche Rolle spielt die Exception `optuna.TrialPruned` im Optimierungsprozess?",
+                "options": [
+                        "Sie markiert den Trial als fehlerhaft und startet neu.",
+                        "Sie signalisiert, dass der Trial vielversprechend ist.",
+                        "Sie beendet den Trial frühzeitig als nicht vielversprechend.",
+                        "Sie speichert den aktuellen Zustand zur späteren Wiederverwendung."
+                ],
+                "correct": 2,
+                "explanation": "Der Text erklärt, dass `raise optuna.TrialPruned()` den Trial sofort beendet und als 'pruned' (beschnitten/nicht vielversprechend) markiert, um Rechenzeit zu sparen, falls der Pruner einen Abbruch empfiehlt."
+        },
+        {
+                "text": "Warum wird im Code-Beispiel kein `trial.suggest_categorical` verwendet?",
+                "options": [
+                        "Optuna unterstützt kategorische Werte nicht effizient.",
+                        "Der Suchraum ist ausschließlich kontinuierlich definiert.",
+                        "Die verwendeten Parameter sind numerisch oder diskret.",
+                        "Kategorien würden die Konvergenz des TPE-Samplers stören."
+                ],
+                "correct": 2,
+                "explanation": "Der Text merkt an, dass `suggest_categorical` für diskrete Kategorien (wie Optimierer-Typen) genutzt wird, aber im vorliegenden Code nicht vorkommt. Stattdessen werden `suggest_int` und `suggest_float` für numerische Parameter wie Hidden-Dim, LR, etc. genutzt."
+        },
+        {
+                "text": "Was ist der Hauptzweck des Aufrufs `trial.report(val_loss, epoch)`?",
+                "options": [
+                        "Es speichert den Loss direkt in der Datenbank des Studies.",
+                        "Es visualisiert den Fortschritt in Echtzeit im Terminal.",
+                        "Es übermittelt den aktuellen Fortschritt an den Pruner.",
+                        "Es aktualisiert die Lernrate dynamisch während des Trainings."
+                ],
+                "correct": 2,
+                "explanation": "Laut Abschnitt 2.4 meldet `trial.report` den aktuellen Fortschritt (Loss) an Optuna, damit der Pruner (z.B. MedianPruner) entscheiden kann, ob der Trial abgebrochen werden soll (`should_prune`)."
+        },
+        {
+                "text": "Warum wird nach der Optuna-Suche ein 'Final Retraining' durchgeführt?",
+                "options": [
+                        "Um die Hyperparameter nochmals manuell zu überprüfen.",
+                        "Um das Modell ohne Pruning-Einschränkungen voll zu trainieren.",
+                        "Um die Daten für das finale Modell neu zu skalieren.",
+                        "Um die Reproduzierbarkeit des Seeds zu validieren."
+                ],
+                "correct": 1,
+                "explanation": "Abschnitt 4 erklärt, dass Trials während der Suche oft früh abgebrochen oder auf wenige Epochen begrenzt sind. Das Final Retraining nutzt das 'Rezept' (best_params), um das Modell ohne diese Einschränkungen (längere Epochenzahl, kein Pruning) vollständig zu konvergieren."
+        },
+        {
+                "text": "Welche Information liefert `study.best_params` im Vergleich zum `state_dict`?",
+                "options": [
+                        "Die trainierten Gewichte des neuronalen Netzes.",
+                        "Die Konfiguration der Hardware und des Devices.",
+                        "Die optimale Kombination der Hyperparameter.",
+                        "Die Historie aller durchgeführten Trials."
+                ],
+                "correct": 2,
+                "explanation": "Der Text unterscheidet zwischen dem 'Rezept' (`study.best_params`, also die Hyperparameter) und dem 'Kuchen' (den Modellgewichten). Optuna speichert standardmäßig nicht die Gewichte aller Trials, sondern nur die Parameter und den Result-Wert."
+        },
+        {
+                "text": "Wie nutzt der `MedianPruner` Informationen früherer Trials?",
+                "options": [
+                        "Er vergleicht den aktuellen Loss mit dem Median aller bisher abgeschlossenen Trials.",
+                        "Er berechnet den Durchschnitt der besten drei Trainingsläufe.",
+                        "Er analysiert die Steigung der Lernkurve des aktuellen Trials.",
+                        "Er ignoriert frühere Trials und basiert nur auf dem aktuellen Fortschritt."
+                ],
+                "correct": 0,
+                "explanation": "Abschnitt 2.4 beschreibt, dass der MedianPruner den aktuellen Loss des Trials mit dem Median der Losses aller bisher abgeschlossenen Trials (nach einer Warm-up-Phase) vergleicht."
+        },
+        {
+                "text": "Welchen Vorteil bietet der TPESampler gegenüber reinem Random Search?",
+                "options": [
+                        "Er garantiert das Finden des globalen Optimums.",
+                        "Er eliminiert die Notwendigkeit von Early Stopping.",
+                        "Er lernt Muster und konvergiert oft schneller.",
+                        "Er benötigt keine Definition des Suchraums."
+                ],
+                "correct": 2,
+                "explanation": "Abschnitt 2.3 erklärt, dass TPE ein bayessches Optimierungsverfahren ist, das Wahrscheinlichkeitsverteilungen nutzt, um vielversprechende Regionen zu erkunden. Vorteil: Konvergiert oft schneller als Random Search, da es lernfähige Muster erkennt."
+        },
+        {
+                "text": "Was geschieht, wenn `trial.should_prune()` True zurückgibt?",
+                "options": [
+                        "Der Trial wird pausiert und später fortgesetzt.",
+                        "Der Trial wird fortgesetzt mit reduzierter Lernrate.",
+                        "Der Trial wird sofort beendet und als pruned markiert.",
+                        "Der Trial speichert seinen aktuellen state_dict."
+                ],
+                "correct": 2,
+                "explanation": "Im Code-Block unter 'Optuna Pruning' wird gezeigt: `if trial.should_prune(): raise optuna.TrialPruned()`. Dies führt zum sofortigen Beenden des Trials."
+        },
+        {
+                "text": "Warum ist die Trennung von Suchphase und Finalisierung wichtig?",
+                "options": [
+                        "Um Speicherplatz durch Wegwerfen von Trials zu sparen.",
+                        "Um sicherzustellen, dass das finale Modell vollständig konvergiert.",
+                        "Um die Komplexität der Objective-Funktion zu reduzieren.",
+                        "Um die Laufzeit der Hyperparameter-Suche zu verkürzen."
+                ],
+                "correct": 1,
+                "explanation": "Abschnitt 4 argumentiert, dass während der Suche oft niedrige Epochenzahlen oder Pruning gelten. Ein finales Modell sollte länger trainiert werden (z.B. 200 vs 100 Epochen), um maximale Performance und volle Konvergenz zu gewährleisten."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+        if (card.classList.contains('completed')) return;
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

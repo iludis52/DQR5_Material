@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Effizientes Hyperparameter-Tuning mit Optuna & PyTorch</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .mistakes { color: #dc3545; }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Effizientes Hyperparameter-Tuning mit Optuna & PyTorch</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 24px; font-size: 1.1rem; border-radius: 8px; cursor: pointer;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Warum wird im professionellen Workflow nach der Optuna-Studie ein separates 'Final Retraining' durchgeführt?",
+                "options": [
+                        "Weil Optuna lediglich die optimalen Hyperparameter, aber nicht die gelernten Gewichte speichert.",
+                        "Weil die Hyperparameter während des Pruning-Prozesses automatisch auf Standardwerte zurückgesetzt werden.",
+                        "Weil das Modell während der Optimierungsphase aufgrund von Data Leakage nicht stabil trainiert wurde.",
+                        "Weil der TPESampler nur für die Definition des Suchraums und nicht für das eigentliche Training zuständig ist."
+                ],
+                "correct": 0,
+                "explanation": "Optuna optimiert das 'Rezept' (Parameter), speichert aber primär Parameter und Loss, um Speicher zu sparen, nicht jedoch die Gewichte der einzelnen Trials."
+        },
+        {
+                "text": "Welchen entscheidenden Vorteil bietet der Mechanismus des 'Pruning' in Optuna gegenüber klassischem Early Stopping?",
+                "options": [
+                        "Pruning beendet nur einzelne Epochen, wenn der Loss stagniert, während Early Stopping ganze Trials abbricht.",
+                        "Pruning nutzt die Lernrate, um die Anzahl der benötigten Epochen innerhalb eines einzelnen Trials zu reduzieren.",
+                        "Pruning bricht ganze Versuche (Trials) vorzeitig ab, wenn sie sich im Vergleich zu bisherigen Trials als schlecht erweisen.",
+                        "Pruning verhindert das Overfitting, indem es die Dropout-Rate während des laufenden Trainings dynamisch anpasst."
+                ],
+                "correct": 2,
+                "explanation": "Während Early Stopping ein einzelnes Training bei Stagnation stoppt, nutzt Pruning (z. B. MedianPruner), um ganze Trials abzubrechen, die unter dem Median der erfolgreichen Versuche liegen."
+        },
+        {
+                "text": "Welche Funktion übernimmt der 'TPESampler' innerhalb des Optuna-Frameworks?",
+                "options": [
+                        "Er führt eine brute-force Grid Search über alle definierten Parameterkombinationen durch.",
+                        "Er nutzt Bayesian Optimization, um aus vergangenen Versuchen für die nächste Wahl zu lernen.",
+                        "Er stellt sicher, dass die Random Seeds für NumPy und PyTorch global fixiert werden.",
+                        "Er transformiert die Eingabedaten in einen logarithmischen Maßstab für eine bessere Konvergenz."
+                ],
+                "correct": 1,
+                "explanation": "Der Tree-structured Parzen Estimator (TPE) ist eine Form der Bayesian Optimization, die intelligent aus vergangenen Versuchen lernt."
+        },
+        {
+                "text": "Wie wird in der bereitgestellten Data Pipeline sichergestellt, dass kein 'Data Leakage' auftritt?",
+                "options": [
+                        "Der StandardScaler wird auf den gesamten Datensatz gefittet, bevor das Train-Test-Split erfolgt.",
+                        "Die LabelEncoder werden für jedes Batch-Verfahren individuell auf die Testdaten angewendet.",
+                        " Der Scaler wird nur auf den Trainingsdaten gefittet und anschließend auf Validierung/Test angewendet.",
+                        "Die Daten werden vor dem Skalieren zufällig mit einem festen Seed neu gemischt (shuffling)."
+                ],
+                "correct": 2,
+                "explanation": "Um Data Leakage zu vermeiden, darf der Scaler nur mit den Trainingsdaten gefittet werden; Validierungs- und Testdaten werden nur transformiert."
+        },
+        {
+                "text": "Was ist das primäre Ziel der Implementierung von `set_seed` im vorliegenden Skript?",
+                "options": [
+                        "Die Beschleunigung des Trainingsprozesses auf NVIDIA CUDA-fähigen Systemen.",
+                        "Die automatische Erkennung und Konfiguration von Apple MPS Hardware.",
+                        "Die Sicherstellung der Reproduzierbarkeit und Vergleichbarkeit von Experimenten.",
+                        "Die Vermeidung von Overfitting durch die zufällige Initialisierung der Gewichte."
+                ],
+                "correct": 2,
+                "explanation": "Das Fixieren von Random Seeds (NumPy, PyTorch) stellt sicher, dass Ergebnisse nicht durch zufällige Initialisierungen verfälscht werden und Experimente reproduzierbar bleiben."
+        },
+        {
+                "text": "Was bewirkt die Verwendung von `log=True` bei der Definition der Lernrate mit `trial.suggest_float`?",
+                "options": [
+                        "Die Lernrate wird in einem logarithmischen Maßstab innerhalb des definierten Suchraums explorativ gesucht.",
+                        "Der Optimierer berechnet den Gradienten nur noch auf Basis der logarithmischen Ableitung des Loss.",
+                        "Die Anzahl der Epochen wird automatisch an die Größenordnung der Lernrate angepasst.",
+                        "Die Parameter werden nach ihrer Wichtigkeit in einem logarithmischen Diagramm sortiert."
+                ],
+                "correct": 0,
+                "explanation": "Bei `log=True` wird der Suchraum für Werte wie die Lernrate über eine logarithmische Skala definiert, was bei Größenordnungen (z. B. 1e-4 bis 1e-1) sinnvoll ist."
+        },
+        {
+                "text": "Was versteht man unter 'Device-Agnostik' im Kontext des vorliegenden Codes?",
+                "options": [
+                        "Die Fähigkeit des Skripts, Daten automatisch zwischen CPU und GPU zu partitionieren.",
+                        "Die automatische Erkennung und Nutzung von verfügbaren Hardware wie CUDA, MPS oder CPU.",
+                        "Die Unabhängigkeit der Hyperparameter-Suche von der gewählten Batch-Größe.",
+                        "Die Verwendung von standardisierten PyTorch-Layern ohne hardwarebezogene Abhängigkeiten."
+                ],
+                "correct": 1,
+                "explanation": "Device-Agnostik bedeutet hier, dass der Code prüft, ob CUDA oder MPS verfügbar ist, um das Modell auf der jeweils leistungsstärksten Hardware zu platzieren."
+        },
+        {
+                "text": "Welche Komponenten müssen laut dem Skript für ein vollständiges Deployment exportiert werden?",
+                "options": [
+                        "Nur die finalen Modellgewichte im .pth Format und die Liste der Hyperparameter.",
+                        "Die Modellgewichte, die Hyperparameter sowie der Scaler und der LabelEncoder.",
+                        "Das gesamte Trainings-Skript inklusive der Optuna-Studie und der Visualisierungs-Plots.",
+                        "Der Transformer-Code, die ursprüngliche CSV-Datei und das Ergebnis des Test-Sets."
+                ],
+                "correct": 1,
+                "explanation": "Für ein einsatzbereites Deployment müssen Gewichte, Hyperparameter, der Scaler und der LabelEncoder gespeichert werden, um die Daten in Produktion exakt wie im Training zu transformieren."
+        },
+        {
+                "text": "Welche Aufgabe übernimmt die Funktion `create_model` innerhalb der Pipeline?",
+                "options": [
+                        "Sie berechnet die Genauigkeit des Modells auf dem Validierungs-Datensatz.",
+                        "Sie definiert den Suchraum für die Hyperparameter während der Optuna-Studie.",
+                        "Sie erstellt dynamisch neuronale Netze basierend auf den aktuellen Hyperparametern.",
+                        "Sie übernimmt das Laden und Vorbereiten der Rohdaten aus der CSV-Datei."
+                ],
+                "correct": 2,
+                "explanation": "Die Model Factory (`create_model`) ist eine dynamische Funktion, die Netzwerke basierend auf Parametern wie `hidden_dim` oder `dropout_rate` instanziiert."
+        },
+        {
+                "text": "Was passiert im Code, wenn ein Trial durch den `MedianPruner` abgebrochen wird?",
+                "options": [
+                        "Der gesamte Optimierungsprozess der Optuna-Studie wird sofort beendet.",
+                        "Es wird eine Exception (`optuna.TrialPruned`) ausgelöst, um den aktuellen Versuch zu stoppen.",
+                        "Die Lernrate des aktuellen Trials wird automatisch auf einen niedrigeren Wert reduziert.",
+                        "Der aktuelle Batch wird übersprungen, um die Rechenzeit für den nächsten Batch zu sparen."
+                ],
+                "correct": 1,
+                "explanation": "Wenn `trial.should_prune()` wahr ist (weil der Trial schlecht performt), wird eine `optuna.TrialPruned`-Exception geworfen, um den Versuch abzubrechen."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+        if (card.classList.contains('completed')) return;
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
