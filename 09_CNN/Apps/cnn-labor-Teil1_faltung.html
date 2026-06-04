@@ -102,6 +102,20 @@ button.secondary:hover { background: #f0f0f0; }
   cursor: pointer;
 }
 .toggle-label input { accent-color: var(--accent); width: 16px; height: 16px; }
+.upload-btn {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.upload-btn:hover { background: #f0f0f0; border-color: var(--accent); }
 /* Main layout: three columns with calc in the middle column */
 .main {
   display: flex;
@@ -205,8 +219,10 @@ button.secondary:hover { background: #f0f0f0; }
   border-radius: 6px;
   padding: 10px 12px;
   width: 100%;
-  max-width: 260px;
+  max-width: 280px;
   min-height: 50px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 .calc-panel h4 {
   font-size: 11px;
@@ -334,9 +350,22 @@ button.secondary:hover { background: #f0f0f0; }
       <option value="clear">Leer (Schwarz)</option>
     </select>
   </div>
+  <div class="ctrl-group">
+    <label>📷 Eigenes Bild:</label>
+    <label class="upload-btn" for="imgUpload">Datei wählen …</label>
+    <input type="file" id="imgUpload" accept="image/*" style="display:none">
+  </div>
   <button class="secondary" id="btnClear" title="Bild löschen">✕ Löschen</button>
   <div class="ctrl-group">
-    <label>Filter:</label>
+    <label>Filtergröße:</label>
+    <select id="kernelSizeSelect">
+      <option value="3" selected>3 × 3</option>
+      <option value="4">4 × 4</option>
+      <option value="5">5 × 5</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Filter-Preset:</label>
     <select id="presetKernel">
       <option value="edgeH">Kante horizontal</option>
       <option value="edgeV">Kante vertikal</option>
@@ -370,8 +399,11 @@ button.secondary:hover { background: #f0f0f0; }
   <div class="legend-item"><div class="legend-swatch" style="background:#111"></div> Dunkel = niedriger Wert</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#999"></div> Mittelgrau = Null</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#f0f0f0;border-color:#bbb"></div> Hell = hoher Wert</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:var(--highlight);opacity:0.7"></div> Aktives Fenster</div>
+  <div class="legend-item" title="Das rezeptive Feld eines Neurons ist der Bereich im Eingabebild, der seinen Aktivierungswert bestimmt."><div class="legend-swatch" style="background:var(--highlight);opacity:0.7"></div> Rezeptives Feld</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#fff;border-color:#bbb;position:relative"><span style="position:absolute;top:1px;right:1px;width:5px;height:5px;border-radius:50%;background:var(--relu-dot)"></span></div> ReLU aktiv</div>
+  <div class="legend-item" id="uploadNameItem" style="display:none;">
+    📷 <span id="uploadName" style="font-style:italic;"></span>
+  </div>
 </div>
 
 <div class="main" id="mainArea">
@@ -426,7 +458,9 @@ button.secondary:hover { background: #f0f0f0; }
 // ═══════════════════════════════════════════
 const S = {
   size: 8,
+  kernelSize: 3,
   image: [],
+  uploadedPixels: null,  // stores raw ImageData for re-scaling when size changes
   kernel: [],
   output: [],
   outputRaw: [],
@@ -438,20 +472,41 @@ const S = {
   animTimer: null,
   highlightCells: [],
   activeOut: null,
-  revealed: null,  // 2D bool array — which output cells are visible during animation
+  revealed: null,
 };
 
 // ═══════════════════════════════════════════
 // PRESETS
 // ═══════════════════════════════════════════
+// Kernels indexed by [size][name]
 const KERNELS = {
-  edgeH:    [[-1,-1,-1],[ 0, 0, 0],[ 1, 1, 1]],
-  edgeV:    [[-1, 0, 1],[-1, 0, 1],[-1, 0, 1]],
-  edgeAll:  [[-1,-1,-1],[-1, 8,-1],[-1,-1,-1]],
-  sharpen:  [[ 0,-1, 0],[-1, 5,-1],[ 0,-1, 0]],
-  blur:     [[1,1,1],[1,1,1],[1,1,1]].map(r => r.map(v => +(v/9).toFixed(2))),
-  emboss:   [[-2,-1, 0],[-1, 1, 1],[ 0, 1, 2]],
-  identity: [[ 0, 0, 0],[ 0, 1, 0],[ 0, 0, 0]],
+  3: {
+    edgeH:    [[-1,-1,-1],[ 0, 0, 0],[ 1, 1, 1]],
+    edgeV:    [[-1, 0, 1],[-1, 0, 1],[-1, 0, 1]],
+    edgeAll:  [[-1,-1,-1],[-1, 8,-1],[-1,-1,-1]],
+    sharpen:  [[ 0,-1, 0],[-1, 5,-1],[ 0,-1, 0]],
+    blur:     [[1,1,1],[1,1,1],[1,1,1]].map(r => r.map(v => +(v/9).toFixed(2))),
+    emboss:   [[-2,-1, 0],[-1, 1, 1],[ 0, 1, 2]],
+    identity: [[ 0, 0, 0],[ 0, 1, 0],[ 0, 0, 0]],
+  },
+  4: {
+    edgeH:    [[-1,-1,-1,-1],[-1,-1,-1,-1],[ 1, 1, 1, 1],[ 1, 1, 1, 1]],
+    edgeV:    [[-1,-1, 1, 1],[-1,-1, 1, 1],[-1,-1, 1, 1],[-1,-1, 1, 1]],
+    edgeAll:  [[-1,-1,-1,-1],[-1, 2, 2,-1],[-1, 2, 2,-1],[-1,-1,-1,-1]],
+    sharpen:  [[ 0,-1,-1, 0],[-1, 4, 4,-1],[-1, 4, 4,-1],[ 0,-1,-1, 0]],
+    blur:     Array.from({length:4}, () => Array(4).fill(+(1/16).toFixed(3))),
+    emboss:   [[-2,-2,-1, 0],[-2,-1, 1, 1],[-1, 1, 1, 2],[ 0, 1, 2, 2]],
+    identity: [[ 0, 0, 0, 0],[ 0, 1, 0, 0],[ 0, 0, 0, 0],[ 0, 0, 0, 0]],
+  },
+  5: {
+    edgeH:    [[-1,-1,-1,-1,-1],[-1,-1,-1,-1,-1],[ 0, 0, 0, 0, 0],[ 1, 1, 1, 1, 1],[ 1, 1, 1, 1, 1]],
+    edgeV:    [[-1,-1, 0, 1, 1],[-1,-1, 0, 1, 1],[-1,-1, 0, 1, 1],[-1,-1, 0, 1, 1],[-1,-1, 0, 1, 1]],
+    edgeAll:  [[-1,-1,-1,-1,-1],[-1, 1, 1, 1,-1],[-1, 1, 8, 1,-1],[-1, 1, 1, 1,-1],[-1,-1,-1,-1,-1]],
+    sharpen:  [[ 0, 0,-1, 0, 0],[ 0,-1,-1,-1, 0],[-1,-1,12,-1,-1],[ 0,-1,-1,-1, 0],[ 0, 0,-1, 0, 0]],
+    blur:     Array.from({length:5}, () => Array(5).fill(+(1/25).toFixed(3))),
+    emboss:   [[-2,-2,-2,-1, 0],[-2,-2,-1, 0, 1],[-2,-1, 1, 1, 2],[-1, 0, 1, 2, 2],[ 0, 1, 2, 2, 2]],
+    identity: [[ 0, 0, 0, 0, 0],[ 0, 0, 0, 0, 0],[ 0, 0, 1, 0, 0],[ 0, 0, 0, 0, 0],[ 0, 0, 0, 0, 0]],
+  },
 };
 
 function makePresetImage(key, n) {
@@ -599,8 +654,11 @@ function fmtKernel(v) {
 function renderGrid(container, data, type) {
   const n = data.length;
   const cols = data[0].length;
-  const sz = type === 'kernel' ? 56 : cellSize();
-  const fsz = type === 'kernel' ? 14 : fontSize();
+  // Kernel cell size: smaller for bigger kernels
+  const kernelCellSz = S.kernelSize === 3 ? 56 : S.kernelSize === 4 ? 46 : 38;
+  const kernelFontSz = S.kernelSize === 3 ? 14 : S.kernelSize === 4 ? 12 : 11;
+  const sz = type === 'kernel' ? kernelCellSz : cellSize();
+  const fsz = type === 'kernel' ? kernelFontSz : fontSize();
 
   container.style.gridTemplateColumns = `repeat(${cols}, ${sz}px)`;
   container.style.gridTemplateRows = `repeat(${n}, ${sz}px)`;
@@ -684,13 +742,14 @@ function renderAll() {
 // CALCULATION DETAIL
 // ═══════════════════════════════════════════
 function showCalcForPosition(outR, outC) {
-  const pad = S.padding === 'same' ? 1 : 0;
+  const pad = S.padding === 'same' ? Math.floor(S.kernelSize / 2) : 0;
   const stride = S.stride;
   const k = S.kernel.length, n = S.image.length;
   const startR = outR * stride, startC = outC * stride;
   const el = document.getElementById('calcContent');
+  const compact = k >= 4; // use compact font for 4x4 / 5x5
 
-  let html = '<div class="calc-grid">';
+  let html = `<div class="calc-grid" style="${compact ? 'font-size:10px;gap:1px 4px;' : ''}">`;
   let sum = 0;
 
   for (let kr = 0; kr < k; kr++) {
@@ -720,7 +779,8 @@ function showCalcForPosition(outR, outC) {
     html += `Σ = <span class="${sumCls}">${sum.toFixed(2)}</span>`;
   }
   html += '</div>';
-  html += `<div class="calc-pos">Position [${outR}, ${outC}]` + (stride > 1 ? ` · Stride ${stride}` : '') + `</div>`;
+  html += `<div class="calc-pos">Position [${outR}, ${outC}]` + (stride > 1 ? ` · Stride ${stride}` : '') + ` · ${k}×${k} Terme</div>`;
+  html += `<div class="calc-pos" style="margin-top:4px;color:var(--accent);font-weight:600;" title="Das rezeptive Feld bezeichnet den Bereich im Eingabebild, der diesen einen Ausgabewert beeinflusst.">📐 Rezeptives Feld: ${k}×${k} Pixel im Eingabebild</div>`;
   el.innerHTML = html;
 
   // Update highlights
@@ -855,16 +915,104 @@ function stepForward() {
 }
 
 // ═══════════════════════════════════════════
+// IMAGE UPLOAD — square-crop, grayscale, scale to S.size
+// ═══════════════════════════════════════════
+function loadImageFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Square-crop from centre
+      const minDim = Math.min(img.width, img.height);
+      const sx = Math.floor((img.width - minDim) / 2);
+      const sy = Math.floor((img.height - minDim) / 2);
+      // Draw into off-screen canvas at target size
+      const canvas = document.createElement('canvas');
+      canvas.width = S.size;
+      canvas.height = S.size;
+      const ctx = canvas.getContext('2d');
+      // Fill white first so transparent pixels and antialiasing edges stay light
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, S.size, S.size);
+      // Draw cropped square → scaled to S.size
+      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, S.size, S.size);
+      const imageData = ctx.getImageData(0, 0, S.size, S.size);
+      // Convert to greyscale 0..1
+      S.image = Array.from({length: S.size}, (_, r) =>
+        Array.from({length: S.size}, (_, c) => {
+          const idx = (r * S.size + c) * 4;
+          const grey = 0.299 * imageData.data[idx]
+                     + 0.587 * imageData.data[idx+1]
+                     + 0.114 * imageData.data[idx+2];
+          return +(grey / 255).toFixed(3);
+        })
+      );
+      // Store the original Image object for re-scaling on size change
+      S.uploadedPixels = { img, sx, sy, minDim };
+      document.getElementById('uploadName').textContent = file.name;
+      document.getElementById('uploadNameItem').style.display = '';
+      document.getElementById('presetImage').value = '';
+      if (S.output.length > 0) computeOutput();
+      clearCalc(); renderAll();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function rescaleUploadedImage() {
+  if (!S.uploadedPixels) return;
+  const { img, sx, sy, minDim } = S.uploadedPixels;
+  const canvas = document.createElement('canvas');
+  canvas.width = S.size; canvas.height = S.size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, S.size, S.size);
+  ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, S.size, S.size);
+  const imageData = ctx.getImageData(0, 0, S.size, S.size);
+  S.image = Array.from({length: S.size}, (_, r) =>
+    Array.from({length: S.size}, (_, c) => {
+      const idx = (r * S.size + c) * 4;
+      const grey = 0.299 * imageData.data[idx]
+                 + 0.587 * imageData.data[idx+1]
+                 + 0.114 * imageData.data[idx+2];
+      return +(grey / 255).toFixed(3);
+    })
+  );
+}
+
+// ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
+function getKernelPreset() {
+  const name = document.getElementById('presetKernel').value;
+  const ks = S.kernelSize;
+  return KERNELS[ks][name] ? KERNELS[ks][name].map(r => [...r]) : makeDefaultKernel(ks);
+}
+
+function makeDefaultKernel(k) {
+  // Identity-like: 1 in centre, 0 elsewhere
+  return Array.from({length: k}, (_, r) =>
+    Array.from({length: k}, (_, c) => (r === Math.floor(k/2) && c === Math.floor(k/2)) ? 1 : 0)
+  );
+}
+
 function initState() {
   stopAnim();
   S.size = +document.getElementById('sizeSelect').value;
+  S.kernelSize = +document.getElementById('kernelSizeSelect').value;
   S.padding = document.getElementById('paddingSelect').value;
   S.stride = +document.getElementById('strideSelect').value;
   S.relu = document.getElementById('reluToggle').checked;
-  S.image = makePresetImage(document.getElementById('presetImage').value, S.size);
-  S.kernel = KERNELS[document.getElementById('presetKernel').value].map(r => [...r]);
+
+  // Image: use uploaded if present, else preset
+  if (S.uploadedPixels) {
+    rescaleUploadedImage();
+  } else {
+    S.image = makePresetImage(document.getElementById('presetImage').value, S.size);
+  }
+
+  S.kernel = getKernelPreset();
   S.output = []; S.outputRaw = [];
   S.highlightCells = []; S.activeOut = null; S.animPos = null; S.revealed = null;
   clearCalc();
@@ -873,13 +1021,27 @@ function initState() {
 
 // Wiring
 document.getElementById('sizeSelect').addEventListener('change', initState);
+document.getElementById('kernelSizeSelect').addEventListener('change', () => {
+  S.kernelSize = +document.getElementById('kernelSizeSelect').value;
+  S.kernel = getKernelPreset();
+  if (S.output.length > 0) computeOutput();
+  clearCalc(); renderAll();
+});
 document.getElementById('presetImage').addEventListener('change', () => {
+  S.uploadedPixels = null;
+  document.getElementById('uploadName').textContent = '';
+  document.getElementById('uploadNameItem').style.display = 'none';
+  document.getElementById('imgUpload').value = '';
   S.image = makePresetImage(document.getElementById('presetImage').value, S.size);
   if (S.output.length > 0) computeOutput();
   clearCalc(); renderAll();
 });
+document.getElementById('imgUpload').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadImageFromFile(file);
+});
 document.getElementById('presetKernel').addEventListener('change', () => {
-  S.kernel = KERNELS[document.getElementById('presetKernel').value].map(r => [...r]);
+  S.kernel = getKernelPreset();
   if (S.output.length > 0) computeOutput();
   clearCalc(); renderAll();
 });
@@ -900,6 +1062,10 @@ document.getElementById('reluToggle').addEventListener('change', () => {
 });
 document.getElementById('btnClear').addEventListener('click', () => {
   S.image = Array.from({length: S.size}, () => Array(S.size).fill(0));
+  S.uploadedPixels = null;
+  document.getElementById('uploadName').textContent = '';
+  document.getElementById('uploadNameItem').style.display = 'none';
+  document.getElementById('imgUpload').value = '';
   if (S.output.length > 0) computeOutput();
   clearCalc(); renderAll();
 });
