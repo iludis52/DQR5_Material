@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDD Wissens-Check: Projekt-Workflow</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>SDD Wissens-Check: Projekt-Workflow</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Wie unterscheidet sich das Vorgehen bei SDD vom klassischen Wasserfall-Modell?",
+            options: [
+                "Man schreibt erst eine perfekte, unveränderliche Spec, bevor Code generiert wird.",
+                "Man startet mit einem Skelett und iteriert in vielen kleinen, vollständigen Durchläufen.",
+                "Man schreibt gar keine Spec, sondern bespricht alles spontan mit der KI.",
+                "Man plant ausschließlich in großen, langfristigen Jahreszyklen."
+            ],
+            correct: 1,
+            explanationCorrect: "Richtig! SDD setzt auf 'just enough spec'. Du startest mit einem Skelett und füllst es schrittweise. Die Spezifikation ist ein lebendes Dokument und wächst iterativ.",
+            explanationWrong: "Leider falsch. SDD verlangt keine perfekte Vorab-Spezifikation (das wäre das alte Wasserfall-Modell), sondern wächst iterativ in vielen kleinen, vollständigen Schnitten mit dem Projekt."
+        },
+        {
+            text: "Welche Reihenfolge der fünf Phasen ist im SDD-Workflow korrekt?",
+            options: [
+                "Planen → Spezifizieren → Implementieren → Zerlegen → Verifizieren",
+                "Spezifizieren → Planen → Zerlegen → Implementieren → Verifizieren",
+                "Zerlegen → Implementieren → Planen → Spezifizieren → Verifizieren",
+                "Spezifizieren → Implementieren → Zerlegen → Planen → Verifizieren"
+            ],
+            correct: 1,
+            explanationCorrect: "Genau! Zuerst wird spezifiziert, dann der Plan abgeleitet, dieser in Tasks zerlegt, danach implementiert und ganz am Ende sorgfältig verifiziert. Jede Phase baut auf der vorigen auf.",
+            explanationWrong: "Nicht ganz. Der Prozess geht streng von der Anforderung zum Code: Spezifizieren, Planen, Zerlegen, Implementieren und schließlich Verifizieren. Ohne einen Plan gibt es keine Tasks!"
+        },
+        {
+            text: "Was muss zwingend passieren, wenn während der Implementierung ein Fehler gefunden oder eine neue Anforderung besprochen wird?",
+            options: [
+                "Die Änderung wird zuerst und ausschließlich im Code vorgenommen.",
+                "Man schreibt einen erklärenden Kommentar in die entsprechende Code-Datei.",
+                "Die Änderung wird ZUERST in die Spezifikation eingetragen und danach im Code umgesetzt.",
+                "Man verwirft den gesamten bisherigen Code und startet das Projekt komplett neu."
+            ],
+            correct: 2,
+            explanationCorrect: "Exakt! Neue Anforderungen oder Regeln wandern immer zuerst in die Spec, nie als formloser Zuruf an den Code. Das hält die 'Source of Truth' aktuell und verhindert Spec-Drift.",
+            explanationWrong: "Leider falsch. Änderungen müssen immer zuerst in die Spec eingetragen werden, da diese die 'Source of Truth' ist. Direkte Code-Änderungen führen zum sogenannten 'Spec-Drift'."
+        },
+        {
+            text: "Wie läuft die Phase 'Implementieren' beim SDD idealerweise ab?",
+            options: [
+                "Tests werden erst ganz am Ende des Projekts nach dem Code geschrieben.",
+                "Die KI schreibt alle Funktionen blind und verzichtet zur Zeitersparnis auf Tests.",
+                "Zuerst werden Unit-Tests aus der Spec generiert, die fehlschlagen. Dann folgt der Code, bis sie grün sind.",
+                "Der Mensch schreibt die Tests, die KI überprüft diese auf syntaktische Fehler."
+            ],
+            correct: 2,
+            explanationCorrect: "Richtig! Das ist das Shift-Left-Prinzip innerhalb der Implementierung: Tests schlagen anfangs fehl, danach schreibt der Agent den Code, bis die Tests erfolgreich sind.",
+            explanationWrong: "Das ist nicht korrekt. Es gilt hier ein striktes 'Test-First'-Prinzip: Tests werden vor dem eigentlichen Feature-Code generiert und müssen initial fehlschlagen, bevor der Code sie erfüllt."
+        },
+        {
+            text: "Wo findet im Workflow der wichtigste 'Shift-Left'-Moment (die Vorverlagerung der Kontrolle) statt?",
+            options: [
+                "Beim Review der Spezifikation und des Plans, BEVOR der Code geschrieben wird.",
+                "Beim Ausführen der automatisierten E2E-Tests in der CI/CD-Pipeline.",
+                "Beim finalen Abnahmegespräch mit dem Fachbereich oder Kunden.",
+                "Beim Zerlegen der Aufgabenliste durch den KI-Agenten."
+            ],
+            correct: 0,
+            explanationCorrect: "Ganz genau! Das wichtigste menschliche Review findet statt, wenn Spec und Plan stehen, aber noch kein Code erzeugt wurde. Dort sind logische oder architektonische Fehler am leichtesten zu beheben.",
+            explanationWrong: "Das stimmt leider nicht. 'Shift-Left' bedeutet beim SDD, dass das menschliche Review schon ganz früh auf Ebene der Spezifikation und Architektur stattfindet – also lange vor der ersten Zeile Code."
+        },
+        {
+            text: "Worauf muss man beim finalen Schritt 'Verifizieren & Review' ganz besonders achten, wenn die automatischen Tests 'grün' sind?",
+            options: [
+                "Dass das Projekt sofort und ohne weitere Prüfung deployt werden kann.",
+                "Dass man kritisch prüft, WARUM die Tests grün sind (z. B. auf abgeschwächte Assertions).",
+                "Dass der generierte Code möglichst kurz ist und wenig Speicher verbraucht.",
+                "Dass man die Tests sofort wieder löscht, um die Code-Basis sauber zu halten."
+            ],
+            correct: 1,
+            explanationCorrect: "Sehr gut! KI-Agenten neigen dazu, Tests 'grün' zu tricksen, indem sie Sonderfälle ignorieren oder Testbedingungen aufweichen. Das Review muss sicherstellen, dass das echte Soll-Verhalten geprüft wird.",
+            explanationWrong: "Leider falsch. Grüne Tests allein sind kein Freifahrtschein. Man muss genau prüfen, *warum* sie grün sind, da KI-Agenten manchmal Assertions abschwächen, um den Testlauf künstlich bestehen zu lassen."
+        },
+        {
+            text: "Was besagt die SDD-Faustregel 'Stabiles früh, Volatiles spät' für den Start eines Projekts?",
+            options: [
+                "Dass ausschließlich Code stabil ist, während Spezifikationen immer volatil sind.",
+                "Dass alles bis ins kleinste Detail spezifiziert werden muss, bevor man startet.",
+                "Fundamente wie Architektur und Daten-Contracts werden früh definiert, konkrete Details wachsen später.",
+                "Dass das Frontend zuerst gebaut wird, da es am stabilsten ist."
+            ],
+            correct: 2,
+            explanationCorrect: "Richtig! Man legt vorab fest, was billig zu durchdenken, aber teuer zu ändern ist (etwa Daten-Contracts). Feine Details, Sonderfälle oder genaue Schwellenwerte lässt man später iterativ wachsen.",
+            explanationWrong: "Das ist nicht korrekt. Die Regel besagt, dass Fundamentales (wie Architektur oder Daten-Contracts) früh spezifiziert wird, während sich Details und Sonderfälle (das Volatile) iterativ entwickeln dürfen."
+        },
+        {
+            text: "Warum wird der technische Plan (Phase 3) in eine strukturierte Aufgabenliste (tasks.md) zerlegt?",
+            options: [
+                "Kleine, testbare Schritte reduzieren Fehler und Halluzinationen im Gegensatz zu großen 'Mach mal alles'-Aufträgen.",
+                "Damit der KI-Agent möglichst viele Tokens und Rechenleistung verbraucht.",
+                "Um das Management mit vielen detaillierten Dokumenten zufriedenzustellen.",
+                "Weil aktuelle Sprachmodelle keine zusammenhängenden Dateien lesen können."
+            ],
+            correct: 0,
+            explanationCorrect: "Korrekt. Kleine, fokussierte und einzeln testbare Aufgaben senken die Fehleranfälligkeit des Agenten enorm und machen den Fortschritt für das menschliche Review viel besser nachvollziehbar.",
+            explanationWrong: "Nicht ganz. Der Hauptgrund ist, dass kleine, einzeln testbare Arbeitspakete die Fehlerquote der KI drastisch senken, ganz im Gegensatz zu einem unübersichtlichen, monolithischen Auftrag."
+        },
+        {
+            text: "Wie sollte die erste Spezifikation (Spec) laut Handreichung am besten und effizientesten erstellt werden?",
+            options: [
+                "Man schreibt das komplette Markdown-Dokument mühsam per Hand.",
+                "Man nutzt einen Meta-Prompt, lässt sich von der KI interviewen und klärt Lücken im Dialog.",
+                "Man kopiert existierenden alten Code und lässt die KI daraus die Spec ableiten.",
+                "Man gibt der KI nur einen Stichpunkt und zwingt sie, sofort Code zu schreiben."
+            ],
+            correct: 1,
+            explanationCorrect: "Genau! Mit dem sogenannten Meta-Prompt drehst du den Spieß einfach um: Die KI interviewt dich anhand deiner groben Idee so lange strukturiert, bis die Anforderungen für eine erste Spec-Fassung klar sind.",
+            explanationWrong: "Das empfiehlt die Methode so nicht. Man nutzt idealerweise einen Meta-Prompt, der die KI anweist, dich als Experten strukturiert zu interviewen, bis alle Lücken für eine erste Spec-Iteration geschlossen sind."
+        },
+        {
+            text: "Was ist beim Spec-Driven Development die primäre 'Iterationseinheit'?",
+            options: [
+                "Die Anzahl der geschrieben Unit-Tests.",
+                "Der fertige Code-Commit auf dem Main-Branch.",
+                "Die Spezifikation (Spec) selbst.",
+                "Der zweiwöchige Sprint-Zyklus."
+            ],
+            correct: 2,
+            explanationCorrect: "Völlig richtig! Die Iterationseinheit ist die Spezifikation selbst. Ein SDD-Durchlauf ist in der Regel kurz; bei jedem neuen Fund wächst die Spec und der Zyklus aus Planung und Code beginnt erneut.",
+            explanationWrong: "Falsch. Die korrekte Iterationseinheit ist die Spezifikation (Spec). SDD-Durchläufe sind kurz und zentrieren sich immer um die Anpassung der Anforderungen in der Spec, die dann übersetzt werden."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanationCorrect}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> ${q.explanationWrong}`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

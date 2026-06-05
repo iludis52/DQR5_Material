@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDD Wissens-Check: Markdown-Dokumente</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>SDD Wissens-Check: Markdown-Dokumente</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was ist die primäre Funktion der Datei 'spec.md' im SDD-Prozess?",
+            options: [
+                "Sie ist ein nachträglich generiertes Handbuch für Endanwender, das beschreibt, wie die fertige Software bedient wird.",
+                "Sie ist der maschinenlesbare Vertrag und die einzige verbindliche 'Source of Truth' für das Soll-Verhalten des Systems.",
+                "Sie enthält den fertigen Python- oder JavaScript-Code, der vom Agenten ausgeführt werden kann.",
+                "Sie dient ausschließlich der Dokumentation von gefundenen Bugs nach dem Deployment."
+            ],
+            correct: 1,
+            explanationCorrect: "Richtig! Die spec.md steht im Zentrum des Prozesses. Sie ist die verbindliche Referenz (Source of Truth), aus der alle weiteren Dokumente, Tests und der eigentliche Code abgeleitet werden.",
+            explanationWrong: "Leider falsch. Die spec.md ist keine nachträgliche Dokumentation, sondern der initiale, verbindliche Vertrag (Source of Truth), auf dessen Basis der KI-Agent alle weiteren Schritte überhaupt erst plant."
+        },
+        {
+            text: "Welchen Zweck erfüllt die 'Constitution' (z. B. CLAUDE.md oder CONVENTIONS.md)?",
+            options: [
+                "Sie enthält die abgeleiteten Teilaufgaben (Tasks) für den aktuellen Entwicklungs-Sprint.",
+                "Sie speichert temporäre Passwörter und API-Keys, damit der Agent externe Schnittstellen aufrufen kann.",
+                "Sie hält projektweite, dauerhaft gültige Grundregeln (Stack, Code-Stil, Arbeitsweise) fest, damit man diese nicht in jedem Chat wiederholen muss.",
+                "Sie ist ein Logbuch, in dem der KI-Agent nach jedem Schritt notiert, wie viele Tokens er verbraucht hat."
+            ],
+            correct: 2,
+            explanationCorrect: "Ganz genau! Die Constitution dient als 'Grundgesetz' des Projekts. Sie gibt dem Agenten in jeder Sitzung automatisch Kontext über die grundsätzliche Arbeitsweise, den Technik-Stack und den Code-Stil.",
+            explanationWrong: "Das ist nicht korrekt. Die Constitution ist ein projektweites Regelwerk, das dauerhafte Vorgaben wie den Tech-Stack und die SDD-Arbeitsweise festhält, um ständige Wiederholungen in Prompts zu vermeiden."
+        },
+        {
+            text: "Warum ist es wichtig, in der spec.md technische 'Constraints' (Leitplanken) zu definieren?",
+            options: [
+                "Um den Lösungsraum des KI-Agenten gezielt einzuengen, Halluzinationen zu reduzieren und kalkulierbarere Ergebnisse zu erhalten.",
+                "Um deterministisch zu garantieren, dass die KI bei jedem Durchlauf exakt den gleichen Code auf das Zeichen genau generiert.",
+                "Weil aktuelle LLMs nur in Python und SQLite programmieren können und andere Sprachen ablehnen.",
+                "Damit das Management einen Überblick hat, wie teuer die eingesetzten Lizenzen später werden."
+            ],
+            correct: 0,
+            explanationCorrect: "Korrekt! Enge Vorgaben zu Bibliotheken oder Datenbanken verkleinern den Handlungsspielraum der KI. Das schützt davor, dass der Agent willkürliche Architektur-Entscheidungen trifft oder wild halluziniert.",
+            explanationWrong: "Leider falsch. Determinismus lässt sich bei stochastischen LLMs nicht garantieren. Constraints dienen vielmehr als Leitplanken, um den Lösungsraum stark einzuschränken und Halluzinationen vorzubeugen."
+        },
+        {
+            text: "Was ist der typische Inhalt und Zweck der Datei 'plan.md'?",
+            options: [
+                "Sie listet exakt die gleichen Informationen wie die spec.md auf, nur formatiert als PDF-Datei.",
+                "Sie beinhaltet die ersten Entwürfe von Unit-Tests, die sofort ausgeführt werden müssen.",
+                "Sie beschreibt die konkrete technische Architektur, das Datenmodell und gewählte Bibliotheken mit Begründung – noch ohne Implementierungscode.",
+                "Sie dokumentiert den zeitlichen Ablaufplan (Gantt-Diagramm) für die menschlichen Entwickler im Team."
+            ],
+            correct: 2,
+            explanationCorrect: "Richtig! Die plan.md schlägt die Brücke zwischen dem 'Was' (Spec) und dem 'Wie' (Code). Sie definiert die technische Struktur und Module auf Basis der Spezifikation, bevor Code geschrieben wird.",
+            explanationWrong: "Das stimmt nicht. Die plan.md ist kein Zeitplan und keine Spec-Kopie. Sie ist der aus der Spec abgeleitete technische Entwurf (Architektur, Datenfluss, Bibliotheken), der vor der Implementierung geprüft wird."
+        },
+        {
+            text: "Welche Eigenschaften muss die Datei 'tasks.md' haben, damit der Agent erfolgreich arbeiten kann?",
+            options: [
+                "Sie muss das gesamte Projekt als eine einzige, monolithische Riesenaufgabe formulieren.",
+                "Sie zerlegt den technischen Plan in möglichst kleine, einzeln testbare Schritte in einer sinnvollen Reihenfolge.",
+                "Sie darf ausschließlich aus Pseudocode bestehen, den der Mensch vorher manuell geschrieben hat.",
+                "Sie listet nur Aufgaben auf, die der Mensch übernehmen muss, während die KI den Rest macht."
+            ],
+            correct: 1,
+            explanationCorrect: "Exakt! Kleine, klar umrissene und einzeln testbare Aufgaben sind für KI-Agenten am besten verdaulich. Sie verhindern, dass die KI den Kontext verliert oder in Endlos-Schleifen stecken bleibt.",
+            explanationWrong: "Das ist falsch. Ein großer 'Mach mal alles'-Auftrag überfordert Agenten. Die tasks.md ist deshalb so wichtig, weil sie die Arbeit in kleine, isoliert testbare und logisch aufeinander aufbauende Schritte zerlegt."
+        },
+        {
+            text: "Welche entscheidende Rolle spielen die 'Akzeptanzkriterien' innerhalb der spec.md?",
+            options: [
+                "Sie dienen als abstrakte, formlose Zielvisionen, die erst beim finalen Go-Live bewertet werden.",
+                "Sie sind primär für das Marketing gedacht, um Features ansprechend bewerben zu können.",
+                "Sie sind messbare, prüfbare Bedingungen, aus denen der Agent zwingend die (zunächst fehlschlagenden) Unit-Tests generieren muss.",
+                "Sie definieren, wie viel Budget maximal für die API-Aufrufe der KI verbraucht werden darf."
+            ],
+            correct: 2,
+            explanationCorrect: "Richtig! Akzeptanzkriterien machen das Verhalten verifizierbar (Verifizierbarkeit durch Design). Sie sind die direkte Vorlage für die Tests, die im 'Shift-Left'-Verfahren vor dem eigentlichen Code geschrieben werden.",
+            explanationWrong: "Leider falsch. Akzeptanzkriterien sind keine abstrakten Ziele, sondern harte, messbare Fakten. Sie sind essenziell, weil der Agent daraus im Implementierungsschritt direkt die Testfälle ableiten muss."
+        },
+        {
+            text: "Warum gibt es in der Prototyp-Spezifikation (spec.md) häufig den expliziten Abschnitt 'Bewusst NICHT im Prototyp'?",
+            options: [
+                "Um den Agenten auszutricksen, damit er genau diese Funktionen aus Trotz trotzdem baut.",
+                "Um Annahmen und Scope explizit zu begrenzen und zu definieren, wo später externe Fachleute für das produktive System ansetzen müssen.",
+                "Das ist lediglich ein historisches Artefakt aus veralteten Wasserfall-Projekten ohne echten Nutzen.",
+                "Um den Code kürzer zu halten, damit man weniger Cloud-Speicherplatz beim Speichern benötigt."
+            ],
+            correct: 1,
+            explanationCorrect: "Ganz genau. Besonders bei PoCs (Proof of Concepts) verhindert dieser Abschnitt, dass ein simpler Prototyp versehentlich für ein fertiges, sicheres Produkt gehalten wird. Er ist zugleich ein Übergabedokument.",
+            explanationWrong: "Das ist nicht korrekt. Dieser Abschnitt ist extrem wertvoll, um den Scope hart abzugrenzen. Er macht deutlich, was fehlt (z.B. Security, Skalierung) und bildet so die saubere Übergabestelle an Fach-Entwickler."
+        },
+        {
+            text: "In welcher logischen Kette werden die Markdown-Dokumente im Idealfall voneinander abgeleitet?",
+            options: [
+                "Idee -> tasks.md -> plan.md -> spec.md",
+                "Idee -> plan.md -> spec.md -> tasks.md",
+                "Idee -> spec.md -> tasks.md -> plan.md",
+                "Idee -> spec.md -> plan.md -> tasks.md"
+            ],
+            correct: 3,
+            explanationCorrect: "Perfekt! Die Kette geht vom Allgemeinen ins Detail: Erst die Anforderung (spec), daraus die technische Architektur (plan) und daraus wiederum die kleinteiligen Arbeitspakete (tasks).",
+            explanationWrong: "Die Reihenfolge stimmt nicht. Man beginnt immer mit der Anforderung (spec.md). Aus dieser Source of Truth leitet man die Architektur ab (plan.md), die dann in kleinteilige Arbeitsschritte (tasks.md) zerlegt wird."
+        },
+        {
+            text: "Was passiert, wenn Entwickler Fehler im Code direkt korrigieren oder neue Features einbauen, ohne die spec.md anzupassen?",
+            options: [
+                "Das Projekt profitiert von 'Round-Tripping', bei dem sich die spec.md magisch selbst aktualisiert.",
+                "Es entsteht sogenannter 'Spec-Drift': Code und Spezifikation laufen auseinander und die Spec verliert ihren Wert als Source of Truth.",
+                "Gar nichts, da die KI den Code ohnehin besser versteht als jede Text-Spezifikation.",
+                "Das Projekt wechselt automatisch in den 'Vibe Coding'-Modus und wird dadurch robuster."
+            ],
+            correct: 1,
+            explanationCorrect: "Richtig! 'Spec-Drift' ist eines der größten Risiken bei SDD. Wenn man an der Spec vorbei arbeitet, ist sie nicht mehr die Source of Truth und spätere Iterationen durch die KI bauen auf falschen Annahmen auf.",
+            explanationWrong: "Leider falsch. Wenn direkt am Code gearbeitet wird, entsteht 'Spec-Drift'. Spezifikation und tatsächlicher Code laufen auseinander. Die Spec veraltet und verliert ihren Nutzen für künftige KI-Iterationen."
+        },
+        {
+            text: "Warum ist ein solider 'Daten-Contract' innerhalb der spec.md gerade bei KI/ML-Prototypen (wie Predictive Maintenance) das wichtigste Fundament?",
+            options: [
+                "Weil er bestimmt, wie viel Geld der Endkunde für die fertige Applikation bezahlen muss.",
+                "Ein ML-System ist nur so gut wie die Klarheit über seine Eingangsdaten ('garbage in, garbage out'); Plausibilitätsgrenzen verhindern, dass z. B. defekte Sensoren falsch gelernt werden.",
+                "Weil die KI sonst automatisch externe Daten von fremden Servern im Internet herunterlädt.",
+                "Der Daten-Contract generiert vollautomatisch die bunte Web-Oberfläche für den Industriemeister."
+            ],
+            correct: 1,
+            explanationCorrect: "Sehr gut! Ohne klare Formate, Einheiten und Plausibilitätsgrenzen lernt ein Modell mitunter Quatsch. Die Unterscheidung zwischen einem echten Maschinenfehler und einem bloßen Sensorfehler ist hier kritisch.",
+            explanationWrong: "Das ist nicht richtig. Der Daten-Contract beschreibt die Struktur, Einheiten und Grenzen der Eingangsdaten. Ohne diese strikte Definition würde ein ML-Modell aus fehlerhaften Sensordaten falsche Schlüsse ziehen ('garbage in, garbage out')."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanationCorrect}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> ${q.explanationWrong}`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

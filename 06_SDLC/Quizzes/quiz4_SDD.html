@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDD Wissens-Check: Vernetzung & Vertiefung</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>SDD Wissens-Check: Vernetzung & Vertiefung</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Warum ist die strikte Reihenfolge (Spec -> Plan -> Tasks -> Implementieren) das stärkste Gegenmittel zum 'Vibe Coding'?",
+            options: [
+                "Weil sie den KI-Agenten zwingt, eine Pause einzulegen und dadurch teure Rechenzeit in der Cloud gespart wird.",
+                "Sie erzwingt, dass Entwickler und Agent das System konzeptionell durchdenken und verifizieren, statt sich blind auf stochastische, unberechenbare Code-Generierung zu verlassen.",
+                "Weil Vibe Coding verbietet, dass Code automatisch erzeugt wird, während SDD genau das im ersten Schritt verlangt.",
+                "Sie garantiert mathematisch, dass der generierte Code völlig fehlerfrei und ohne menschliches Zutun deployt werden kann."
+            ],
+            correct: 1,
+            explanationCorrect: "Richtig! Vibe Coding überspringt Planung und Review zugunsten schneller Iteration. Die strukturierte Kette des SDD zwingt zur Reflektion: Erst das 'Was', dann das 'Wie', dann der Code. Das schafft reproduzierbare Qualität.",
+            explanationWrong: "Leider falsch. Die strukturierte Reihenfolge soll in erster Linie verhindern, dass man sich blind den Launen der KI hingibt. Sie zwingt zur Vorab-Planung und macht Architekturentscheidungen nachvollziehbar."
+        },
+        {
+            text: "Was ist der korrekte iterative Weg, wenn beim Verifizieren der fertigen Code-Änderungen auffällt, dass ein wichtiges Akzeptanzkriterium (z. B. eine Fehlermeldung) vergessen wurde?",
+            options: [
+                "Man trägt das Kriterium in die spec.md ein, generiert daraus neue fehlschlagende Tests und lässt den Agenten anschließend den Code anpassen.",
+                "Man bittet die KI formlos im Chat, schnell eine Fehlermeldung in den Code einzubauen, um Zeit zu sparen.",
+                "Man muss das gesamte Projekt löschen und den SDD-Workflow von Tag 1 an komplett neu starten.",
+                "Man ignoriert den Fehler für diesen Sprint und dokumentiert ihn erst ganz am Ende in der 'Constitution'."
+            ],
+            correct: 0,
+            explanationCorrect: "Genau! Jede Iteration – auch Fehlerkorrekturen – startet wieder bei der Spezifikation (Source of Truth). Das verhindert den sogenannten Spec-Drift, bei dem Code und Dokumentation auseinanderlaufen.",
+            explanationWrong: "Das ist nicht korrekt. Wer am Prozess vorbei direkt den Code ändert, verursacht 'Spec-Drift'. Neue Anforderungen oder Fehlerkorrekturen müssen zwingend eine Schleife über die spec.md drehen."
+        },
+        {
+            text: "An welchem konkreten Dokumenten-Übergang im SDD-Prozess findet der wichtigste 'Shift-Left' der menschlichen Qualitätskontrolle statt?",
+            options: [
+                "Beim Übergang von tasks.md zum fertigen Programmcode.",
+                "Beim Deployment des Codes auf den Server.",
+                "Beim Übergang von der groben Idee zur automatisierten CI/CD-Pipeline.",
+                "Beim Übergang von der spec.md zur plan.md, also beim Review der Architektur und Logik VOR dem Code."
+            ],
+            correct: 3,
+            explanationCorrect: "Perfekt! Das Herzstück von SDD ist es, Logik- und Designfehler zu beheben, bevor sie in Code gegossen werden. Das Review der Spec und des daraus abgeleiteten Plans ist der entscheidende 'Shift-Left'.",
+            explanationWrong: "Leider falsch. Der Begriff 'Shift-Left' bedeutet hier, dass die Fehlerkontrolle nach links (an den Projektanfang) verschoben wird. Das wichtigste Review findet an der spec.md und der plan.md statt, bevor Code existiert."
+        },
+        {
+            text: "Wie wirken sich die in der spec.md definierten 'Constraints' (Leitplanken) konkret auf die Implementierungsphase des KI-Agenten aus?",
+            options: [
+                "Sie machen den stochastischen KI-Agenten deterministisch, sodass er immer zeichengenau den exakt selben Code ausgibt.",
+                "Sie zwingen den Agenten dazu, sämtliche Tests zu überspringen und direkt zur Produktion überzugehen.",
+                "Sie verkleinern den Lösungsraum auf einen definierten Stack, was Halluzinationen reduziert und willkürliche Architekturentscheidungen verhindert.",
+                "Sie vergrößern den Kontext des Agenten, sodass er das gesamte Internet nach Lösungen durchsuchen kann."
+            ],
+            correct: 2,
+            explanationCorrect: "Richtig! Ohne Constraints würde die KI bei jedem Schritt andere Bibliotheken oder Muster wählen. Leitplanken (wie 'nutze FastAPI und SQLite') schränken diesen Lösungsraum massiv ein und machen Ergebnisse kalkulierbarer.",
+            explanationWrong: "Das stimmt nicht. Constraints können ein KI-Modell nicht völlig deterministisch machen. Sie dienen als strikte Leitplanken, um den Lösungsraum radikal einzuengen und so wilde Halluzinationen zu verhindern."
+        },
+        {
+            text: "Warum sollte man sich in der Praxis nicht auf das sogenannte 'Round-Tripping' (verlustfreies Neugenerieren von Code aus der Spec) verlassen?",
+            options: [
+                "Weil Round-Tripping technisch zu 100% funktioniert und Entwickler dadurch überflüssig machen würde.",
+                "Weil es aktuell technisch noch unreif ist; wer am Code vorbei arbeitet, riskiert daher dauerhaft den 'Spec-Drift'.",
+                "Weil Round-Tripping strengstens durch die 'Constitution' in der CLAUDE.md verboten wird.",
+                "Weil es dazu führt, dass die KI alte Programmiersprachen wie COBOL statt Python verwendet."
+            ],
+            correct: 1,
+            explanationCorrect: "Sehr gut. Die Idealvorstellung, Code per Knopfdruck jederzeit verlustfrei aus der Spec neu zu generieren, funktioniert in der Realität oft nicht fehlerfrei. Daher ist konsequente Disziplin gegen Spec-Drift so wichtig.",
+            explanationWrong: "Leider falsch. Round-Tripping (Code aus Spec komplett neu erzeugen) ist eine faszinierende Idee, aber heute technisch oft noch unreif. Daher ist es brandgefährlich, den Code manuell zu ändern und zu hoffen, die Spec zöge magisch nach."
+        },
+        {
+            text: "Was passiert typischerweise, wenn man die Phase 'Zerlegen' überspringt und den Agenten bittet, die gesamte plan.md direkt als einen Block zu implementieren?",
+            options: [
+                "Der Agent arbeitet deutlich effizienter und liefert sauberen, kompakten Code ab.",
+                "Der Agent verliert schnell den Kontext, vermischt Architektur-Schichten und die Code-Diffs werden für den Menschen unmöglich zu prüfen.",
+                "Das Projekt gilt automatisch als 'Proof of Concept' und ist bereit für die Übergabe.",
+                "Die IDE weigert sich, den Code auszuführen, bis eine tasks.md angelegt wurde."
+            ],
+            correct: 1,
+            explanationCorrect: "Korrekt! Große 'Mach mal alles'-Aufträge überfordern Agenten und Menschen gleichermaßen. Die tasks.md ist das Scharnier, das große Pläne in kleine, testbare und prüfbare Schritte übersetzt.",
+            explanationWrong: "Das ist nicht richtig. Große Block-Aufträge sind der Hauptgrund für gescheiterte KI-Codings. Der Agent halluziniert oder verliert den Faden. Die tasks.md ist essenziell, um das Chaos in verdaubare Häppchen zu zerteilen."
+        },
+        {
+            text: "Welche methodische Kette verbindet die spec.md direkt mit der Qualitätssicherung des zu generierenden Codes?",
+            options: [
+                "Akzeptanzkriterien (spec.md) -> Generierung fehlschlagender Unit-Tests -> Generierung des Feature-Codes (bis Tests grün sind).",
+                "Constraints (spec.md) -> Installation von Virenscannern -> Schreiben der tasks.md.",
+                "Daten-Contract (spec.md) -> Manuelles Schreiben von Code -> KI schreibt danach die Tests.",
+                "Annahmen (spec.md) -> Vibe Coding -> Löschen aller bisherigen Fehlerprotokolle."
+            ],
+            correct: 0,
+            explanationCorrect: "Genau! Dies ist das Herzstück des Test-Driven-Anteils in SDD: Die Akzeptanzkriterien aus der Spec werden zu Tests übersetzt (die mangels Code fehlschlagen). Der Code wird danach geschrieben, um diese Tests zu bestehen.",
+            explanationWrong: "Leider falsch. Die direkte Kette der Qualitätssicherung läuft von den formulierten Akzeptanzkriterien hin zu automatisierten Tests. Diese werden zwingend VOR dem Feature-Code generiert ('Shift-Left')."
+        },
+        {
+            text: "Warum ist die 'Constitution' (CLAUDE.md oder CONVENTIONS.md) unverzichtbar, obwohl die spec.md bereits die konkreten Feature-Anforderungen enthält?",
+            options: [
+                "Weil die spec.md aus Sicherheitsgründen nach jedem Sprint gelöscht wird.",
+                "Sie gibt dem Agenten sitzungsübergreifend den methodischen Kontext (SDD, Test-First, Code-Stil) mit, ohne dass der Entwickler dies bei jedem neuen Chat als Prompt eintippen muss.",
+                "Sie ist nur für das menschliche Management gedacht und wird vom KI-Agenten ignoriert.",
+                "Weil sie die einzigen gültigen Zugangsdaten für die SQLite-Datenbank enthält."
+            ],
+            correct: 1,
+            explanationCorrect: "Richtig! Die spec.md beschreibt das 'Was' eines konkreten Projekts. Die Constitution beschreibt das allgemeine 'Wie' (Regeln, Stil, Arbeitsweise). Sie fungiert als dauerhaftes Gedächtnis für den Agenten.",
+            explanationWrong: "Das stimmt nicht. Während die spec.md projektspezifische Anforderungen enthält, liefert die Constitution die projektübergreifenden, methodischen 'Spielregeln' (z. B. 'Arbeite Test-First'), damit man diese nicht ständig neu prompten muss."
+        },
+        {
+            text: "In welchem Szenario rät die Handreichung explizit von SDD ab und empfiehlt stattdessen Vibe Coding?",
+            options: [
+                "Bei Software für die Medizintechnik oder Luftfahrt.",
+                "Bei langlebigen Kernsystemen, an denen Teams von mehreren Entwicklern über Jahre arbeiten.",
+                "Bei reinen Lernprojekten, Einweg-Skripten und kurzlebigen Explorationen, bei denen der Overhead für eine saubere Spec unwirtschaftlich wäre.",
+                "Wenn der Agent besonders viele Fehler macht und halluziniert."
+            ],
+            correct: 2,
+            explanationCorrect: "Korrekt! SDD ist kein Allheilmittel. Es verlangt Vorarbeit und Disziplin. Für ein Skript, das man nur einmal nutzt, ist dieser Overhead verschwendete Zeit. Hier ist 'Vibe Coding' völlig legitim.",
+            explanationWrong: "Leider falsch. SDD ist prädestiniert für hochkomplexe oder kritische Systeme. Für triviale Wegwerf-Skripte oder reines Explorations-Hacking ist der Dokumentations-Overhead von SDD hingegen viel zu hoch – hier glänzt Vibe Coding."
+        },
+        {
+            text: "Wie sieht der Start eines SDD-Projekts aus, wenn man das Prinzip 'just enough spec' und die Faustregel 'Stabiles früh, Volatiles spät' beachtet?",
+            options: [
+                "Man verfasst sofort eine 50-seitige Dokumentation, die jeden denkbaren Klick des Anwenders im Voraus festlegt.",
+                "Man startet mit einem dünnen Skelett (nur Architektur und Daten-Contracts) und lässt detaillierte Feinheiten in iterativen Durchläufen wachsen.",
+                "Man delegiert die gesamte Entscheidungsfindung an die KI und wartet ab, was sie als Architektur vorschlägt.",
+                "Man programmiert zuerst das Frontend (das Volatile) und überlegt sich danach, welche Daten (das Stabile) benötigt werden."
+            ],
+            correct: 1,
+            explanationCorrect: "Perfekt! Das ist der Unterschied zu klassischem Wasserfall. Man fixiert nur das, was später teuer zu ändern ist (Contracts, Architektur). Alles andere wächst iterativ mit den Erkenntnissen aus den SDD-Durchläufen.",
+            explanationWrong: "Das ist nicht korrekt. Die Methodik verbietet gigantische Vorab-Spezifikationen. Man fixiert zuerst das feste Fundament (Stabiles wie Daten-Contracts) und lässt die Feinheiten in kleinen Iterationen wachsen."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanationCorrect}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> ${q.explanationWrong}`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
