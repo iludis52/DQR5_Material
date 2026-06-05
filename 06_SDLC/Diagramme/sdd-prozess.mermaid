@@ -1,0 +1,30 @@
+flowchart TD
+    Idea(["Idee / Anforderung"]) --> S["1 · Spezifizieren<br/>(/specify)"]
+    Const["Constitution<br/>projektweite Grundregeln"] -.->|"gilt in allen Phasen"| S
+
+    S --> SA[/"spec.md — Source of Truth"/]
+    SA --> RG{"Review vor dem Code:<br/>Architektur- &amp; Logiklücken?"}
+    RG -->|"Lücken → Spec schärfen"| S
+    RG -->|"ok"| PL["2 · Planen<br/>(/plan)"]
+
+    PL --> PA[/"plan.md<br/>Architektur · Stack · Datenmodell"/]
+    PA --> TK["3 · Zerlegen<br/>(/tasks)"]
+    TK --> TA[/"tasks.md<br/>kleine, testbare Aufgaben"/]
+    TA --> IMP
+
+    subgraph impl["4 · Implementieren"]
+        IMP["Tests aus Spec generieren<br/>(Shift-Left · schlagen zuerst fehl)"] --> CODE["Code schreiben"]
+        CODE --> RUN{"Tests grün?"}
+        RUN -->|"nein · Fehler zurück an Agent"| CODE
+    end
+
+    RUN -->|"ja"| VER{"5 · Verifizieren &amp; Review<br/>Warum sind die Tests grün?"}
+    VER -->|"neue Regel / Fehler → in die Spec"| S
+    VER -->|"abgenommen"| DONE(["Feature fertig"])
+
+    classDef phase fill:#eef3f8,stroke:#33415c,color:#1a2433;
+    classDef sot fill:#eaf2fb,stroke:#0969da,color:#06214a;
+    classDef art fill:#f6f8fa,stroke:#8a94a6,color:#24292f;
+    class S,PL,TK,IMP,CODE phase
+    class SA sot
+    class PA,TA art

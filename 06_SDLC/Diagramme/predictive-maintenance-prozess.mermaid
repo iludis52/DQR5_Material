@@ -1,0 +1,33 @@
+flowchart TD
+    A(["Sensor-Gateway"]) -->|"JSON, 1x/Sek."| B["POST /ingest · FastAPI"]
+    B --> C{"Wert plausibel?<br/>(Grenzen laut Daten-Contract)"}
+    C -->|"nein · Sensorfehler"| D["Messwert verwerfen<br/>UI: Sensor prüfen"]
+    C -->|"ja"| E[("Messwert in SQLite")]
+    E --> F{"Modell angelernt?"}
+    F -->|"nein · Kaltstart"| G["status = lernt …<br/>keine Warnungen"]
+    F -->|"ja"| H["IsolationForest<br/>healthScore 0..1"]
+    H --> I{"healthScore?"}
+    I -->|"unter 0.4"| J["status = ok"]
+    I -->|"0.4 bis 0.7"| K["status = warnung"]
+    I -->|"über 0.7"| L["status = kritisch"]
+    G --> M[("aktueller Status<br/>je Maschine")]
+    J --> M
+    K --> M
+    L --> M
+
+    subgraph ui["Web-Oberfläche · Auto-Refresh alle 5 Sek."]
+        N{"seit über 30 Sek.<br/>keine gültigen Werte?"}
+        N -->|"ja"| O["dataStale = true<br/>Warnhinweis + letzter Wert"]
+        N -->|"nein"| P["Ampel + healthScore<br/>+ Verlauf der letzten 30 Min."]
+    end
+
+    M --> N
+    O --> Q(["Industriemeister"])
+    P --> Q
+
+    classDef ok fill:#d7f5dd,stroke:#1a7f37,color:#08311a;
+    classDef warn fill:#fdf2c4,stroke:#9a6700,color:#3d2c00;
+    classDef crit fill:#ffd8d3,stroke:#cf222e,color:#4d0b06;
+    class J ok
+    class K warn
+    class L,O crit
