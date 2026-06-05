@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spec-Driven Development (SDD) - Handreichung</title>
+    <style>
+        :root {
+            --bg-color: #e0e5ec;
+            --page-bg: #ffffff;
+            --text-color: #333333;
+            --primary-color: #0056b3;
+            --border-color: #cccccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px 0 80px 0;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        /* DIN A4 Proportionen */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background-color: var(--page-bg);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            padding: 20mm;
+            box-sizing: border-box;
+            display: none;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .page.active {
+            display: block;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1, h2, h3 { color: var(--primary-color); }
+        h1 { border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            vertical-align: top;
+        }
+        th { background-color: #f4f7f6; }
+
+        pre {
+            background-color: #2b2b2b;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .quote-box {
+            background-color: #f9f9f9;
+            border-left: 5px solid var(--primary-color);
+            padding: 15px;
+            margin: 1em 0;
+            font-style: italic;
+        }
+
+        /* Navigation Controls */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 12px 25px;
+            border-radius: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .controls button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .controls button:hover { background-color: #004494; }
+        .controls button:disabled { background-color: #555; cursor: not-allowed; }
+        
+        .page-indicator { font-weight: bold; font-size: 14px; }
+
+        .cite {
+            font-size: 0.8em;
+            color: #666;
+            vertical-align: super;
+        }
+
+        /* Print adjustments */
+        @media print {
+            body { background: none; padding: 0; display: block; }
+            .page { box-shadow: none; display: block !important; page-break-after: always; margin: 0; min-height: auto; }
+            .controls { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page active" id="page-1">
+        <h1>Spec-Driven Development (SDD) <span class="cite">[cite: 1]</span></h1>
+        <h2>KI-assistierte Softwareentwicklung <span class="cite">[cite: 2]</span></h2>
+        <h3>Handreichung für Studium und Praxis <span class="cite">[cite: 3]</span></h3>
+
+        <div class="quote-box">
+            <strong>Worum es geht.</strong> Diese Handreichung erklärt, wie sich Softwareentwicklung durch KI-Coding-Agenten verändert. Sie grenzt das fehleranfällige „Vibe Coding“ vom strukturierten Spec-Driven Development ab, ordnet SDD in bekannte Verfahren des Software-Engineerings ein, benennt seine Prinzipien und Grenzen und liefert ein korrigiertes Beispiel, einen praxistauglichen Workflow sowie einen Meta-Prompt zum schnellen Erstellen von Spezifikationen. <span class="cite">[cite: 4]</span>
+        </div>
+
+        <h3>Inhalt <span class="cite">[cite: 5]</span></h3>
+        <ul>
+            <li>1. Was ist SDD — und woher es kommt <span class="cite">[cite: 7]</span></li>
+            <li>2. Das Problem: „Vibe Coding“ <span class="cite">[cite: 8]</span></li>
+            <li>3. Die Prinzipien des SDD <span class="cite">[cite: 9]</span></li>
+            <li>4. Das Spezifikationsdokument <span class="cite">[cite: 10]</span></li>
+            <li>5. Der Workflow in der Praxis <span class="cite">[cite: 11]</span></li>
+            <li>6. Werkzeuglandschaft <span class="cite">[cite: 12]</span></li>
+            <li>7. Grenzen — und wann SDD sich nicht lohnt <span class="cite">[cite: 13]</span></li>
+            <li>8. Spezifikationen schnell erstellen: der Meta-Prompt <span class="cite">[cite: 14]</span></li>
+            <li>9. Der SDD-Prozess von der Idee zum fertigen Feature <span class="cite">[cite: 15]</span></li>
+            <li>10. Glossar <span class="cite">[cite: 16]</span></li>
+            <li>Erste Schritte & Tutorial <span class="cite">[cite: 17, 19, 130]</span></li>
+        </ul>
+    </div>
+
+    <div class="page" id="page-2">
+        <h2>1. Was ist SDD — und woher es kommt <span class="cite">[cite: 29]</span></h2>
+        <p>Spec-Driven Development stellt eine maschinenlesbare Spezifikation ins Zentrum des Entwicklungsprozesses. <span class="cite">[cite: 30]</span> Zuerst wird beschrieben, was ein System leisten soll und unter welchen Bedingungen; aus dieser Beschreibung leitet ein KI-Agent Plan, Tests und Code ab. <span class="cite">[cite: 31, 32]</span> Die Spezifikation ist der verbindliche Vertrag — die „Source of Truth“. <span class="cite">[cite: 33]</span> Code und Tests sind nachgelagerte Artefakte, die sich an ihr messen lassen müssen. <span class="cite">[cite: 34]</span> Der entscheidende Effekt: Der menschliche Aufwand verschiebt sich von der Implementierung hin zur präzisen Beschreibung von Anforderungen, Architektur und Akzeptanzkriterien — also dorthin, wo Fehler am billigsten zu beheben sind. <span class="cite">[cite: 35]</span></p>
+
+        <table>
+            <tr><th colspan="2">Vertiefung — Einordnung <span class="cite">[cite: 36]</span></th></tr>
+            <tr><td colspan="2">SDD ist keine Erfindung von 2025, sondern eine Neuverpackung bewährter Ideen des Software-Engineerings: <span class="cite">[cite: 36]</span></td></tr>
+            <tr>
+                <td>Contract-First-Design</td>
+                <td>Die Schnittstelle (z. B. als OpenAPI/Swagger-Dokument) steht vor der Implementierung fest. <span class="cite">[cite: 36]</span></td>
+            </tr>
+            <tr>
+                <td>Design by Contract</td>
+                <td>(Bertrand Meyer, Eiffel) — Vor- und Nachbedingungen als Vertrag zwischen Komponenten. <span class="cite">[cite: 36]</span></td>
+            </tr>
+            <tr>
+                <td>Formale Spezifikation & BDD</td>
+                <td>(Z, VDM) und Behaviour-Driven Development (Gherkin/Cucumber) — Verhalten in prüfbarer Form. <span class="cite">[cite: 36]</span></td>
+            </tr>
+            <tr>
+                <td>ADR</td>
+                <td>Architecture Decision Records — bewusst dokumentierte, nachvollziehbare Entwurfsentscheidungen. <span class="cite">[cite: 36]</span></td>
+            </tr>
+            <tr><td colspan="2">Neu ist allein der Auslöser: Leistungsfähige Coding-Agenten machen es erstmals praktikabel, ausführbaren Code unmittelbar aus einer präzisen Spezifikation zu erzeugen. <span class="cite">[cite: 36]</span></td></tr>
+        </table>
+
+        <h2>2. Das Problem: „Vibe Coding“ <span class="cite">[cite: 37]</span></h2>
+        <p>Der Begriff „Vibe Coding“ wurde Anfang 2025 geprägt. Sein Kern ist nicht bloß „einfacher Prompt, dann iterieren“, sondern dass man den generierten Code akzeptiert, ohne ihn vollständig zu lesen oder zu verstehen — man gibt sich den „Vibes“ hin und vertraut dem Modell. <span class="cite">[cite: 38]</span> Für schnelle Prototypen, Wegwerf-Skripte und Exploration ist das ein legitimes, oft sehr produktives Vorgehen. <span class="cite">[cite: 39]</span></p>
+        <p>Bei ernsthaften, langlebigen Systemen treten jedoch typische Nachteile auf: Der Agent trifft willkürliche architektonische Entscheidungen, die Ergebnisse sind schwer reproduzierbar, es fehlt die Nachvollziehbarkeit, und der Code „kompiliert zwar, trifft aber die eigentliche Absicht nicht“. <span class="cite">[cite: 40]</span> Der klassische Planungs- und Reviewzyklus wird übersprungen, was Wartung und Teamarbeit erschwert. <span class="cite">[cite: 41]</span></p>
+
+        <div class="quote-box">
+            <strong>Wichtig — keine Schwarz-Weiß-Frage:</strong> Vibe Coding ist nicht per se schlecht; es ist das richtige Werkzeug für Wegwerf-Code und schnelle Experimente. SDD lohnt sich, sobald Korrektheit, Wartbarkeit, Teamarbeit, Sicherheit oder rechtliche Nachvollziehbarkeit zählen. <span class="cite">[cite: 42]</span>
+        </div>
+    </div>
+
+    <div class="page" id="page-3">
+        <h2>3. Die Prinzipien des SDD <span class="cite">[cite: 43]</span></h2>
+        <ul>
+            <li><strong>Spezifikation als Source of Truth.</strong> Die Spec ist der maßgebliche Vertrag. Bei Abweichungen wird zuerst die Spec geprüft und angepasst, nicht ad hoc der Code. <span class="cite">[cite: 45, 46]</span></li>
+            <li><strong>Trennung von „Was“ und „Wie“.</strong> Der Mensch definiert das Was, der Agent übernimmt das Wie (Syntax, Boilerplate, Implementierungsdetails). <span class="cite">[cite: 47]</span></li>
+            <li><strong>Shift-Left der menschlichen Kontrolle.</strong> Das Review findet bei Spezifikation und Architektur statt — bevor Code entsteht. <span class="cite">[cite: 48]</span></li>
+            <li><strong>Leitplanken statt Determinismus.</strong> Enge Vorgaben zu Bibliotheken, Fehlerbehandlung und Namenskonventionen verkleinern den Lösungsraum. <span class="cite">[cite: 49, 50]</span></li>
+            <li><strong>Verifizierbarkeit durch Design.</strong> Eine Spec ist nur so gut, wie sie sich in messbare Akzeptanzkriterien übersetzen lässt. <span class="cite">[cite: 51]</span></li>
+            <li><strong>Nachvollziehbarkeit (Traceability).</strong> Jedes Code-Artefakt lässt sich auf ein Spec-Element zurückführen. <span class="cite">[cite: 52]</span></li>
+            <li><strong>Lebendes Dokument.</strong> Die Spec wird versioniert, lebt im Repository und wird über Pull Requests fortgeschrieben. <span class="cite">[cite: 54, 55]</span></li>
+            <li><strong>Werkzeug-Unabhängigkeit.</strong> SDD ist eine Methodik, kein Produkt. <span class="cite">[cite: 56]</span></li>
+        </ul>
+
+        <table>
+            <tr><th>Vertiefung — „Source of Truth“ realistisch betrachtet <span class="cite">[cite: 57]</span></th></tr>
+            <tr><td>Das Ideal lautet: bei Fehlern stets die Spec ändern und den Code neu generieren, nie umgekehrt. In der Praxis ist das eine Zielvorstellung, kein Automatismus. Generierter Code braucht weiterhin Review; eine Spec erfasst selten 100 % des Verhaltens; und das verlustfreie Regenerieren von Code aus der Spec funktioniert heute nicht zuverlässig. Wer am Code vorbei arbeitet, erzeugt „Spec-Drift“. Behandeln Sie das Prinzip daher als Disziplin, die das Team aktiv aufrechterhält. <span class="cite">[cite: 57]</span></td></tr>
+        </table>
+        
+        <h2>4. Das Spezifikationsdokument <span class="cite">[cite: 58]</span></h2>
+        <p>Eine Spec wird als maschinenlesbarer Vertrag (typischerweise Markdown) in das Projekt gelegt und dem Coding-Agenten als Kontext übergeben. <span class="cite">[cite: 60]</span> Das folgende Beispiel stammt aus einem Prototypen für Predictive Maintenance: Eine Maschine wird mit Sensoren nachgerüstet, ein ML-Modell bewertet ihren Zustand, und ein Industriemeister überwacht das Ergebnis. <span class="cite">[cite: 61, 62]</span></p>
+    </div>
+
+    <div class="page" id="page-4">
+        <h2>Spezifikations-Beispiel (spec.md) <span class="cite">[cite: 66, 230]</span></h2>
+        <p>Die Spec ist zugleich Bauplan und Übergabedokument. <span class="cite">[cite: 64]</span></p>
+<pre><code class="language-markdown"># Feature: Predictive-Maintenance-Prototyp
+
+## 0. Zweck & Reifegrad
+PROTOTYP / Proof of Concept. Ziel ist NICHT der produktive Dauerbetrieb, sondern der Nachweis, dass sich aus Sensordaten ein brauchbares Frühwarnsignal für den Wartungsbedarf ableiten lässt. Die skalierte, produktive Umsetzung erfolgt anschließend mit externen Fachleuten. Diese Spec ist zugleich Bauplan und Übergabedokument.
+
+## 1. Daten-Contract (Sensorik)
+- Quelle: Sensor-Gateway sendet Messwerte als JSON per HTTP POST an /ingest.
+- Abtastrate (Prototyp): 1 Messung pro Sekunde je Sensor.
+- Felder je Nachricht:
+  - machineId (string)
+  - timestamp (ISO 8601, UTC)
+  - vibration (number, mm/s)
+  - temperature (number, °C)
+  - current (number, A)
+- Plausibilitätsgrenzen -- Werte außerhalb gelten als SENSORFEHLER, NICHT als Maschinenfehler:
+  - temperature: -20 bis 150
+  - vibration: 0 bis 50
+  - current: 0 bis 100
+
+## 2. ML-Aufgabe (bewusst einfach gehalten)
+- Aufgabentyp: ANOMALIE-ERKENNUNG (unüberwacht). KEINE Ausfallvorhersage in Zeiteinheiten -- im Prototyp liegen i. d. R. noch keine echten Ausfälle als Trainingslabel vor ("Cold-Start-Problem").
+- Vorgehen: Das Modell lernt das Normalverhalten aus einer störungsfreien Referenzphase und meldet Abweichungen als Anomalie-Score.
+- Ausgabe je Maschine, alle 5 Sekunden aktualisiert:
+  - healthScore (number, 0..1)
+  - status ("ok" | "warnung" | "kritisch")
+  - Schwellen: < 0.4 = ok,  0.4-0.7 = warnung,  > 0.7 = kritisch
+  - dataStale (boolean) -- true, wenn seit > 30 s keine gültigen Werte kamen
+
+## 3. Web-Oberfläche (für den Industriemeister)
+- Eine Seite, Auto-Refresh alle 5 Sekunden.
+- Zeigt je Maschine: Ampel (grün/gelb/rot), healthScore, Zeitpunkt der letzten Messung sowie den Verlauf der letzten 30 Minuten als einfaches Liniendiagramm.
+- Bei Status "kritisch" oder dataStale: deutlich sichtbarer Warnhinweis.
+
+## 4. Verhalten in Sonderfällen
+- Datenlücke / Sensorausfall: Status NICHT auf "ok" setzen; dataStale = true.
+- Sensorfehler: Messwert verwerfen, im UI als "Sensor prüfen" markieren, nicht in den healthScore einrechnen.
+- Kaltstart: Status "lernt ..." anzeigen, noch keine Warnungen erzeugen.
+
+## 5. Technische Constraints (prototyp-tauglich)
+- Sprache: Python.
+- ML: scikit-learn, z. B. IsolationForest -- KEIN Deep Learning.
+- Backend: FastAPI; Datenhaltung: SQLite.
+- Frontend: simple HTML-Seite via fetch.
+- Lokal auf einem Rechner lauffähig.
+
+## 6. Akzeptanzkriterien
+- Bei Normaldaten bleibt der Status auf "ok".
+- Künstliche Anomalie hebt Status nach 15 s auf "warnung".
+- Abgeschalteter Sensor zeigt binnen 30 s dataStale an.
+
+## 7. Annahmen
+- Genau eine Maschine, internes Netz, ausreichend Trainingsdaten.
+
+## 8. Bewusst NICHT im Prototyp -- Übergabe an Fachleute
+- Skalierung, Zeitreihen-DB, echte Restlebensdauer-Vorhersage, Auth, Audit, Alerting.
+</code></pre>
+    </div>
+
+    <div class="page" id="page-5">
+        <h2>5. Der Workflow in der Praxis <span class="cite">[cite: 68]</span></h2>
+        <p>Der Workflow gliedert sich in fünf Phasen: <span class="cite">[cite: 69]</span></p>
+        <ol>
+            <li><strong>Spezifizieren.</strong> Die Spec schreiben und den Agenten auf Logiklücken prüfen lassen — noch ohne Code. <span class="cite">[cite: 71]</span></li>
+            <li><strong>Planen.</strong> Einen technischen Plan ableiten: Architektur, Datenmodell, Schnittstellen. <span class="cite">[cite: 72]</span></li>
+            <li><strong>Zerlegen.</strong> Den Plan in kleine, einzeln testbare Aufgaben aufteilen. <span class="cite">[cite: 73]</span></li>
+            <li><strong>Implementieren.</strong> Zuerst Tests aus der Spec generieren (Shift-Left), dann Code schreiben, bis die Tests grün sind. <span class="cite">[cite: 74]</span> Fehlermeldungen gehen zur Selbstkorrektur an den Agenten. <span class="cite">[cite: 75]</span></li>
+            <li><strong>Verifizieren & Review.</strong> Prüfen, warum die Tests grün sind. Neue Regeln wandern in die Spec. <span class="cite">[cite: 76, 77]</span></li>
+        </ol>
+
+        <h2>6. Werkzeuglandschaft <span class="cite">[cite: 79]</span></h2>
+        <p>Den Begriff SDD hat vor allem GitHub Spec Kit geprägt. <span class="cite">[cite: 80]</span> Coding-Agenten, mit denen SDD praktiziert wird, sind unter anderem Claude Code, GitHub Copilot, Gemini CLI, Cursor und Aider. <span class="cite">[cite: 82]</span> Entscheidend ist nicht das Produkt, sondern die Disziplin: Spezifikation zuerst, Code als Ableitung. <span class="cite">[cite: 83]</span></p>
+
+        <h2>7. Grenzen — und wann SDD sich nicht lohnt <span class="cite">[cite: 84]</span></h2>
+        <ul>
+            <li><strong>Overhead:</strong> Eine gute Spec zu schreiben kostet Zeit. <span class="cite">[cite: 86]</span></li>
+            <li><strong>Fehlbare Spec:</strong> Eine Spezifikation kann genauso unvollständig oder falsch sein wie Code. <span class="cite">[cite: 87]</span></li>
+            <li><strong>Restrisiko Halluzination:</strong> Auch mit Constraints kann ein Modell Fehler produzieren. <span class="cite">[cite: 89]</span></li>
+            <li><strong>Spec-Drift:</strong> Code und Spec laufen auseinander, wenn man am Code vorbei arbeitet. <span class="cite">[cite: 90]</span></li>
+        </ul>
+
+        <table>
+            <tr><th>Faustregel zur Auswahl <span class="cite">[cite: 92]</span></th></tr>
+            <tr><td>SDD lohnt sich bei langlebigen, mehrköpfigen, korrektheits- oder compliance-kritischen Projekten und beim Arbeiten in bestehenden Codebasen. Für Exploration, Lernprojekte und Einweg-Skripte genügt Vibe Coding — und ist oft schneller. <span class="cite">[cite: 92]</span></td></tr>
+        </table>
+    </div>
+
+    <div class="page" id="page-6">
+        <h2>8. Spezifikationen schnell erstellen: der Meta-Prompt <span class="cite">[cite: 93]</span></h2>
+        <p>Statt Spezifikationen mühsam selbst zu schreiben, dreht man den Spieß um und lässt sich von der KI interviewen. <span class="cite">[cite: 94]</span></p>
+
+<pre><code class="language-text">Du agierst ab sofort als sehr erfahrener Senior Software Architect und Product Manager. Mein Ziel ist es, nach den Prinzipien des Spec-Driven Development (SDD) zu arbeiten. Am Ende sollst du mir eine wasserdichte, maschinenlesbare Markdown-Spezifikation (spec.md) für ein Feature/Projekt schreiben, die ich direkt an einen KI-Coding-Agenten übergeben kann.
+
+Hier ist meine noch sehr vage Idee:
+[HIER DEINE IDEE EINTRAGEN, z. B. "Ich brauche ein internes Dashboard, in dem Mitarbeiter Urlaubsanträge einreichen und Vorgesetzte sie genehmigen."]
+
+WICHTIGE REGEL: Schreibe die Spezifikation noch NICHT.
+
+Bevor wir sie erstellen, musst du alle Unklarheiten beseitigen. Stelle mir eine strukturierte, nummerierte Liste der 10 bis 14 wichtigsten Fragen.
+Gruppiere sie in folgende Kategorien:
+1. Geschäftslogik & Core-Feature-Verhalten
+2. Edge Cases (unerwartetes Verhalten, Fehler, Nebenläufigkeit)
+3. Security, Authentifizierung & Berechtigungen
+4. Technische Constraints (Stack, Datenbank, APIs)
+5. Nicht-funktionale Anforderungen (Performance, Skalierung, Logging, Datenschutz)
+6. Testing & Akzeptanzkriterien
+
+Stelle präzise, technische Fragen. Biete bei komplexen Punkten direkt 2 bis 3 Best-Practice-Optionen (A, B, C) an, aus denen ich wählen kann.
+
+Warte nach deinen Fragen auf meine Antworten. Wenn meine Antworten weitere Lücken aufwerfen, hake nach. Deine Einschätzung "keine Lücken mehr" ist eine Heuristik, keine Garantie -- bleibe daher kritisch. Erst wenn du hinreichend sicher bist, werde ich sagen: "Erstelle jetzt die spec.md".</code></pre>
+
+        <h3>So geht es nach dem Prompt weiter <span class="cite">[cite: 97]</span></h3>
+        <p><strong>Beantworten:</strong> kurz und knapp auf die Fragen antworten. <span class="cite">[cite: 98]</span><br>
+        <strong>Nachschärfen:</strong> eventuelle Rückfragen der KI klären. <span class="cite">[cite: 99]</span><br>
+        <strong>Generieren:</strong> den finalen Befehl geben: „Perfekt. Erstelle nun die finale spec.md...“ <span class="cite">[cite: 100]</span></p>
+    </div>
+
+    <div class="page" id="page-7">
+        <h2>10. Glossar <span class="cite">[cite: 117]</span></h2>
+        <ul>
+            <li><strong>Spec-Driven Development (SDD):</strong> Methodik, die eine maschinenlesbare Spezifikation ins Zentrum stellt. <span class="cite">[cite: 118]</span></li>
+            <li><strong>Vibe Coding:</strong> Generierten Code akzeptieren und iterieren, ohne ihn vollständig zu durchdringen. <span class="cite">[cite: 119]</span></li>
+            <li><strong>Source of Truth:</strong> Die Spezifikation als einzige verbindliche Referenz. <span class="cite">[cite: 120]</span></li>
+            <li><strong>Shift-Left:</strong> Qualitätssicherung früh im Prozess verankern (Review bei Spec/Architektur). <span class="cite">[cite: 121]</span></li>
+            <li><strong>Traceability:</strong> Jedes Code-Artefakt lässt sich auf ein Spec-Element zurückführen. <span class="cite">[cite: 123]</span></li>
+            <li><strong>Constitution:</strong> Projektweite Grundregeln, die über einzelnen Specs stehen. <span class="cite">[cite: 127]</span></li>
+            <li><strong>Spec-Drift:</strong> Auseinanderlaufen von Spezifikation und Code. <span class="cite">[cite: 129]</span></li>
+        </ul>
+
+        <h2>Erste Schritte: SDD ist iterativ, nicht Wasserfall <span class="cite">[cite: 139]</span></h2>
+        <p>Niemand schreibt vor dem ersten Tastendruck eine perfekte, fertige Spezifikation. Genau das wäre nicht SDD, sondern Wasserfall. <span class="cite">[cite: 134]</span> Die Spezifikation wächst mit dem Projekt: Man startet mit einem Skelett und füllt es Schritt für Schritt. <span class="cite">[cite: 137]</span></p>
+
+        <table>
+            <tr>
+                <th>“Altes Software-Dev” (Wasserfall) <span class="cite">[cite: 143]</span></th>
+                <th>So ist SDD gemeint (iterativ) <span class="cite">[cite: 143]</span></th>
+            </tr>
+            <tr>
+                <td>Erst das komplette Dokument, dann Code</td>
+                <td>Dünne Spec, kurzer Durchlauf, dann nachschärfen</td>
+            </tr>
+            <tr>
+                <td>Die Spec ist fertig und unveränderlich</td>
+                <td>Die Spec ist ein lebendes Dokument</td>
+            </tr>
+            <tr>
+                <td>Ein großer Wurf</td>
+                <td>Viele kleine, vollständige Schnitte</td>
+            </tr>
+        </table>
+        
+        <p><strong>Faustregel für den Einstieg:</strong> Stabiles früh, Volatiles spät. Vorab gehört, was billig zu denken und teuer zu ändern ist. Wachsen darf, was man ohnehin erst später genauer weiß. <span class="cite">[cite: 148, 149]</span></p>
+    </div>
+
+    <div class="page" id="page-8">
+        <h2>Tutorial am Beispiel Predictive Maintenance <span class="cite">[cite: 154]</span></h2>
+        
+        <h3>0. Voraussetzungen & Setup <span class="cite">[cite: 157]</span></h3>
+        <p>Du brauchst vorab drei Dinge: VS Code, Python und ein KI-Werkzeug. <span class="cite">[cite: 158]</span></p>
+        
+        <table>
+            <tr>
+                <th>So geht's in Continue (VS Code) <span class="cite">[cite: 161]</span></th>
+                <th>So geht's in Claude Code <span class="cite">[cite: 161]</span></th>
+            </tr>
+            <tr>
+                <td>In VS Code links auf „Extensions“ gehen, nach „Continue“ suchen, installieren. Beim ersten Start anmelden bzw. Modell hinterlegen.<br><br>Continue kennt vier Funktionen: Autocomplete, Chat, Edit und Agent. <span class="cite">[cite: 161]</span></td>
+                <td>Claude Code installieren. Empfohlen ist der native Installer:<br><code>curl -fsSL https://claude.ai/install.sh | bash</code><br><br>Alternativ per npm:<br><code>npm install -g @anthropic-ai/claude-code</code><br>Danach <code>claude</code> im Ordner ausführen. <span class="cite">[cite: 161]</span></td>
+            </tr>
+        </table>
+
+        <h3>1. Das Fundament: die Spec ins Projekt legen <span class="cite">[cite: 167]</span></h3>
+        <p>Die Spezifikation ist die „Source of Truth“. Sie gehört als Datei ins Projekt — nicht in den Chatverlauf. <span class="cite">[cite: 168]</span> Daneben braucht das Werkzeug dauerhafte Projektregeln (die „Constitution“), so muss man sich nicht in jeder Sitzung wiederholen. <span class="cite">[cite: 170, 171]</span></p>
+
+<pre><code class="language-markdown"># Inhalt für CLAUDE.md oder CONVENTIONS.md
+# Projekt: Predictive-Maintenance-Prototyp
+- Verbindliche Spezifikation: siehe spec.md (Source of Truth).
+- Sprache: Python. Stil: einfach, gut kommentiert, prototyp-tauglich.
+- Stack laut spec.md: FastAPI, scikit-learn, SQLite. Kein Deep Learning.
+- Regel: Neue Anforderungen zuerst in spec.md aufnehmen, dann umsetzen.
+- Vor groesseren Aenderungen kurz den Plan erlaeutern.</code></pre>
+
+        <p><strong>Tipp:</strong> Initialisiere Git und committe nach jeder Phase. <span class="cite">[cite: 173, 174]</span></p>
+<pre><code class="language-bash">git init
+git add spec.md CLAUDE.md
+git commit -m "chore: Spezifikation und Projektregeln"</code></pre>
+    </div>
+
+    <div class="page" id="page-9">
+        <h2>2. Spec prüfen und Plan erzeugen — noch ohne Code <span class="cite">[cite: 176]</span></h2>
+        <p>Das ist der „Shift-Left“-Moment: Bevor eine Zeile Code entsteht, lässt du das Modell die Spezifikation auf Lücken prüfen. Arbeite dafür in einem Modus, der nur liest und nichts verändert. <span class="cite">[cite: 177, 178]</span></p>
+
+<pre><code class="language-text">Prompt:
+Lies @spec.md und @CLAUDE.md. Du bist erfahrener Senior-Entwickler. Prüfe die Spezifikation auf Architektur- und Logiklücken, BEVOR wir Code schreiben. Stelle mir gezielte Rückfragen zu allem, was unklar oder widersprüchlich ist. Schreibe noch keinen Code.</code></pre>
+
+        <p>Beantworte die Rückfragen knapp. Tauchen dabei echte Lücken auf, ergänze sie in spec.md — nicht im Chat. <span class="cite">[cite: 180]</span> Danach lässt du den Plan erstellen: <span class="cite">[cite: 181]</span></p>
+
+<pre><code class="language-text">Prompt:
+Erstelle aus @spec.md einen technischen Plan und speichere ihn als plan.md:
+Projektstruktur (Dateien/Module), Datenfluss, gewählte Bibliotheken und kurze Begründungen.
+Halte dich an die Constraints in spec.md. Noch kein Implementierungscode.</code></pre>
+
+        <h3>3. In kleine Aufgaben zerlegen <span class="cite">[cite: 301]</span></h3>
+        <p>Aus dem Plan wird eine Aufgabenliste (tasks.md). <span class="cite">[cite: 302]</span></p>
+
+<pre><code class="language-text">Prompt:
+Leite aus @plan.md eine Aufgabenliste ab und speichere sie als tasks.md:
+kleine, einzeln testbare Schritte in sinnvoller Reihenfolge, jede mit einem Satz Ziel.</code></pre>
+    </div>
+
+    <div class="page" id="page-10">
+        <h2>4. Implementieren — Tests zuerst <span class="cite">[cite: 314]</span></h2>
+        <p>Jetzt darf der Agent Dateien anlegen und Befehle ausführen (z.B. im Agent-Modus von Continue). Die SDD-Reihenfolge lautet: erst die Tests aus den Akzeptanzkriterien, dann der Code. <span class="cite">[cite: 315, 316]</span></p>
+
+        <p><strong>Schritt 1 — Tests, die zunächst fehlschlagen:</strong> <span class="cite">[cite: 317]</span></p>
+<pre><code class="language-text">Prompt:
+Wir arbeiten @tasks.md Schritt für Schritt ab. Beginne mit den Tests. Schreibe auf Basis der Akzeptanzkriterien in @spec.md (Abschnitt 6) pytest-Tests, die das Verhalten prüfen und zunächst fehlschlagen. Erkläre kurz, was jeder Test prüft. Schreibe noch keinen Implementierungscode.</code></pre>
+
+        <p><strong>Schritt 2 — Code, bis die Tests grün sind:</strong> <span class="cite">[cite: 319]</span></p>
+<pre><code class="language-text">Prompt:
+Implementiere jetzt den Code, bis alle Tests grün sind. Halte dich strikt an die Constraints in @spec.md Abschnitt 5 (Python, FastAPI, scikit-learn IsolationForest, SQLite). Führe die Tests aus und zeig mir das Ergebnis. Schlagen Tests fehl, korrigiere und wiederhole.</code></pre>
+
+        <p><strong>Schritt 3 — testen ohne echte Maschine:</strong> <span class="cite">[cite: 323]</span></p>
+<pre><code class="language-text">Prompt:
+Erzeuge ein Skript simulate_sensor.py, das jede Sekunde plausible Messwerte an /ingest sendet.
+Mit dem Schalter --anomalie steigt die Vibration langsam an, sodass der Status auf warnung/kritisch wechselt. So kann ich die Akzeptanzkriterien von Hand prüfen.</code></pre>
+
+        <h2>5. Verifizieren & weiterentwickeln <span class="cite">[cite: 327]</span></h2>
+        <p>Neue Wünsche oder gefundene Fehler kommen ZUERST in spec.md — nie als formloser Zuruf an den Code. <span class="cite">[cite: 330]</span></p>
+<pre><code class="language-text">Prompt-Beispiel für Änderung:
+@spec.md wurde geändert (Abschnitt 3: Maschinen-ID im Titel der Web-Oberfläche).
+Passe Implementierung UND Tests entsprechend an und führe die Tests aus.</code></pre>
+
+        <h3>Häufige Stolpersteine <span class="cite">[cite: 335]</span></h3>
+        <ul>
+            <li><strong>Blind „Accept“ klicken.</strong> Diffs immer lesen. <span class="cite">[cite: 336]</span></li>
+            <li><strong>Grün ≠ richtig.</strong> Tests können bestehen, weil sie abgeschwächt wurden. <span class="cite">[cite: 337]</span></li>
+            <li><strong>Kontext überladen.</strong> Nur relevante Dateien anhängen. <span class="cite">[cite: 338]</span></li>
+            <li><strong>Sensible Daten.</strong> Keine echten Betriebsdaten an Cloud-Modelle. <span class="cite">[cite: 339]</span></li>
+        </ul>
+    </div>
+
+<div class="page" id="page-11">
+        <h2>Ausformulierte Komplett-Spezifikation (spec.md)</h2>
+        <p>Hier ist der vollständige Text der Spezifikation als kopierbare Schnellreferenz[cite: 66, 228]:</p>
+        <pre><code class="language-markdown"># Spezifikation: Predictive-Maintenance-Prototyp für eine Produktionsmaschine [cite: 230]
+> **Status:** Prototyp / Proof of Concept · **Source of Truth** für dieses Projekt. [cite: 231]
+> Änderungen am Verhalten werden zuerst hier eingetragen, dann im Code umgesetzt. [cite: 232]
+
+## 0. Zweck & Reifegrad [cite: 233]
+PROTOTYP / Proof of Concept. [cite: 234] Ziel ist nicht der produktive Dauerbetrieb, sondern der Nachweis, dass sich aus Sensordaten ein brauchbares Frühwarnsignal für den Wartungsbedarf ableiten lässt. [cite: 234, 235] Die skalierte, produktive Umsetzung erfolgt anschließend mit externen Fachleuten (siehe Abschnitt 8). [cite: 236, 237] Diese Spezifikation ist zugleich Bauplan und Übergabedokument. [cite: 237]
+
+## 1. Daten-Contract (Sensorik) [cite: 238]
+- **Quelle:** Sensor-Gateway sendet Messwerte als JSON per HTTP `POST /ingest`. [cite: 239]
+- **Abtastrate (Prototyp):** 1 Messung pro Sekunde je Sensor. [cite: 240]
+- **Felder je Nachricht:** [cite: 241]
+  - `machineId` (string) [cite: 242]
+  - `timestamp` (ISO 8601, UTC) [cite: 243]
+  - `vibration` (number, mm/s) [cite: 244]
+  - `temperature` (number, °C) [cite: 245]
+  - `current` (number, A) [cite: 246]
+- **Plausibilitätsgrenzen** — Werte außerhalb gelten als **Sensorfehler**, nicht als Maschinenfehler: [cite: 247]
+  - `temperature`: -20 bis 150 [cite: 248]
+  - `vibration`: 0 bis 50 [cite: 249]
+  - `current`: 0 bis 100 [cite: 250]
+
+## 2. ML-Aufgabe (bewusst einfach gehalten) [cite: 251]
+- **Aufgabentyp:** Anomalie-Erkennung (unüberwacht). [cite: 252] Keine Ausfallvorhersage in Zeiteinheiten — im Prototyp liegen i. d. R. noch keine echten Ausfälle als Trainingslabel vor („Cold-Start-Problem“). [cite: 252, 253, 254]
+- **Vorgehen:** Das Modell lernt das Normalverhalten aus einer störungsfreien Referenzphase und meldet Abweichungen als Anomalie-Score. [cite: 255, 256]
+- **Ausgabe je Maschine, alle 5 Sekunden aktualisiert:** [cite: 257]
+  - `healthScore` (number, 0..1) [cite: 258]
+  - `status` (`"ok"` | `"warnung"` | `"kritisch"`) [cite: 259]
+  - Schwellen (Prototyp, später kalibrierbar): `< 0.4` = ok, `0.4–0.7` = warnung, `> 0.7` = kritisch [cite: 260]
+  - `dataStale` (boolean) — `true`, wenn seit mehr als 30 s keine gültigen Werte kamen [cite: 261]
+
+## 3. Web-Oberfläche (für den Industriemeister) [cite: 262]
+- Eine Seite, Auto-Refresh alle 5 Sekunden. [cite: 263]
+- Zeigt je Maschine: Ampel (grün/gelb/rot), `healthScore`, Zeitpunkt der letzten Messung sowie den Verlauf der letzten 30 Minuten als einfaches Liniendiagramm. [cite: 264, 265]
+- Bei Status `kritisch` oder `dataStale`: deutlich sichtbarer Warnhinweis. [cite: 266]
+- Verständlich ohne Schulung — der Meister muss den Zustand sofort deuten können. [cite: 267]
+
+## 4. Verhalten in Sonderfällen [cite: 268]
+- **Datenlücke / Sensorausfall:** Status nicht auf `ok` setzen; `dataStale = true` und letzten bekannten Wert mit Zeitstempel anzeigen. [cite: 269, 270]
+- **Sensorfehler** (Wert außerhalb der Plausibilitätsgrenzen): Messwert verwerfen, im UI als „Sensor prüfen“ markieren, nicht in den `healthScore` einrechnen. [cite: 271, 272]
+- **Kaltstart** (Modell noch nicht angelernt): Status `"lernt …"` anzeigen, noch keine Warnungen erzeugen. [cite: 273, 274]
+
+## 5. Technische Constraints (prototyp-tauglich) [cite: 275]
+- **Sprache:** Python. [cite: 276]
+- **ML:** scikit-learn, z. B. `IsolationForest` — kein Deep Learning im Prototyp. [cite: 277]
+- **Backend:** FastAPI. **Datenhaltung:** SQLite (eine Datei, kein DB-Server). [cite: 278]
+- **Frontend:** eine einfache HTML-Seite, die das Backend per `fetch` abfragt. [cite: 279]
+- Alles lokal auf einem Rechner lauffähig, keine Cloud-Abhängigkeit. [cite: 280]
+
+## 6. Akzeptanzkriterien (Prototyp gilt als erfolgreich, wenn …) [cite: 281]
+1. Bei eingespielten Normaldaten bleibt der Status stabil auf `ok`. [cite: 282]
+2. Eine künstlich erzeugte Auffälligkeit (z. B. steigende Vibration) hebt den Status innerhalb von 15 s auf `warnung`/`kritisch`. [cite: 283, 284]
+3. Bei abgeschaltetem Sensor zeigt das UI binnen 30 s `dataStale` an. [cite: 285]
+4. Der Industriemeister deutet den angezeigten Zustand ohne Erklärung richtig. [cite: 286]
+
+## 7. Annahmen (explizit, damit sie überprüfbar bleiben) [cite: 287]
+- Genau eine Maschine; Mehrmaschinen-Betrieb erst in der Produktivversion. [cite: 288]
+- Läuft im geschützten internen Netz → keine Authentifizierung/Verschlüsselung im PoC. [cite: 289]
+- Eine ausreichend lange störungsfreie Referenzphase zum Anlernen existiert. [cite: 290]
+- Datenmengen sind klein genug für SQLite und einen einzelnen Prozess. [cite: 291]
+
+## 8. Bewusst NICHT im Prototyp — Übergabe an Fachleute [cite: 292]
+- Skalierung auf viele Maschinen, Hochverfügbarkeit, Zeitreihen-Datenbank. [cite: 293]
+- Echte Restlebensdauer-Vorhersage auf Basis gelabelter Ausfälle. [cite: 294]
+- Authentifizierung, Rollen, Audit, Alarmierung per E-Mail/SMS. [cite: 295]
+- Modell-Monitoring, Drift-Erkennung, regelmäßiges Re-Training. [cite: 296]
+- OT-/Sicherheitsanforderungen (Trennung vom Produktionsnetz, einschlägige Normen). [cite: 297]</code></pre>
+    </div>
+
+    <div class="page" id="page-12">
+        <h2>Vertiefungen & Hintergrundwissen</h2>
+        
+        <table>
+            <tr><th>Vertiefung — Was eine gute KI-/ML-Prototyp-Spec ausmacht [cite: 67]</th></tr>
+            <tr><td><strong>ML-Aufgabe präzise benennen:</strong> Anomalie-Erkennung ist nicht dasselbe wie Ausfallvorhersage. Wer das offenlässt, bekommt vom Agenten womöglich etwas ganz anderes als gemeint. [cite: 67]</td></tr>
+            <tr><td><strong>Cold-Start ehrlich behandeln:</strong> Predictive Maintenance bräuchte eigentlich echte Ausfalldaten zum Lernen, die im Prototyp fast nie vorliegen. Die Spec macht aus dieser Not eine bewusste Entscheidung: unüberwachte Anomalie-Erkennung auf Basis des Normalverhaltens. [cite: 67]</td></tr>
+            <tr><td><strong>Daten-Contract ist das Fundament:</strong> Format, Abtastrate, Einheiten und Plausibilitätsgrenzen. Ein ML-System ist nur so gut wie die Klarheit über seine Eingangsdaten — „garbage in, garbage out“. [cite: 67]</td></tr>
+            <tr><td><strong>Sensorfehler ≠ Maschinenfehler:</strong> Diese Unterscheidung entscheidet, ob das Frühwarnsystem vertrauenswürdig ist. Ein defekter Sensor darf keinen Maschinenalarm auslösen — und umgekehrt. [cite: 67]</td></tr>
+            <tr><td><strong>Verständlichkeit für den Nutzer:</strong> Der Industriemeister ist kein Data Scientist. Eine Ampel, die er ohne Schulung deuten kann, ist mehr wert als ein präziser, aber unverständlicher Score. [cite: 67]</td></tr>
+            <tr><td><strong>Annahmen und Scope explizit machen:</strong> Gerade weil später Fachleute übernehmen, ist die Spec die Übergabestelle. Die Abschnitte „Annahmen“ und „Bewusst NICHT im Prototyp“ verhindern, dass ein Proof of Concept versehentlich für ein fertiges Produkt gehalten wird. [cite: 67]</td></tr>
+        </table>
+
+        <table>
+            <tr><th>Achtung — Grenzen der autonomen Fehlerbehebung [cite: 78]</th></tr>
+            <tr><td>Ein Agent kann Tests auch „grün“ bekommen, indem er Assertions abschwächt oder Sonderfälle umgeht, statt das Problem zu lösen. [cite: 78] Das Review muss daher prüfen, ob die Tests das richtige Verhalten erzwingen — nicht nur, ob sie bestehen. [cite: 78] Begrenzen Sie zudem die Zahl der Selbstkorrektur-Schleifen, um Endlos-Iterationen zu vermeiden. [cite: 78]</td></tr>
+        </table>
+    </div>
+
+    <div class="page" id="page-13">
+        <h2>9. Der SDD-Prozess von der Idee zum fertigen Feature</h2>
+        <p>Der Spec-Driven-Development-Ablauf lässt sich als eine Kette aus fünf Phasen beschreiben, die jeweils ein überprüfbares Zwischenergebnis erzeugen[cite: 101, 102]. Über allen Phasen liegt dabei die übergeordnete Constitution (z. B. die `CLAUDE.md` bzw. `CONVENTIONS.md` im Tutorial)[cite: 103].</p>
+        
+        <p>Aus der ursprünglichen Idee entsteht in der Phase „Spezifizieren" die Datei `spec.md`, die als Source of Truth den verbindlichen Vertrag bildet[cite: 104]. Vor der ersten Zeile Code steht ein menschliches Review, das die Spezifikation auf Architektur- und Logiklücken prüft (Shift-Left)[cite: 105]. Werden Lücken gefunden, fließt die Korrektur direkt zurück in die Spec und nicht erst in eine spätere Phase[cite: 106].</p>
+        
+        <p>Erst nach Freigabe leitet die Phase „Planen" daraus `plan.md` ab (Architektur, Stack, Datenmodell) und die Phase „Zerlegen" erzeugt die `tasks.md` (kleine, einzeln testbare Aufgaben)[cite: 107]. In der Phase „Implementieren" werden zuerst die Tests aus der Spezifikation erzeugt — sie schlagen zunächst fehl — und anschließend so viel Code geschrieben, bis die Tests grün sind[cite: 108]. Schlägt ein Test fehl, geht die Fehlermeldung zurück an den Agenten, der den Code anpasst[cite: 109]. Diese Test-Korrektur-Schleife läuft innerhalb der Implementierung und betrifft nur den Code, nicht die Anforderungen[cite: 110].</p>
+        
+        <p>Die Phase „Verifizieren & Review" prüft danach nicht nur, dass die Tests grün sind, sondern warum[cite: 111]. Hier zeigt sich die zentrale SDD-Regel als wichtige Rückkopplung: Jede neue Regel und jeder gefundene Fehler wird zuerst in `spec.md` aufgenommen — die Abläufe führen deshalb stets zurück zur Phase „Spezifizieren", nie direkt zum Code[cite: 112]. Erst wenn das Feature abgenommen ist, endet der Durchlauf[cite: 113].</p>
+        
+        <p>Zusammenfassend gibt es drei kritische Rückkopplungen im Prozess: erstens das Review vor dem Code, zweitens die Test-Korrektur-Schleife in der Implementierung und drittens die übergeordnete Schleife, die jede Änderung über die Spezifikation führt[cite: 116].</p>
+    </div>
+
+    <div class="page" id="page-14">
+        <h2>Ergänzende Prinzipien & Einstiegshilfen</h2>
+        
+        <table>
+            <tr>
+                <th>“Altes Software-Dev” (Wasserfall) [cite: 143]</th>
+                <th>So ist SDD gemeint (iterativ) [cite: 143]</th>
+            </tr>
+            <tr>
+                <td>Erst das komplette Dokument, dann Code [cite: 143]</td>
+                <td>Dünne Spec, kurzer Durchlauf, dann nachschärfen [cite: 143]</td>
+            </tr>
+            <tr>
+                <td>Die Spec ist fertig und unveränderlich [cite: 143]</td>
+                <td>Die Spec ist ein lebendes Dokument [cite: 143]</td>
+            </tr>
+            <tr>
+                <td>Vollständigkeit vor dem ersten Schritt [cite: 143]</td>
+                <td>Nur so viel wie für den nächsten Schritt nötig [cite: 143]</td>
+            </tr>
+            <tr>
+                <td>Ein großer Wurf [cite: 143]</td>
+                <td>Viele kleine, vollständige Schnitte [cite: 143]</td>
+            </tr>
+        </table>
+
+        <div class="quote-box">
+            <strong>Merksatz:</strong> Just enough spec — so viel Spezifikation, wie für den nächsten kleinen Schritt nötig ist, nicht mehr. [cite: 145] Die Iterationseinheit ist die Spec, nicht der Code. [cite: 147]
+        </div>
+
+        <table>
+            <tr><th>Faustregel für den Einstieg: Stabiles früh, Volatiles spät [cite: 148, 149]</th></tr>
+            <tr><td>Vorab gehört, was billig zu denken und teuer zu ändern ist. Wachsen darf, was man ohnehin erst später genauer weiß. [cite: 149]</td></tr>
+            <tr><td><strong>Früh festlegen:</strong> Der ML-Aufgabentyp (hier Anomalie-Erkennung statt Ausfallvorhersage), der Daten-Contract und ein bis zwei Akzeptanzkriterien. [cite: 149]</td></tr>
+            <tr><td><strong>Später wachsen lassen:</strong> Konkrete Schwellenwerte, Feinheiten und Sonderfälle. [cite: 149]</td></tr>
+        </table>
+
+        <h3>So fängst du konkret an [cite: 150]</h3>
+        <ul>
+            <li>Mit einem Skelett starten: Zweck, Daten-Contract und eine einzige Akzeptanzbedingung genügen. [cite: 151]</li>
+            <li>Den ersten kleinen Schnitt bauen — ein vollständiger, kurzer Durchlauf wie im Tutorial. [cite: 152]</li>
+            <li>Den laufenden Prototyp „fragen“, was als Nächstes in die Spec muss — und die Spec ergänzen. [cite: 153]</li>
+        </ul>
+    </div>
+
+    <div class="page" id="page-15">
+        <h2>Komplettes Beispiel für Projektregeln (CLAUDE.md / CONVENTIONS.md)</h2>
+        <p>Hier ist die vollständige "Constitution" des Projekts zur direkten Verwendung als kopierbare Schnellreferenz[cite: 170, 184]:</p>
+        
+        <pre><code class="language-markdown"># Projektregeln — Predictive-Maintenance-Prototyp [cite: 186]
+> Diese Datei ist das „Grundgesetz“ des Projekts (Constitution). [cite: 187]
+> **Claude Code** liest sie zu Beginn jeder Sitzung automatisch. [cite: 188]
+> Für die **Continue-Extension**: denselben Inhalt als `CONVENTIONS.md` ablegen und im Chat per `@CONVENTIONS.md` anhängen. [cite: 189, 190]
+
+## Worum es geht [cite: 191]
+Prototyp / Proof of Concept für Predictive Maintenance: Sensordaten → Anomalie-Erkennung → Ampel-Status → einfache Web-Oberfläche für den Industriemeister. [cite: 192, 193]
+
+## Wichtigste Regel (Spec-Driven Development) [cite: 194]
+- **`spec.md` ist die Source of Truth.** Verhalten, Constraints und Akzeptanzkriterien stehen dort. [cite: 195]
+- **Neue Anforderungen oder Fehler kommen ZUERST in `spec.md`**, danach in den Code — niemals umgekehrt. Keine stillen Änderungen am Verhalten. [cite: 196, 197]
+
+## Tech-Stack & Constraints (aus spec.md, Abschnitt 5) [cite: 198]
+- Sprache: **Python**. [cite: 199]
+- ML: **scikit-learn** (`IsolationForest`) — **kein** Deep Learning. [cite: 200]
+- Backend: **FastAPI**. Datenhaltung: **SQLite** (eine Datei, kein DB-Server). [cite: 201]
+- Frontend: eine einfache HTML-Seite, die das Backend per `fetch` abfragt. [cite: 202]
+- Lokal lauffähig, keine Cloud-Abhängigkeit. [cite: 203]
+- **Keine zusätzlichen Bibliotheken** einführen, die nicht in `spec.md` genannt sind, ohne vorher zu fragen. [cite: 204]
+
+## Arbeitsweise, die ich erwarte [cite: 205]
+- Bei größeren Schritten zuerst kurz den **Plan** erläutern, dann umsetzen. [cite: 206]
+- **Tests zuerst:** zu den Akzeptanzkriterien (`spec.md`, Abschnitt 6) `pytest`-Tests schreiben, die zunächst fehlschlagen — danach den Code, bis sie grün sind. [cite: 207]
+- In **kleinen, einzeln testbaren Schritten** entlang `tasks.md` arbeiten. [cite: 208]
+- Tests selbst ausführen und das Ergebnis zeigen. Änderungen als nachvollziehbare Diffs halten. [cite: 209]
+
+## Code-Stil [cite: 210]
+- Einfach und gut lesbar; Kommentare auf Deutsch sind willkommen. [cite: 211]
+- Type Hints verwenden; kleine, fokussierte Funktionen und Module. [cite: 212]
+
+## Nicht im Prototyp (siehe spec.md, Abschnitt 8) [cite: 213]
+- Keine Authentifizierung, kein Mehrmaschinen-Betrieb, kein Modell-Monitoring. [cite: 214]
+- Das übernehmen später externe Fachleute. Im Zweifel: lieber einfach halten und in `spec.md` vermerken. [cite: 215]
+
+## Nützliche Befehle [cite: 216]
+# Umgebung aktivieren
+source .venv/bin/activate          # Windows: .venv\Scripts\activate [cite: 218, 219]
+# Server starten
+uvicorn main:app --reload          # http://127.0.0.1:8000 [cite: 220, 221]
+# Tests ausführen
+pytest [cite: 222, 223]
+# Sensor-Simulator (Test ohne echte Hardware)
+python simulate_sensor.py              # Normalbetrieb -> Ampel bleibt grün [cite: 224, 225]
+python simulate_sensor.py --anomalie   # Störung -> Ampel wird gelb/rot [cite: 226, 227]</code></pre>
+    </div>
+
+    <div class="page" id="page-16">
+        <h2>Projektstruktur & Werkzeug-Spickzettel</h2>
+        <p>Hier siehst du, wie die fertige Projektmappe strukturell aufgebaut ist[cite: 298]:</p>
+        
+    <pre><code>pdm-prototyp/
+  spec.md              # Source of Truth [cite: 299]
+  plan.md              # abgeleitetes Artefakt [cite: 299]
+  tasks.md             # abgeleitetes Artefakt [cite: 299]
+  CLAUDE.md            # Projektregeln (bzw. CONVENTIONS.md fuer Continue) [cite: 299]
+  main.py              # FastAPI: /ingest, Status, Web-Seite [cite: 299]
+  model.py             # Anlernen + Anomalie-Score (IsolationForest) [cite: 299]
+  simulate_sensor.py   # Sensor-Simulator (--anomalie) [cite: 299]
+  static/index.html    # Ampel-Oberflaeche (Auto-Refresh) [cite: 299]
+  tests/               # pytest [cite: 299]
+  pdm.db               # SQLite (wird erzeugt) [cite: 299]</code></pre>
+
+        <h3>Spickzettel: Continue vs. Claude Code [cite: 333]</h3>
+        <table>
+            <tr>
+                <th>Aufgabe [cite: 334]</th>
+                <th>Continue (VS Code) [cite: 334]</th>
+                <th>Claude Code [cite: 334]</th>
+            </tr>
+            <tr>
+                <td>Datei als Kontext geben [cite: 334]</td>
+                <td>@dateiname im Chat [cite: 334]</td>
+                <td>@dateiname oder /add [cite: 334]</td>
+            </tr>
+            <tr>
+                <td>Nur lesen / planen (sicher) [cite: 334]</td>
+                <td>Plan-Modus wählen [cite: 334]</td>
+                <td>Plan-Modus (Shift+Tab) [cite: 334]</td>
+            </tr>
+            <tr>
+                <td>Dateien anlegen, Befehle ausführen [cite: 334]</td>
+                <td>Agent-Modus [cite: 334]</td>
+                <td>Standardmodus (fragt nach) [cite: 334]</td>
+            </tr>
+            <tr>
+                <td>Projektregeln dauerhaft [cite: 334]</td>
+                <td>CONVENTIONS.md + @-Verweis [cite: 334]</td>
+                <td>CLAUDE.md im Stammverzeichnis [cite: 334]</td>
+            </tr>
+            <tr>
+                <td>Neue, leere Sitzung [cite: 334]</td>
+                <td>Strg/Cmd + L [cite: 334]</td>
+                <td>/clear [cite: 334]</td>
+            </tr>
+            <tr>
+                <td>Änderungen prüfen [cite: 334]</td>
+                <td>Diff ansehen, dann „Accept“ [cite: 334]</td>
+                <td>In-Editor-Diff, bestätigen [cite: 334]</td>
+            </tr>
+        </table>
+
+        <h3>Quellen & weiterführende Links [cite: 342]</h3>
+        <ul>
+            <li>Claude Code — Dokumentation: <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank">https://docs.claude.com/en/docs/claude-code/overview</a> [cite: 343]</li>
+            <li>Continue — Dokumentation: <a href="https://docs.continue.dev" target="_blank">https://docs.continue.dev</a> [cite: 344]</li>
+            <li>GitHub Spec Kit: <a href="https://github.com/github/spec-kit" target="_blank">https://github.com/github/spec-kit</a> [cite: 345]</li>
+        </ul>
+    </div>
+
+    <div class="controls">
+        <button id="btnPrev" onclick="prevPage()">Zurück</button>
+        <span class="page-indicator" id="pageNum">Seite 1 von 10</span>
+        <button id="btnNext" onclick="nextPage()">Weiter</button>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const pages = document.querySelectorAll('.page');
+        const totalPages = pages.length;
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+        const pageNum = document.getElementById('pageNum');
+
+        function updatePagination() {
+            pages.forEach((page, index) => {
+                if (index + 1 === currentPage) {
+                    page.classList.add('active');
+                } else {
+                    page.classList.remove('active');
+                }
+            });
+            
+            pageNum.innerText = `Seite ${currentPage} von ${totalPages}`;
+            btnPrev.disabled = currentPage === 1;
+            btnNext.disabled = currentPage === totalPages;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                updatePagination();
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                updatePagination();
+            }
+        }
+
+        // Add Copy Buttons to all <pre> blocks
+        document.querySelectorAll('pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'relative';
+            wrapper.style.marginBottom = '20px';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+
+            const btn = document.createElement('button');
+            btn.innerText = 'Kopieren';
+            btn.style.position = 'absolute';
+            btn.style.top = '10px';
+            btn.style.right = '10px';
+            btn.style.padding = '6px 12px';
+            btn.style.cursor = 'pointer';
+            btn.style.backgroundColor = 'var(--primary-color)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '4px';
+            btn.style.fontWeight = 'bold';
+            btn.style.fontSize = '12px';
+            btn.style.transition = 'background-color 0.2s';
+
+            btn.onmouseover = () => btn.style.backgroundColor = '#004494';
+            btn.onmouseout = () => btn.style.backgroundColor = 'var(--primary-color)';
+
+            btn.onclick = () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.innerText = 'Kopiert!';
+                    btn.style.backgroundColor = '#28a745';
+                    setTimeout(() => {
+                        btn.innerText = 'Kopieren';
+                        btn.style.backgroundColor = 'var(--primary-color)';
+                    }, 2000);
+                });
+            };
+            wrapper.appendChild(btn);
+        });
+
+        // Init
+        updatePagination();
+    </script>
+</body>
+</html>
