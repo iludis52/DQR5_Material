@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimierer Wissens-Check – Wohin & Wie weit</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixierte Statusleiste -->
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Optimierer: Wohin &amp; Wie weit</h1>
+
+<!-- Hier werden alle Fragen dynamisch reingeladen -->
+<div class="quiz-container" id="quiz-container"></div>
+
+<!-- Abschlussmeldung -->
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // MODULARITÄT: Hier einfach weitere Objekte hinzufügen, um neue Fragen zu generieren.
+    const questions = [
+        {
+            text: "Adam muss bei jedem Optimierungsschritt zwei Fragen beantworten. Welche?",
+            options: [
+                "Wie viele Daten? und Wie viele Epochen?",
+                "Wohin soll es gehen (Richtung)? und Wie weit (Schrittlänge)?",
+                "Welcher Loss? und Welche Architektur?",
+                "Wann starten? und Wann aufhören?"
+            ],
+            correct: 1,
+            explanation: "Genau. Der Text reduziert alles auf zwei Fragen: das Wohin (die Richtung) und das Wie weit (die Schrittlänge). Die fünf Verfahren unterscheiden sich nur darin, wie geschickt sie diese beiden Fragen beantworten."
+        },
+        {
+            text: "Womit beantwortet SGD beide Fragen – Richtung UND Schrittlänge?",
+            options: [
+                "Mit dem rohen, aktuellen Gradienten.",
+                "Mit einem gleitenden Mittelwert vergangener Gradienten.",
+                "Mit einer pro Parameter angepassten Lernrate.",
+                "Mit einer geglätteten Richtung plus kalibrierter Länge."
+            ],
+            correct: 0,
+            explanation: "Richtig. SGD nutzt ein und dieselbe Information für beides: den rohen aktuellen Gradienten – wie ein Wanderer, der nur schaut, wo es gerade am steilsten bergab geht."
+        },
+        {
+            text: "Welche zwei Schwächen hat SGD?",
+            options: [
+                "Er ist zu langsam und braucht zu viel Speicher.",
+                "Er hat kein Gedächtnis (zappelt in engen Tälern) und seine Schrittlänge hängt blind von der Gradienten-Größe ab.",
+                "Er vergisst zu schnell und überspringt seltene Merkmale.",
+                "Er passt jede Lernrate einzeln an und wird dadurch instabil."
+            ],
+            correct: 1,
+            explanation: "Korrekt. SGD hat kein Gedächtnis und zappelt deshalb in engen Tälern hin und her, und seine Schrittlänge ist ungeregelt – sie hängt blind von der zufälligen Größe des Gradienten ab."
+        },
+        {
+            text: "Welche der beiden Fragen verbessert SGD+Momentum gezielt – und wie?",
+            options: [
+                "Das Wie weit, indem es jedem Parameter eine eigene Lernrate gibt.",
+                "Das Wohin, indem es die letzten Richtungen zu einem stabilen Kurs mittelt.",
+                "Beide gleichzeitig, indem es Richtung und Länge übereinanderlegt.",
+                "Keine – es verändert nur die Anzahl der Schritte."
+            ],
+            correct: 1,
+            explanation: "Genau. Momentum verbessert das Wohin: Statt der zappeligen Momentanrichtung mittelt es die letzten Richtungen – der rollende Medizinball mit Trägheit. Die Schrittlänge bleibt dabei ungeregelt."
+        },
+        {
+            text: "Welche Analogie passt am besten für SGD+Momentum?",
+            options: [
+                "Die automatische Aussteuerung eines Mikrofons.",
+                "Ein guter Autofahrer mit getrennter Lenkung und Gaspedal.",
+                "Ein rollender Medizinball mit Trägheit.",
+                "Ein Wanderer, der nur auf die steilste Richtung schaut."
+            ],
+            correct: 2,
+            explanation: "Richtig. Der Medizinball behält durch seine Trägheit die eingeschlagene Richtung bei und lässt sich von kurzem Hin und Her nicht aus der Bahn werfen – gegenläufige Ausschläge mitteln sich heraus."
+        },
+        {
+            text: "Worum kümmert sich AdaGrad – und wie?",
+            options: [
+                "Um das Wie weit: jeder Parameter bekommt eine eigene, individuell angepasste Lernrate.",
+                "Um das Wohin: die Richtungen werden geglättet.",
+                "Um beide Fragen gleichzeitig wie ein Autofahrer.",
+                "Um die Anzahl der Epochen pro Training."
+            ],
+            correct: 0,
+            explanation: "Korrekt. AdaGrad ist das erste adaptive Verfahren und kümmert sich um die Schrittlänge: Wer schon viele große Gradienten gesehen hat, wird gebremst; wer kaum bewegt wurde, darf große Schritte machen. Stark bei seltenen Merkmalen."
+        },
+        {
+            text: "Was ist der zentrale Haken an AdaGrad?",
+            options: [
+                "Es vergisst zu schnell und wird dadurch instabil.",
+                "Sein Gedächtnis vergisst nie: die aufsummierten Gradienten-Größen wachsen nur, die Schrittweiten schrumpfen Richtung null – das Training kann einschlafen.",
+                "Es behandelt alle Parameter mit derselben festen Lernrate.",
+                "Es kann die Richtung nicht bestimmen."
+            ],
+            correct: 1,
+            explanation: "Genau. AdaGrad summiert alle bisherigen Gradienten-Größen auf. Da diese Summe nur wachsen kann, schrumpfen die Schrittweiten unaufhaltsam – das Training kann einschlafen, bevor es am Ziel ist."
+        },
+        {
+            text: "Wie behebt RMSprop genau diesen Defekt?",
+            options: [
+                "Es summiert noch mehr Gradienten auf, um stabiler zu werden.",
+                "Es führt statt der endlosen Summe einen gleitenden Mittelwert der jüngsten Gradienten-Größen – alte Werte verblassen ('vergessliches Gedächtnis').",
+                "Es schaltet die adaptive Lernrate ganz ab.",
+                "Es mittelt die Richtungen wie Momentum."
+            ],
+            correct: 1,
+            explanation: "Richtig. RMSprop ist im Kern dieselbe Tempo-Anpassung, nutzt aber ein vergessliches Gedächtnis: ein gleitender Mittelwert, bei dem alte Werte verblassen. So passt sich die Schrittlänge ans aktuelle Gelände an und stirbt nicht aus."
+        },
+        {
+            text: "Welche Analogie passt gut für RMSprop?",
+            options: [
+                "Die automatische Aussteuerung eines Mikrofons: laute Signale werden leiser, leise lauter.",
+                "Ein Medizinball mit Trägheit.",
+                "Ein Wanderer auf der steilsten Route.",
+                "Ein Gedächtnis, das niemals vergisst."
+            ],
+            correct: 0,
+            explanation: "Genau. Wie bei der automatischen Mikrofon-Aussteuerung werden laute Signale leiser geregelt und leise lauter, sodass am Ende alles auf einem brauchbaren Pegel ankommt – alle Parameter lernen in vergleichbarem Tempo."
+        },
+        {
+            text: "Wie kombiniert Adam laut Text die Vorgänger – und welches Bild passt dazu?",
+            options: [
+                "Es nutzt den rohen Gradienten für beides, wie ein Wanderer.",
+                "Es nimmt die geglättete Richtung von Momentum und die kalibrierte Schrittlänge von RMSprop – wie ein guter Autofahrer, der Lenkung und Gaspedal getrennt löst.",
+                "Es summiert alle Gradienten endlos auf wie AdaGrad.",
+                "Es regelt nur die Schrittlänge, nicht die Richtung."
+            ],
+            correct: 1,
+            explanation: "Korrekt. Adam trennt 'wohin' und 'wie weit' und legt beides übereinander: Richtung über die geglättete Vergangenheit (Momentum), Länge über die Gradienten-Größe der jüngeren Vergangenheit (RMSprop) – der Autofahrer, der nicht bei jedem Schlagloch am Lenkrad reißt und zugleich das Tempo an die Straße anpasst."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>

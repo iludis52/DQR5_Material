@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimierer Wissens-Check – Prinzipien</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixierte Statusleiste -->
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Optimierer – Prinzipien verstehen</h1>
+
+<!-- Hier werden alle Fragen dynamisch reingeladen -->
+<div class="quiz-container" id="quiz-container"></div>
+
+<!-- Abschlussmeldung -->
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // MODULARITÄT: Hier einfach weitere Objekte hinzufügen, um neue Fragen zu generieren.
+    const questions = [
+        {
+            text: "Was ist die grundlegende Aufgabe eines Optimierers beim Training?",
+            options: [
+                "Er passt die Parameter des Netzes schrittweise so an, dass der Loss kleiner wird.",
+                "Er sammelt die Trainingsdaten ein und sortiert sie nach Wichtigkeit.",
+                "Er legt die Anzahl der Schichten im Netz fest.",
+                "Er übersetzt die Vorhersage des Netzes in eine für Menschen lesbare Form."
+            ],
+            correct: 0,
+            explanation: "Genau. Ein Optimierer steuert, wie das Netz aus seinen Fehlern lernt – er verschiebt die Parameter Schritt für Schritt in die Richtung, die den Loss verringert."
+        },
+        {
+            text: "In welche Richtung bewegt der Optimierer die Parameter?",
+            options: [
+                "In Richtung des Gradienten, also dorthin, wo der Loss steigt.",
+                "Entgegen dem Gradienten, also dorthin, wo der Loss sinkt.",
+                "In eine zufällige Richtung, um nicht stecken zu bleiben.",
+                "Immer in Richtung der größten Gewichte."
+            ],
+            correct: 1,
+            explanation: "Richtig. Der Gradient zeigt bergauf (steigender Loss). Der Optimierer geht in die Gegenrichtung – das ist das Grundprinzip des Gradientenabstiegs."
+        },
+        {
+            text: "Welche Rolle spielt die Lernrate?",
+            options: [
+                "Sie bestimmt, wie viele Daten pro Schritt verarbeitet werden.",
+                "Sie legt fest, wie groß ein einzelner Anpassungsschritt ausfällt.",
+                "Sie misst, wie gut das Modell auf neuen Daten funktioniert.",
+                "Sie gibt an, wie viele Schichten das Netz besitzt."
+            ],
+            correct: 1,
+            explanation: "Korrekt. Die Lernrate ist die Schrittweite: zu groß → das Training springt über das Minimum hinweg, zu klein → die Konvergenz wird extrem langsam."
+        },
+        {
+            text: "Was ist die Grundidee hinter 'Momentum'?",
+            options: [
+                "Jeder Schritt ignoriert die Vergangenheit und startet komplett neu.",
+                "Vergangene Gradienten fließen mit ein – wie ein Ball, der Schwung aufnimmt.",
+                "Die Lernrate wird bei jedem Schritt verdoppelt.",
+                "Die Daten werden vor jedem Schritt neu gemischt."
+            ],
+            correct: 1,
+            explanation: "Genau. Momentum nimmt vergangene Gradienten mit, gibt dem Verlauf 'Schwung' und dämpft so Schwingungen – das beschleunigt die Konvergenz."
+        },
+        {
+            text: "Was bedeutet eine 'adaptive Lernrate'?",
+            options: [
+                "Alle Parameter bekommen immer dieselbe, feste Schrittweite.",
+                "Die Schrittweite wird pro Parameter individuell angepasst.",
+                "Die Lernrate richtet sich nach der Tageszeit des Trainings.",
+                "Die Lernrate wird nur am Ende des Trainings einmal gesetzt."
+            ],
+            correct: 1,
+            explanation: "Richtig. Statt einer Einheitslernrate für alle bekommen die Parameter individuell angepasste Schrittweiten – seltene oder schwache Signale können so größere Schritte machen."
+        },
+        {
+            text: "Adam gilt als besonders beliebt, weil er zwei Grundideen kombiniert. Welche?",
+            options: [
+                "Momentum (Schwung aus vergangenen Gradienten) und adaptive Lernrate pro Parameter.",
+                "Mehr Schichten und mehr Trainingsdaten.",
+                "Eine feste Lernrate und ein festes Abbruchkriterium.",
+                "Datenmischen und Datenbereinigung."
+            ],
+            correct: 0,
+            explanation: "Korrekt. Adam merkt sich sowohl den geglätteten Durchschnitt der Gradienten (Momentum-Idee) als auch deren Schwankung, um die Lernrate pro Parameter anzupassen – beide Stärken in einem."
+        },
+        {
+            text: "Adam merkt sich vereinfacht gesagt zwei Dinge über die Gradienten. Welche?",
+            options: [
+                "Ihren Durchschnitt (Richtung) und ihre Schwankung (Stärke der Streuung).",
+                "Ihre Farbe und ihre Größe.",
+                "Die Anzahl der Parameter und die Anzahl der Epochen.",
+                "Den höchsten und den niedrigsten je gemessenen Loss-Wert."
+            ],
+            correct: 0,
+            explanation: "Genau. Vereinfacht: ein geglätteter Durchschnitt (1. Moment, gibt die Richtung) und ein Maß für die Schwankung (2. Moment, skaliert die Schrittweite pro Parameter)."
+        },
+        {
+            text: "Wozu dient Weight Decay (Gewichtsdekadenz)?",
+            options: [
+                "Es vergrößert die Gewichte gezielt, um schneller zu lernen.",
+                "Es schrumpft die Gewichte leicht Richtung Null und beugt so Überanpassung vor.",
+                "Es löscht zufällig einzelne Datenpunkte aus dem Trainingssatz.",
+                "Es erhöht die Lernrate, wenn der Loss nicht mehr sinkt."
+            ],
+            correct: 1,
+            explanation: "Richtig. Weight Decay zieht die Gewichte bei jedem Schritt ein wenig Richtung Null. Das verhindert extrem große Gewichte und verbessert die Generalisierung."
+        },
+        {
+            text: "Was beschreibt der Begriff 'Konvergenz'?",
+            options: [
+                "Der Loss nähert sich einem stabilen Minimum und die Parameter ändern sich kaum noch.",
+                "Das Netz bekommt zum ersten Mal Daten zu sehen.",
+                "Die Lernrate wird auf null gesetzt.",
+                "Die Anzahl der Parameter wächst während des Trainings."
+            ],
+            correct: 0,
+            explanation: "Korrekt. Konvergenz ist der Zustand, in dem das Training 'ankommt': Der Loss stabilisiert sich nahe einem Minimum und weitere Schritte verändern die Parameter kaum noch."
+        },
+        {
+            text: "Was ist das eigentliche Ziel des Trainings – über die Trainingsdaten hinaus?",
+            options: [
+                "Den Trainings-Loss exakt auf null zu drücken.",
+                "Möglichst viele Parameter zu verwenden.",
+                "Gute Generalisierung – also gute Ergebnisse auf neuen, ungesehenen Daten.",
+                "Das Training so lange wie möglich laufen zu lassen."
+            ],
+            correct: 2,
+            explanation: "Genau. Ein Modell, das nur die Trainingsdaten auswendig kann, ist überangepasst. Ziel ist Generalisierung: gute Leistung auf Daten, die das Modell noch nie gesehen hat."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>
