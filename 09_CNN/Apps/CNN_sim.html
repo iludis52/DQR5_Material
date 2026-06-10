@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN Grayscale Trainer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            min-height: 100%;
+            background: #f0f1f5;
+            overflow: auto;
+        }
+
+        #root {
+            width: 100%;
+            min-height: 100%;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 20px 0;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+        select { outline: none; }
+        select:focus { border-color: #4373cc !important; }
+        button { outline: none; transition: all .12s; }
+        button:hover:not(:disabled) { filter: brightness(0.95); }
+        button:active:not(:disabled) { filter: brightness(0.9); }
+        input[type=range] { height: 4px; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c8ccd8; border-radius: 3px; }
+
+        canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="text/babel" data-type="module">
+        const { useState, useRef, useCallback, useEffect, useMemo } = React;
+        const { downloadFile, exportImageCSV, exportNetwork, importNetwork } = await import('./exchange.js');
+
+        // ═══════════════════════════════════════════════════════════════
+        // THEME
+        // ═══════════════════════════════════════════════════════════════
+        const C = {
+            bg: "#f5f6fa", surface: "#ffffff", surface2: "#f0f1f5",
+            border: "#d8dbe6", borderLight: "#e8eaf0", text: "#1e2230", textDim: "#7a809a",
+            accent: "#4373cc", accent2: "#1a9a6e", danger: "#d94444",
+            orange: "#d48520", purple: "#7c5cbf",
+            font: "'IBM Plex Mono','Fira Code',monospace",
+            fontSans: "'DM Sans',-apple-system,'Segoe UI',sans-serif",
+        };
+        const CC = [[67, 115, 204], [26, 154, 110], [217, 68, 68], [212, 133, 32], [124, 92, 191]];
+        const rgb = c => "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+        const secLabel = { fontSize: 10, fontFamily: C.fontSans, color: C.textDim, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2 };
+
+        // ═══════════════════════════════════════════════════════════════
+        // CNN ENGINE
+        // ═══════════════════════════════════════════════════════════════
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        const Activations = {
+            relu: { f: x => Math.max(0, x), df: x => x > 0 ? 1 : 0 },
+            sigmoid: {
+                f: x => 1 / (1 + Math.exp(-clamp(x, -500, 500))),
+                df: x => { const s = 1 / (1 + Math.exp(-clamp(x, -500, 500))); return s * (1 - s); }
+            },
+            tanh: { f: x => Math.tanh(x), df: x => 1 - Math.tanh(x) ** 2 },
+            softmax: { f: null, df: x => x * (1 - x) }
+        };
+        function softmaxArray(arr) {
+            const mx = Math.max(...arr);
+            const exps = arr.map(v => Math.exp(clamp(v - mx, -500, 500)));
+            const sum = exps.reduce((a, b) => a + b, 0) || 1;
+            return exps.map(v => v / sum);
+        }
+        // Seedable PRNG (mulberry32) so weight-init, split and shuffle are reproducible.
+        function mulberry32(a) {
+            return function () {
+                a |= 0; a = a + 0x6D2B79F5 | 0;
+                let t = Math.imul(a ^ a >>> 15, 1 | a);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+        let _rng = Math.random;
+        const seedRng = (s) => { _rng = mulberry32(s >>> 0); };
+        const unseedRng = () => { _rng = Math.random; };
+        const rand = () => _rng() * 2 - 1;
+
+        function makeDense(prevSize, size, activation) {
+            const scale = activation === 'relu' ? Math.sqrt(2 / prevSize) : Math.sqrt(1 / prevSize);
+            const weights = [], biases = [];
+            for (let j = 0; j < size; j++) {
+                const w = []; for (let k = 0; k < prevSize; k++) w.push(rand() * scale);
+                weights.push(w); biases.push(rand() * 0.01);
+            }
+            return { type: 'dense', weights, biases, activation, size, prevSize };
+        }
+
+        // Build a CNN from an architecture descriptor.
+        // arch = { convLayers:[{kernels,activation,pool}], denseLayers:[{size,activation}] }
+        function buildCNN(arch, imgW, imgH, numClasses) {
+            const net = [];
+            let inC = 1, inH = imgH, inW = imgW;
+            for (const cl of arch.convLayers) {
+                const K = cl.kernels;
+                const fanIn = inC * 9;
+                const scale = cl.activation === 'relu' ? Math.sqrt(2 / fanIn) : Math.sqrt(1 / fanIn);
+                const kernels = [], biases = [];
+                for (let k = 0; k < K; k++) {
+                    const chans = [];
+                    for (let c = 0; c < inC; c++) {
+                        const m = [];
+                        for (let dy = 0; dy < 3; dy++) { const row = []; for (let dx = 0; dx < 3; dx++) row.push(rand() * scale); m.push(row); }
+                        chans.push(m);
+                    }
+                    kernels.push(chans); biases.push(rand() * 0.01);
+                }
+                const cH = inH - 2, cW = inW - 2;
+                let oH = cH, oW = cW;
+                if (cl.pool !== 'none') { oH = Math.floor(cH / 2); oW = Math.floor(cW / 2); }
+                net.push({ type: 'conv', kernels, biases, activation: cl.activation, pool: cl.pool, inC, inH, inW, convH: cH, convW: cW, outC: K, outH: oH, outW: oW });
+                inC = K; inH = oH; inW = oW;
+            }
+            let prev = inC * inH * inW;
+            for (const dl of arch.denseLayers) { net.push(makeDense(prev, dl.size, dl.activation)); prev = dl.size; }
+            const outAct = numClasses > 1 ? 'softmax' : 'sigmoid';
+            net.push(makeDense(prev, numClasses > 1 ? numClasses : 1, outAct));
+            return net;
+        }
+
+        function inputToMaps(flat, W, H) {
+            const m = [];
+            for (let y = 0; y < H; y++) { const row = []; for (let x = 0; x < W; x++) row.push(flat[y * W + x]); m.push(row); }
+            return [m];
+        }
+        function flattenMaps(maps) {
+            const out = [];
+            for (let c = 0; c < maps.length; c++) for (let y = 0; y < maps[c].length; y++) for (let x = 0; x < maps[c][y].length; x++) out.push(maps[c][y][x]);
+            return out;
+        }
+        function unflatten(vec, Cn, H, W) {
+            const m = []; let i = 0;
+            for (let c = 0; c < Cn; c++) { const ch = []; for (let y = 0; y < H; y++) { const row = []; for (let x = 0; x < W; x++) row.push(vec[i++]); ch.push(row); } m.push(ch); }
+            return m;
+        }
+        function conv2dForward(maps, L) {
+            const out = [];
+            for (let k = 0; k < L.outC; k++) {
+                const map = [];
+                for (let y = 0; y < L.convH; y++) {
+                    const row = [];
+                    for (let x = 0; x < L.convW; x++) {
+                        let s = L.biases[k];
+                        for (let c = 0; c < L.inC; c++) for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++)
+                            s += maps[c][y + dy][x + dx] * L.kernels[k][c][dy][dx];
+                        row.push(s);
+                    }
+                    map.push(row);
+                }
+                out.push(map);
+            }
+            return out;
+        }
+        function actMap(map, act) { const f = Activations[act].f; return map.map(ch => ch.map(row => row.map(f))); }
+        function poolForward(map, L) {
+            const out = [], arg = [];
+            for (let c = 0; c < L.outC; c++) {
+                const ch = [], ach = [];
+                for (let py = 0; py < L.outH; py++) {
+                    const row = [], arow = [];
+                    for (let px = 0; px < L.outW; px++) {
+                        if (L.pool === 'max') {
+                            let best = -Infinity, by = 0, bx = 0;
+                            for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+                                const v = map[c][py * 2 + dy][px * 2 + dx];
+                                if (v > best) { best = v; by = py * 2 + dy; bx = px * 2 + dx; }
+                            }
+                            row.push(best); arow.push({ y: by, x: bx });
+                        } else {
+                            let s = 0;
+                            for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) s += map[c][py * 2 + dy][px * 2 + dx];
+                            row.push(s / 4); arow.push(null);
+                        }
+                    }
+                    ch.push(row); ach.push(arow);
+                }
+                out.push(ch); arg.push(ach);
+            }
+            return { out, arg };
+        }
+        function poolBackward(dPooled, arg, L) {
+            const out = [];
+            for (let c = 0; c < L.outC; c++) {
+                const ch = []; for (let y = 0; y < L.convH; y++) { const row = []; for (let x = 0; x < L.convW; x++) row.push(0); ch.push(row); } out.push(ch);
+            }
+            for (let c = 0; c < L.outC; c++) for (let py = 0; py < L.outH; py++) for (let px = 0; px < L.outW; px++) {
+                const d = dPooled[c][py][px];
+                if (L.pool === 'max') { const a = arg[c][py][px]; out[c][a.y][a.x] += d; }
+                else { for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) out[c][py * 2 + dy][px * 2 + dx] += d / 4; }
+            }
+            return out;
+        }
+
+        function forwardCNN(net, inputFlat) {
+            const convLayers = net.filter(l => l.type === 'conv');
+            const denseLayers = net.filter(l => l.type === 'dense');
+            let maps = null, flat, finalShape = null;
+            const convCaches = [], convOutputs = [];
+            if (convLayers.length) {
+                const L0 = convLayers[0];
+                maps = inputToMaps(inputFlat, L0.inW, L0.inH);
+                for (const L of convLayers) {
+                    const convRaw = conv2dForward(maps, L);
+                    const convAct = actMap(convRaw, L.activation);
+                    let pooled, arg;
+                    if (L.pool === 'none') { pooled = convAct; arg = null; }
+                    else { const p = poolForward(convAct, L); pooled = p.out; arg = p.arg; }
+                    convCaches.push({ input: maps, convRaw, arg });
+                    convOutputs.push(pooled);
+                    maps = pooled;
+                }
+                const last = convLayers[convLayers.length - 1];
+                finalShape = { C: last.outC, H: last.outH, W: last.outW };
+                flat = flattenMaps(maps);
+            } else {
+                flat = inputFlat.slice();
+            }
+            const denseLayerOutputs = [flat.slice()];
+            const denseLayerRaws = [null];
+            let cur = flat;
+            for (const L of denseLayers) {
+                const raw = [];
+                for (let j = 0; j < L.size; j++) { let s = L.biases[j]; for (let k = 0; k < L.prevSize; k++) s += L.weights[j][k] * cur[k]; raw.push(s); }
+                denseLayerRaws.push(raw);
+                cur = L.activation === 'softmax' ? softmaxArray(raw) : raw.map(v => Activations[L.activation].f(v));
+                denseLayerOutputs.push(cur.slice());
+            }
+            return { output: cur, convCaches, convOutputs, denseLayerOutputs, denseLayerRaws, finalShape, convLayers, denseLayers };
+        }
+
+        function perSampleLoss(output, tgt, outAct) {
+            let l = 0;
+            if (outAct === 'softmax') { for (let i = 0; i < output.length; i++) l += -tgt[i] * Math.log(output[i] + 1e-12); }
+            else { for (let i = 0; i < output.length; i++) l += (output[i] - tgt[i]) ** 2; }
+            return l;
+        }
+
+        // Accumulate gradients over a batch (no weight update). Returns grads + total loss.
+        function computeGrads(net, data) {
+            const convLayers = net.filter(l => l.type === 'conv');
+            const denseLayers = net.filter(l => l.type === 'dense');
+            const gK = convLayers.map(L => L.kernels.map(k => k.map(c => c.map(r => r.map(() => 0)))));
+            const gKB = convLayers.map(L => L.biases.map(() => 0));
+            const gW = denseLayers.map(L => L.weights.map(w => w.map(() => 0)));
+            const gB = denseLayers.map(L => L.biases.map(() => 0));
+            const outAct = denseLayers[denseLayers.length - 1].activation;
+            let totalLoss = 0;
+
+            for (const s of data) {
+                const fp = forwardCNN(net, s.input);
+                const out = fp.output, tgt = s.output;
+                totalLoss += perSampleLoss(out, tgt, outAct);
+
+                // Dense backward
+                let deltas = new Array(out.length);
+                const outRaw = fp.denseLayerRaws[denseLayers.length];
+                if (outAct === 'softmax') { for (let i = 0; i < out.length; i++) deltas[i] = out[i] - tgt[i]; }
+                else { for (let i = 0; i < out.length; i++) deltas[i] = (out[i] - tgt[i]) * Activations[outAct].df(outRaw[i]); }
+                let dFlat = null;
+                for (let l = denseLayers.length - 1; l >= 0; l--) {
+                    const Ld = denseLayers[l];
+                    const prev = fp.denseLayerOutputs[l];
+                    const nd = new Array(Ld.prevSize).fill(0);
+                    for (let j = 0; j < Ld.size; j++) {
+                        gB[l][j] += deltas[j];
+                        for (let k = 0; k < Ld.prevSize; k++) { gW[l][j][k] += deltas[j] * prev[k]; nd[k] += deltas[j] * Ld.weights[j][k]; }
+                    }
+                    if (l > 0) { const pa = denseLayers[l - 1].activation; const praw = fp.denseLayerRaws[l]; deltas = nd.map((d, i) => d * Activations[pa].df(praw[i])); }
+                    else dFlat = nd;
+                }
+
+                // Conv backward
+                if (convLayers.length) {
+                    let dMaps = unflatten(dFlat, fp.finalShape.C, fp.finalShape.H, fp.finalShape.W);
+                    for (let ci = convLayers.length - 1; ci >= 0; ci--) {
+                        const L = convLayers[ci], cache = fp.convCaches[ci];
+                        const dConvAct = L.pool === 'none' ? dMaps : poolBackward(dMaps, cache.arg, L);
+                        const df = Activations[L.activation].df;
+                        const input = cache.input;
+                        const dInput = input.map(ch => ch.map(row => row.map(() => 0)));
+                        for (let k = 0; k < L.outC; k++) for (let y = 0; y < L.convH; y++) for (let x = 0; x < L.convW; x++) {
+                            const d = dConvAct[k][y][x] * df(cache.convRaw[k][y][x]);
+                            gKB[ci][k] += d;
+                            for (let c = 0; c < L.inC; c++) for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
+                                gK[ci][k][c][dy][dx] += d * input[c][y + dy][x + dx];
+                                dInput[c][y + dy][x + dx] += d * L.kernels[k][c][dy][dx];
+                            }
+                        }
+                        dMaps = dInput;
+                    }
+                }
+            }
+            return { gK, gKB, gW, gB, loss: totalLoss, convLayers, denseLayers };
+        }
+
+        function trainStepCNN(net, data, lr) {
+            const { gK, gKB, gW, gB, loss, convLayers, denseLayers } = computeGrads(net, data);
+            const n = data.length || 1;
+            for (let ci = 0; ci < convLayers.length; ci++) {
+                const L = convLayers[ci];
+                for (let k = 0; k < L.outC; k++) {
+                    L.biases[k] -= lr * gKB[ci][k] / n;
+                    for (let c = 0; c < L.inC; c++) for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++)
+                        L.kernels[k][c][dy][dx] -= lr * gK[ci][k][c][dy][dx] / n;
+                }
+            }
+            for (let l = 0; l < denseLayers.length; l++) {
+                const L = denseLayers[l];
+                for (let j = 0; j < L.size; j++) {
+                    L.biases[j] -= lr * gB[l][j] / n;
+                    for (let k = 0; k < L.prevSize; k++) L.weights[j][k] -= lr * gW[l][j][k] / n;
+                }
+            }
+            return loss / n;
+        }
+
+        function computeLoss(net, data) {
+            if (!net || !data.length) return 0;
+            const outAct = net[net.length - 1].activation;
+            let l = 0;
+            for (const s of data) { const { output } = forwardCNN(net, s.input); l += perSampleLoss(output, s.output, outAct); }
+            return l / data.length;
+        }
+        function computeLossAndAcc(net, data) {
+            if (!net || !data.length) return { loss: 0, acc: 0 };
+            const outAct = net[net.length - 1].activation;
+            let l = 0, correct = 0;
+            for (const s of data) {
+                const { output } = forwardCNN(net, s.input);
+                l += perSampleLoss(output, s.output, outAct);
+                if (output.indexOf(Math.max(...output)) === s.output.indexOf(Math.max(...s.output))) correct++;
+            }
+            return { loss: l / data.length, acc: correct / data.length * 100 };
+        }
+
+        // Finite-difference gradient check (called automatically when ?debug=true).
+        function verifyGradients(net, sample, epsilon = 1e-5) {
+            const { gK, gKB, gW, gB, convLayers, denseLayers } = computeGrads(net, [sample]);
+            const outAct = denseLayers[denseLayers.length - 1].activation;
+            const lossAt = () => { const { output } = forwardCNN(net, sample.input); return perSampleLoss(output, sample.output, outAct); };
+            let maxRel = 0, checked = 0;
+            const check = (getSet, analytic) => {
+                const orig = getSet();
+                getSet(orig + epsilon); const lp = lossAt();
+                getSet(orig - epsilon); const lm = lossAt();
+                getSet(orig);
+                const numeric = (lp - lm) / (2 * epsilon);
+                const denom = Math.max(1e-8, Math.abs(numeric) + Math.abs(analytic));
+                const rel = Math.abs(numeric - analytic) / denom;
+                maxRel = Math.max(maxRel, rel); checked++;
+            };
+            convLayers.forEach((L, ci) => {
+                for (let k = 0; k < L.outC; k++) {
+                    check(v => { if (v !== undefined) L.biases[k] = v; return L.biases[k]; }, gKB[ci][k]);
+                    for (let c = 0; c < L.inC; c++) for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++)
+                        check(v => { if (v !== undefined) L.kernels[k][c][dy][dx] = v; return L.kernels[k][c][dy][dx]; }, gK[ci][k][c][dy][dx]);
+                }
+            });
+            denseLayers.forEach((L, l) => {
+                for (let j = 0; j < L.size; j++) {
+                    check(v => { if (v !== undefined) L.biases[j] = v; return L.biases[j]; }, gB[l][j]);
+                    for (let k = 0; k < L.prevSize; k++)
+                        check(v => { if (v !== undefined) L.weights[j][k] = v; return L.weights[j][k]; }, gW[l][j][k]);
+                }
+            });
+            const pass = maxRel < 1e-3;
+            console.log('%c[verifyGradients] max relative error = ' + maxRel.toExponential(3) + ' over ' + checked + ' params → ' + (pass ? 'PASS' : 'FAIL'),
+                'color:' + (pass ? '#1a9a6e' : '#d94444') + ';font-weight:bold');
+            return { maxRel, pass, checked };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // DIMENSIONS
+        // ═══════════════════════════════════════════════════════════════
+        function computeDims(arch, imgW, imgH, numClasses) {
+            const stages = [{ label: 'Input', dims: imgW + ' × ' + imgH + ' × 1', color: C.accent, kind: 'input' }];
+            let inC = 1, inH = imgH, inW = imgW, valid = true, error = null;
+            arch.convLayers.forEach((cl, i) => {
+                const cH = inH - 2, cW = inW - 2;
+                if (cH < 1 || cW < 1) { valid = false; if (!error) error = 'Layer output too small — reduce Conv layers or increase image size'; }
+                stages.push({ label: 'Conv' + (i + 1) + ' (' + cl.kernels + 'k)', dims: valid ? cW + ' × ' + cH + ' × ' + cl.kernels : '—', color: C.orange, kind: 'conv', act: cl.activation, convIndex: i });
+                inC = cl.kernels; inH = Math.max(cH, 0); inW = Math.max(cW, 0);
+                if (cl.pool !== 'none') {
+                    const pH = Math.floor(inH / 2), pW = Math.floor(inW / 2);
+                    if (valid && (pH < 1 || pW < 1)) { valid = false; if (!error) error = 'Pool output too small — feature map below 2×2'; }
+                    stages.push({ label: 'Pool' + (i + 1), dims: valid ? pW + ' × ' + pH + ' × ' + inC : '—', color: C.purple, kind: 'pool', pool: cl.pool });
+                    inH = pH; inW = pW;
+                }
+            });
+            const flatSize = valid ? inC * inH * inW : 0;
+            stages.push({ label: 'Flatten', dims: '' + flatSize, color: C.textDim, kind: 'flatten' });
+            arch.denseLayers.forEach((dl, i) => stages.push({ label: 'Dense' + (i + 1), dims: '' + dl.size, color: C.accent, kind: 'dense', act: dl.activation }));
+            stages.push({ label: 'Output', dims: '' + (numClasses > 1 ? numClasses : 1), color: C.accent2, kind: 'output', act: numClasses > 1 ? 'softmax' : 'sigmoid' });
+            return { stages, valid, error, flatSize };
+        }
+
+        function defaultArch(imgW, imgH, numClasses) {
+            const pixelCount = imgW * imgH;
+            const kernels = Math.min(8, Math.max(4, Math.floor(pixelCount / 200)));
+            const convLayers = [{ kernels, activation: 'relu', pool: 'max' }];
+            // flattened size after 1 conv + pool
+            const cH = imgH - 2, cW = imgW - 2;
+            const pH = Math.floor(cH / 2), pW = Math.floor(cW / 2);
+            const flat1 = kernels * Math.max(pH, 0) * Math.max(pW, 0);
+            const denseLayers = [{ size: Math.min(16, Math.max(1, Math.floor(flat1 / 4))), activation: 'relu' }];
+            if (flat1 >= 50 && pH - 2 >= 1 && pW - 2 >= 1) {
+                convLayers.push({ kernels, activation: 'relu', pool: 'max' });
+                denseLayers.push({ size: Math.min(16, Math.max(1, Math.floor(flat1 / 8))), activation: 'relu' });
+            }
+            return { convLayers, denseLayers };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // DATA PIPELINE
+        // ═══════════════════════════════════════════════════════════════
+        function parseImageCSV(text) {
+            const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+            if (!lines.length) throw new Error('Empty CSV / 0 valid rows');
+            const head = lines[0];
+            const sep = head.includes(';') ? ';' : (head.includes('\t') ? '\t' : ',');
+            let rows = lines.map(l => l.split(sep).map(s => s.trim().replace(/^"|"$/g, '')));
+            const first = rows[0];
+            const headerLike = first.slice(0, -1).some(c => c === '' || isNaN(parseFloat(c)));
+            if (headerLike) rows = rows.slice(1);
+            rows = rows.filter(r => r.length > 1 && r.some(c => c !== ''));
+            if (!rows.length) throw new Error('Empty CSV / 0 valid rows');
+            const pixelCount = rows[0].length - 1;
+            const pixels = rows.map(r => r.slice(0, -1).map(v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; }));
+            const labels = rows.map(r => r[r.length - 1]);
+            return { pixels, labels, pixelCount };
+        }
+
+        function autoDetectWidth(pixelCount) {
+            const root = Math.round(Math.sqrt(pixelCount));
+            if (root * root === pixelCount && root <= 28) return root;
+            // search nearest divisor giving height ≤ 28
+            for (let d = 0; d < 28; d++) {
+                for (const w of [root - d, root + d]) {
+                    if (w >= 1 && w <= 28 && pixelCount % w === 0 && pixelCount / w <= 28) return w;
+                }
+            }
+            return 0;
+        }
+        function hasValidDims(pixelCount) {
+            for (let w = 1; w <= 28; w++) if (pixelCount % w === 0 && pixelCount / w <= 28) return true;
+            return false;
+        }
+
+        function shuffleInPlace(arr, rng = Math.random) {
+            for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+            return arr;
+        }
+
+        // Build dataset from parsed pixels/labels + chosen width. Throws on validation failure.
+        function buildDataset(pixels, labels, pixelCount, width, warn) {
+            const height = Math.floor(pixelCount / width);
+            if (pixelCount !== width * height) throw new Error('Expected ' + width + '×' + height + ' = ' + (width * height) + ' pixels, got ' + pixelCount + ' columns');
+            if (width > 28 || height > 28) throw new Error('Image dimensions ' + width + '×' + height + ' exceed maximum 28×28');
+
+            const classNames = [...new Set(labels)];
+            if (classNames.length < 1) throw new Error('Empty CSV / 0 valid rows');
+            if (classNames.length > 5) throw new Error('Too many classes (' + classNames.length + '). Maximum is 5.');
+
+            let rowsP = pixels, rowsL = labels;
+            if (rowsP.length > 2000) { if (warn) warn('Dataset truncated to 2000 rows.'); rowsP = rowsP.slice(0, 2000); rowsL = rowsL.slice(0, 2000); }
+
+            // global min-max normalization
+            let mn = Infinity, mx = -Infinity;
+            for (const r of rowsP) for (const v of r) { if (v < mn) mn = v; if (v > mx) mx = v; }
+            const range = (mx - mn) || 1;
+
+            const samples = rowsP.map((r, i) => {
+                const input = r.map(v => (v - mn) / range);
+                const ci = classNames.indexOf(rowsL[i]);
+                const output = classNames.map((_, j) => j === ci ? 1 : 0);
+                return { input, output };
+            });
+            if (classNames.length === 1 && warn) warn('Only 1 class detected — training will not converge');
+
+            const inputNames = []; for (let i = 0; i < pixelCount; i++) inputNames.push('pixel_' + i);
+            return { samples, width, height, outputNames: classNames, inputNames };
+        }
+
+        function splitData(samples, rng = Math.random) {
+            const sh = shuffleInPlace(samples.slice(), rng);
+            const n = sh.length;
+            const nTrain = Math.max(1, Math.round(n * 0.6));
+            const nVal = Math.round(n * 0.2);
+            return { train: sh.slice(0, nTrain), val: sh.slice(nTrain, nTrain + nVal), test: sh.slice(nTrain + nVal) };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PRESETS
+        // ═══════════════════════════════════════════════════════════════
+        function gaussNoise(sigma) {
+            let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random();
+            return sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        }
+        function makePatterns() {
+            const W = 8, H = 8, perClass = 40, classes = ['horiz', 'vert', 'diag', 'circle'];
+            const samples = [];
+            const ri = n => Math.floor(Math.random() * n);
+            for (let ci = 0; ci < classes.length; ci++) {
+                for (let n = 0; n < perClass; n++) {
+                    const px = new Array(W * H).fill(0);
+                    if (ci === 0) { // horizontal lines
+                        const nl = 2 + ri(2);
+                        const used = new Set(); while (used.size < nl) used.add(ri(H));
+                        used.forEach(y => { for (let x = 0; x < W; x++) px[y * W + x] = 1; });
+                    } else if (ci === 1) { // vertical lines
+                        const nl = 2 + ri(2);
+                        const used = new Set(); while (used.size < nl) used.add(ri(W));
+                        used.forEach(x => { for (let y = 0; y < H; y++) px[y * W + x] = 1; });
+                    } else if (ci === 2) { // diagonal stripes
+                        const phase = ri(3);
+                        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x + y + phase) % 3 === 0) px[y * W + x] = 1;
+                    } else { // circle / ring
+                        const cx = 3.5 + (Math.random() - 0.5), cy = 3.5 + (Math.random() - 0.5), r = 2.3 + Math.random() * 0.5;
+                        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                            const d = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+                            if (Math.abs(d - r) < 0.85) px[y * W + x] = 1;
+                        }
+                    }
+                    for (let i = 0; i < px.length; i++) px[i] = clamp(px[i] + gaussNoise(0.08), 0, 1);
+                    const output = [0, 0, 0, 0]; output[ci] = 1;
+                    samples.push({ input: px, output });
+                }
+            }
+            const inputNames = []; for (let i = 0; i < W * H; i++) inputNames.push('pixel_' + i);
+            return { samples, width: W, height: H, outputNames: classes, inputNames };
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SHARED UI
+        // ═══════════════════════════════════════════════════════════════
+        function Pill({ label, value, color }) {
+            return (<div style={{ background: C.surface, padding: "3px 10px", borderRadius: 5, border: "1px solid " + C.border, display: "flex", gap: 5, alignItems: "center" }}>
+                <span style={{ color: C.textDim, fontSize: 10, fontFamily: C.font }}>{label}</span>
+                <span style={{ color, fontWeight: 700, fontSize: 12, fontFamily: C.font }}>{value}</span>
+            </div>);
+        }
+        const ACTS = ["relu", "sigmoid", "tanh"];
+        const mb = { background: C.surface2, border: "1px solid " + C.border, color: C.text, width: 22, height: 22, borderRadius: 3, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 };
+        const ddStyle = { background: C.surface, border: "1px solid " + C.border, color: C.text, padding: "2px 6px", borderRadius: 4, fontSize: 10, fontFamily: C.font, cursor: "pointer" };
+
+        // Draw a grayscale bitmap onto a canvas (values 0..1).
+        function drawBitmap(canvas, flat, W, H) {
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const img = ctx.createImageData(W, H);
+            for (let i = 0; i < W * H; i++) {
+                const v = Math.round(clamp(flat[i], 0, 1) * 255);
+                img.data[i * 4] = v; img.data[i * 4 + 1] = v; img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+            }
+            canvas.width = W; canvas.height = H;
+            ctx.putImageData(img, 0, 0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SAMPLE GALLERY
+        // ═══════════════════════════════════════════════════════════════
+        const SPLIT_COLOR = { train: C.accent, val: C.accent2, test: C.danger };
+        function Thumb({ sample, W, H, outputNames, selected, split, onClick }) {
+            const ref = useRef(null);
+            useEffect(() => { drawBitmap(ref.current, sample.input, W, H); }, [sample, W, H]);
+            const ci = sample.output.indexOf(Math.max(...sample.output));
+            const col = CC[ci % CC.length];
+            const border = SPLIT_COLOR[split] || C.border;
+            return (
+                <div onClick={onClick} title={outputNames[ci] + " · " + (split || "")} style={{
+                    cursor: "pointer", padding: 3, borderRadius: 6,
+                    border: "2px solid " + (selected ? rgb(col) : "transparent"),
+                    background: selected ? rgb(col) + "14" : "transparent", display: "flex", flexDirection: "column", alignItems: "center", gap: 2
+                }}>
+                    <canvas ref={ref} className="pixelated" width={W} height={H} style={{ width: 40, height: 40 * H / W, display: "block", borderRadius: 3, border: "1px solid " + border }} />
+                    <span style={{ fontSize: 8, fontFamily: C.font, fontWeight: 700, color: rgb(col), maxWidth: 46, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outputNames[ci]}</span>
+                </div>
+            );
+        }
+
+        function SplitLegend({ splits }) {
+            const item = (label, n, color) => (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, border: "1.5px solid " + color, display: "inline-block" }} />
+                    <span style={{ fontSize: 9, fontFamily: C.font, color: C.textDim }}>{label} {n}</span>
+                </span>
+            );
+            return (
+                <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                    {item("Train", splits.train, C.accent)}
+                    {item("Val", splits.val, C.accent2)}
+                    {item("Test", splits.test, C.danger)}
+                </div>
+            );
+        }
+
+        function SampleGallery({ data, width, height, outputNames, splits, splitTag, selected, onSelect }) {
+            if (!data || !data.length) {
+                return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: C.textDim, fontFamily: C.fontSans, fontSize: 13, textAlign: "center", padding: 20 }}>Import a CSV dataset to begin</div>;
+            }
+            return (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                    <div style={{ marginBottom: 6, flexShrink: 0 }}>
+                        <span style={secLabel}>Dataset · {data.length} rows</span>
+                        <SplitLegend splits={splits} />
+                    </div>
+                    <div style={{ flex: 1, overflow: "auto", borderRadius: 6, border: "1px solid " + C.border, background: C.surface, minHeight: 0, padding: 6, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))", gap: 4, alignContent: "start" }}>
+                        {data.map((s, i) => (
+                            <Thumb key={i} sample={s} W={width} H={height} outputNames={outputNames} selected={selected === i} split={splitTag.get(s)} onClick={() => onSelect(i)} />
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CNN CONFIG
+        // ═══════════════════════════════════════════════════════════════
+        function ConfRow({ children }) {
+            return <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>{children}</div>;
+        }
+        function Stepper({ value, onChange, min, max }) {
+            return (
+                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <button onClick={() => onChange(Math.max(min, value - 1))} style={mb}>−</button>
+                    <span style={{ color: C.text, fontSize: 13, fontWeight: 700, fontFamily: C.font, minWidth: 18, textAlign: "center" }}>{value}</span>
+                    <button onClick={() => onChange(Math.min(max, value + 1))} style={mb}>+</button>
+                </div>
+            );
+        }
+        function CNNConfig({ arch, imgW, imgH, numClasses, dimInfo, onArchChange, onPoolChange }) {
+            const stages = dimInfo.stages;
+            const stageByConv = {}; const stagePool = {};
+            stages.forEach(s => { if (s.kind === 'conv') stageByConv[s.convIndex] = s.dims; });
+            // map pool dims per conv index by walking
+            let pi = -1;
+            stages.forEach(s => { if (s.kind === 'conv') pi = s.convIndex; if (s.kind === 'pool') stagePool[pi] = s.dims; });
+            const flatStage = stages.find(s => s.kind === 'flatten');
+
+            const updConv = (i, patch) => {
+                const convLayers = arch.convLayers.map((c, j) => j === i ? { ...c, ...patch } : { ...c });
+                onArchChange({ ...arch, convLayers });
+            };
+            const updDense = (i, patch) => {
+                const denseLayers = arch.denseLayers.map((d, j) => j === i ? { ...d, ...patch } : { ...d });
+                onArchChange({ ...arch, denseLayers });
+            };
+            const addConv = () => onArchChange({ ...arch, convLayers: [...arch.convLayers.map(c => ({ ...c })), { kernels: 4, activation: 'relu', pool: 'max' }] });
+            const rmConv = (i) => onArchChange({ ...arch, convLayers: arch.convLayers.filter((_, j) => j !== i).map(c => ({ ...c })) });
+            const addDense = () => onArchChange({ ...arch, denseLayers: [...arch.denseLayers.map(d => ({ ...d })), { size: 8, activation: 'relu' }] });
+            const rmDense = (i) => onArchChange({ ...arch, denseLayers: arch.denseLayers.filter((_, j) => j !== i).map(d => ({ ...d })) });
+
+            const blk = { padding: "6px 8px", background: C.surface, borderRadius: 6, border: "1px solid " + C.border, display: "flex", flexDirection: "column", gap: 5 };
+            const tag = (color) => ({ fontSize: 9, fontWeight: 800, fontFamily: C.font, color, letterSpacing: .4 });
+            const dimTxt = { fontSize: 11, fontFamily: C.font, fontWeight: 700, color: C.text };
+
+            return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={secLabel}>Architecture</span>
+                    {!dimInfo.valid && (
+                        <div style={{ background: C.danger + "14", border: "1px solid " + C.danger + "55", color: C.danger, fontSize: 10, fontFamily: C.font, padding: "6px 8px", borderRadius: 6, fontWeight: 600 }}>{dimInfo.error}</div>
+                    )}
+                    <div style={{ ...blk, background: C.surface2 }}>
+                        <ConfRow><span style={tag(C.accent)}>INPUT</span><span style={{ ...dimTxt, marginLeft: "auto" }}>{imgW} × {imgH} × 1</span></ConfRow>
+                    </div>
+
+                    {arch.convLayers.map((cl, i) => (
+                        <div key={"c" + i} style={{ ...blk, borderColor: C.orange + "55" }}>
+                            <ConfRow>
+                                <span style={tag(C.orange)}>CONV {i + 1}</span>
+                                <button onClick={() => rmConv(i)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.danger + "99", cursor: "pointer", fontSize: 15, lineHeight: 1 }}>×</button>
+                            </ConfRow>
+                            <ConfRow>
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: C.font }}>Kernels</span>
+                                <Stepper value={cl.kernels} min={1} max={8} onChange={v => updConv(i, { kernels: v })} />
+                                <select value={cl.activation} onChange={e => updConv(i, { activation: e.target.value })} style={{ ...ddStyle, marginLeft: "auto" }}>
+                                    {ACTS.map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                            </ConfRow>
+                            <ConfRow>
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: C.font }}>Pool</span>
+                                <select value={cl.pool} onChange={e => onPoolChange(i, e.target.value)} style={ddStyle}>
+                                    <option value="none">none</option><option value="max">max</option><option value="avg">avg</option>
+                                </select>
+                                <span style={{ ...dimTxt, marginLeft: "auto", color: C.orange }}>{cl.pool === 'none' ? stageByConv[i] : stagePool[i]}</span>
+                            </ConfRow>
+                        </div>
+                    ))}
+                    {arch.convLayers.length < 2 && (
+                        <button onClick={addConv} style={{ background: C.orange + "14", border: "1px solid " + C.orange + "55", color: C.orange, padding: "4px 8px", borderRadius: 5, fontSize: 10, cursor: "pointer", fontFamily: C.font, fontWeight: 700 }}>+ Conv Layer</button>
+                    )}
+
+                    <div style={{ ...blk, background: C.surface2 }}>
+                        <ConfRow><span style={tag(C.textDim)}>FLATTEN</span><span style={{ ...dimTxt, marginLeft: "auto" }}>{flatStage ? flatStage.dims : "—"}</span></ConfRow>
+                    </div>
+
+                    {arch.denseLayers.map((dl, i) => (
+                        <div key={"d" + i} style={{ ...blk, borderColor: C.accent + "55" }}>
+                            <ConfRow>
+                                <span style={tag(C.accent)}>DENSE {i + 1}</span>
+                                <button onClick={() => rmDense(i)} style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.danger + "99", cursor: "pointer", fontSize: 15, lineHeight: 1 }}>×</button>
+                            </ConfRow>
+                            <ConfRow>
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: C.font }}>Neurons</span>
+                                <Stepper value={dl.size} min={1} max={16} onChange={v => updDense(i, { size: v })} />
+                                <select value={dl.activation} onChange={e => updDense(i, { activation: e.target.value })} style={{ ...ddStyle, marginLeft: "auto" }}>
+                                    {ACTS.map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                            </ConfRow>
+                        </div>
+                    ))}
+                    {arch.denseLayers.length < 2 && (
+                        <button onClick={addDense} style={{ background: C.accent + "14", border: "1px solid " + C.accent + "55", color: C.accent, padding: "4px 8px", borderRadius: 5, fontSize: 10, cursor: "pointer", fontFamily: C.font, fontWeight: 700 }}>+ Dense Layer</button>
+                    )}
+
+                    <div style={{ ...blk, background: C.accent2 + "10", borderColor: C.accent2 + "55" }}>
+                        <ConfRow><span style={tag(C.accent2)}>OUTPUT</span><span style={{ ...dimTxt, marginLeft: "auto", color: C.accent2 }}>{numClasses > 1 ? numClasses : 1} · {numClasses > 1 ? 'softmax' : 'sigmoid'}</span></ConfRow>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ARCHITECTURE DIAGRAM
+        // ═══════════════════════════════════════════════════════════════
+        function ArchitectureDiagram({ dimInfo, onHoverConv }) {
+            return (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                    <span style={{ ...secLabel, marginBottom: 6, flexShrink: 0 }}>Network Diagram</span>
+                    <div style={{ flex: 1, overflow: "auto", borderRadius: 6, border: "1px solid " + C.border, background: C.surface, minHeight: 0, padding: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                        {dimInfo.stages.map((s, i) => (
+                            <React.Fragment key={i}>
+                                <div
+                                    onMouseEnter={() => s.kind === 'conv' && onHoverConv && onHoverConv(s.convIndex)}
+                                    onMouseLeave={() => s.kind === 'conv' && onHoverConv && onHoverConv(null)}
+                                    style={{
+                                        minWidth: 120, padding: "6px 12px", borderRadius: 8, textAlign: "center",
+                                        background: s.color + "18", border: "1.5px solid " + s.color + "88",
+                                        cursor: s.kind === 'conv' ? 'pointer' : 'default'
+                                    }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: C.font, color: C.text }}>{s.dims}</div>
+                                    <div style={{ fontSize: 9, fontFamily: C.font, color: s.color, fontWeight: 700 }}>{s.label}{s.act ? ' · ' + s.act : ''}{s.pool ? ' · ' + s.pool : ''}</div>
+                                </div>
+                                {i < dimInfo.stages.length - 1 && <div style={{ color: C.textDim, fontSize: 12, lineHeight: 1, margin: "1px 0" }}>▼</div>}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TRAINING CONFIG (batch / shuffle / seed)
+        // ═══════════════════════════════════════════════════════════════
+        function TrainingConfig({ trainSize, batchSize, onBatch, shuffle, onShuffle, seed, onSeed }) {
+            const inp = { width: "100%", padding: "4px 6px", border: "1px solid " + C.border, borderRadius: 5, fontFamily: C.font, fontSize: 12, color: C.text };
+            const eff = Math.min(Math.max(1, batchSize), Math.max(1, trainSize));
+            const nBatches = trainSize ? Math.ceil(trainSize / eff) : 0;
+            const row = { display: "flex", flexDirection: "column", gap: 4, padding: "6px 8px", background: C.surface, borderRadius: 6, border: "1px solid " + C.border };
+            const lbl = { fontSize: 10, color: C.textDim, fontFamily: C.font, fontWeight: 600 };
+            const sub = { fontSize: 9, color: C.textDim, fontFamily: C.font };
+            return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={secLabel}>Training</span>
+                    <div style={row}>
+                        <span style={lbl}>Batch size</span>
+                        <input type="number" min={1} max={Math.max(1, trainSize)} value={batchSize} onChange={e => onBatch(Math.max(1, parseInt(e.target.value) || 1))} style={inp} />
+                        <span style={sub}>{nBatches} batch{nBatches !== 1 ? "es" : ""} / epoch · {trainSize} train</span>
+                    </div>
+                    <div style={{ ...row, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={lbl}>Shuffle</span>
+                        <button onClick={() => onShuffle(!shuffle)} style={{ width: 44, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: shuffle ? C.accent2 : C.border, position: "relative", transition: "all .15s", flexShrink: 0 }}>
+                            <span style={{ position: "absolute", top: 2, left: shuffle ? 24 : 2, width: 18, height: 18, borderRadius: 9, background: "#fff", transition: "all .15s" }} />
+                        </button>
+                    </div>
+                    <div style={row}>
+                        <span style={lbl}>Random seed</span>
+                        <input type="number" value={seed} onChange={e => onSeed(parseInt(e.target.value) || 0)} style={inp} />
+                        <span style={sub}>controls split · init · shuffle</span>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // FEATURE MAPS (activations of the selected sample)
+        // ═══════════════════════════════════════════════════════════════
+        function FeatureMap({ map, size = 32 }) {
+            const ref = useRef(null);
+            useEffect(() => {
+                const H = map.length, W = map[0].length;
+                let mn = Infinity, mx = -Infinity;
+                for (const r of map) for (const v of r) { if (v < mn) mn = v; if (v > mx) mx = v; }
+                const rng = (mx - mn) || 1; const flat = [];
+                for (const r of map) for (const v of r) flat.push((v - mn) / rng);
+                drawBitmap(ref.current, flat, W, H);
+            }, [map]);
+            const H = map.length, W = map[0].length;
+            return <canvas ref={ref} className="pixelated" width={W} height={H} style={{ width: size, height: size * H / W, border: "1px solid " + C.border, borderRadius: 3 }} />;
+        }
+        // Build the per-conv-layer activation groups for a sample, given a forward pass.
+        function featureGroups(fp) {
+            if (!fp) return [];
+            return fp.convLayers.map((L, i) => ({ label: "Conv" + (i + 1) + " (" + L.outC + ")", color: C.orange, maps: fp.convOutputs[i] }));
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // KERNEL VISUALIZATION
+        // ═══════════════════════════════════════════════════════════════
+        function interpolateColor(a, b, t) {
+            const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
+            const pb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
+            const r = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
+            return "rgb(" + r[0] + "," + r[1] + "," + r[2] + ")";
+        }
+        function kernelColor(w, absMax) {
+            const norm = absMax === 0 ? 0 : w / absMax;
+            if (norm < 0) return interpolateColor('#ffffff', '#4373cc', -norm);
+            return interpolateColor('#ffffff', '#d94444', norm);
+        }
+        function KernelVisualization({ networkRef, renderTick, highlightConv }) {
+            const canvasRef = useRef(null);
+            const [tip, setTip] = useState(null);
+            const layoutRef = useRef([]);
+            const TILE = 32, GAP = 4, PAD = 6;
+
+            useEffect(() => {
+                const canvas = canvasRef.current, net = networkRef.current;
+                if (!canvas || !net) return;
+                const convLayers = net.filter(l => l.type === 'conv');
+                const ctx = canvas.getContext('2d');
+                const layout = [];
+                // compute size
+                let maxRow = 0, rows = 0;
+                convLayers.forEach(L => { maxRow = Math.max(maxRow, L.outC * L.inC); rows += 1; });
+                const width = Math.max(180, PAD * 2 + (maxRow) * (TILE + GAP));
+                const rowH = TILE + GAP + 16;
+                const height = Math.max(60, PAD + convLayers.length * rowH + 4);
+                canvas.width = width; canvas.height = height;
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = C.surface; ctx.fillRect(0, 0, width, height);
+
+                let y = PAD + 14;
+                convLayers.forEach((L, li) => {
+                    ctx.fillStyle = (highlightConv === li) ? C.orange : C.textDim;
+                    ctx.font = "700 10px " + C.font;
+                    ctx.fillText("Conv" + (li + 1) + "(" + L.outC + ")", PAD, y - 3);
+                    let absMax = 1e-6;
+                    for (const k of L.kernels) for (const c of k) for (const r of c) for (const w of r) absMax = Math.max(absMax, Math.abs(w));
+                    let x = PAD;
+                    for (let k = 0; k < L.outC; k++) {
+                        for (let c = 0; c < L.inC; c++) {
+                            const ker = L.kernels[k][c];
+                            for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) {
+                                ctx.fillStyle = kernelColor(ker[dy][dx], absMax);
+                                ctx.fillRect(x + dx * (TILE / 3), y + dy * (TILE / 3), TILE / 3 + 0.5, TILE / 3 + 0.5);
+                            }
+                            ctx.strokeStyle = (highlightConv === li) ? C.orange : C.border;
+                            ctx.lineWidth = (highlightConv === li) ? 1.5 : 1;
+                            ctx.strokeRect(x, y, TILE, TILE);
+                            layout.push({ x, y, w: TILE, h: TILE, ker, label: "Conv" + (li + 1) + " k" + (k + 1) + (L.inC > 1 ? " c" + (c + 1) : "") });
+                            x += TILE + GAP;
+                        }
+                    }
+                    y += rowH;
+                });
+                layoutRef.current = layout;
+            }, [networkRef, renderTick, highlightConv]);
+
+            const onMove = (e) => {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const sx = canvasRef.current.width / rect.width, sy = canvasRef.current.height / rect.height;
+                const mx = (e.clientX - rect.left) * sx, my = (e.clientY - rect.top) * sy;
+                const hit = layoutRef.current.find(t => mx >= t.x && mx <= t.x + t.w && my >= t.y && my <= t.y + t.h);
+                if (hit) {
+                    const vals = hit.ker.map(r => r.map(v => v.toFixed(2).padStart(5)).join(" ")).join("\n");
+                    setTip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text: hit.label + "\n" + vals });
+                } else setTip(null);
+            };
+
+            return (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                    <span style={{ ...secLabel, marginBottom: 6, flexShrink: 0 }}>Kernels</span>
+                    <div style={{ flex: 1, overflow: "auto", borderRadius: 6, border: "1px solid " + C.border, background: C.surface, minHeight: 0, position: "relative" }}>
+                        <canvas ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} style={{ display: "block" }} />
+                        {tip && (
+                            <div style={{ position: "absolute", left: Math.min(tip.x + 10, 160), top: tip.y + 10, background: "#1e2230", color: "#fff", fontSize: 9, fontFamily: C.font, padding: "4px 6px", borderRadius: 4, whiteSpace: "pre", pointerEvents: "none", zIndex: 5 }}>{tip.text}</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PREDICTION STRIP
+        // ═══════════════════════════════════════════════════════════════
+        function PredictionStrip({ networkRef, sample, sampleIndex, width, height, outputNames, renderTick }) {
+            const canvasRef = useRef(null);
+            useEffect(() => { if (sample) drawBitmap(canvasRef.current, sample.input, width, height); }, [sample, width, height]);
+
+            if (!sample) {
+                return <div style={{ padding: 16, color: C.textDim, fontFamily: C.fontSans, fontSize: 13, textAlign: "center" }}>Select a sample from the gallery</div>;
+            }
+            let probs = new Array(outputNames.length).fill(0);
+            const net = networkRef.current;
+            let fp = null;
+            if (net) { try { fp = forwardCNN(net, sample.input); probs = fp.output; } catch (e) { } }
+            const groups = featureGroups(fp);
+            const pred = probs.indexOf(Math.max(...probs));
+            const actual = sample.output.indexOf(Math.max(...sample.output));
+            const correct = pred === actual;
+
+            return (
+                <div style={{ padding: "10px 16px", display: "flex", gap: 16, alignItems: "stretch", flexWrap: "nowrap" }}>
+                    {/* Selected sample */}
+                    <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                            <span style={{ fontSize: 11, fontFamily: C.font, fontWeight: 700, color: C.text }}>Sample #{sampleIndex}</span>
+                            <span style={{ fontSize: 11, fontFamily: C.font, color: C.textDim }}>Class: <b style={{ color: rgb(CC[actual % CC.length]) }}>{outputNames[actual]}</b></span>
+                        </div>
+                        <canvas ref={canvasRef} className="pixelated" width={width} height={height} style={{ width: 104, height: 104 * height / width, borderRadius: 6, border: "1px solid " + C.border }} />
+                        <span style={{ fontSize: 12, fontFamily: C.font, fontWeight: 700, color: correct ? C.accent2 : C.danger }}>{correct ? "Correct ✓" : "Wrong ✗"}</span>
+                    </div>
+
+                    {/* Feature maps — directly right of the sample */}
+                    <div style={{ flexShrink: 0, width: 300, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span style={secLabel}>Feature Maps</span>
+                        <div style={{ flex: 1, display: "flex", gap: 12, overflow: "auto", border: "1px solid " + C.border, borderRadius: 6, background: C.surface, padding: 6, maxHeight: 132 }}>
+                            {groups.length === 0 && <div style={{ color: C.textDim, fontFamily: C.fontSans, fontSize: 11, textAlign: "center", margin: "auto" }}>{net ? "No conv layers" : "—"}</div>}
+                            {groups.map((g, gi) => (
+                                <div key={gi} style={{ flexShrink: 0 }}>
+                                    <div style={{ fontSize: 9, fontFamily: C.font, fontWeight: 700, color: g.color, marginBottom: 4 }}>{g.label}</div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, max-content)", gap: 4 }}>
+                                        {g.maps.map((m, mi) => (<FeatureMap key={mi} map={m} size={22} />))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Softmax output bars */}
+                    <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 4, justifyContent: "center" }}>
+                        {outputNames.map((name, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ width: 64, fontSize: 10, fontFamily: C.font, color: i === pred ? C.text : C.textDim, fontWeight: i === pred ? 700 : 400, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                                <span style={{ width: 34, fontSize: 10, fontFamily: C.font, color: C.text }}>{probs[i].toFixed(2)}</span>
+                                <div style={{ flex: 1, height: 12, background: C.surface2, borderRadius: 3, overflow: "hidden" }}>
+                                    <div style={{ width: (probs[i] * 100) + "%", height: "100%", background: rgb(CC[i % CC.length]), transition: "width .1s" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // LOSS CHART
+        // ═══════════════════════════════════════════════════════════════
+        function LossChart({ history, valHistory, loss, valLoss, epoch, fixedMax }) {
+            const W = 400, H = 160;
+            const maxL = fixedMax > 0 ? fixedMax : .001;
+            const toPts = arr => arr.length > 1 ? arr.map((v, i) => "" + (28 + (i / (arr.length - 1)) * (W - 48)) + "," + (10 + (1 - Math.min(v, maxL) / maxL) * (H - 30))).join(" ") : "";
+            const pts = toPts(history);
+            const vpts = valHistory && valHistory.length > 1 ? toPts(valHistory) : "";
+            return (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        <span style={secLabel}>Loss</span>
+                        <Pill label="Epoch" value={epoch} color={C.accent} />
+                        <Pill label="Train" value={loss.toFixed(4)} color={loss < .1 ? C.accent2 : loss < .5 ? C.orange : C.danger} />
+                        {valLoss != null && <Pill label="Val" value={valLoss.toFixed(4)} color={C.purple} />}
+                    </div>
+                    <div style={{ flex: 1, borderRadius: 6, border: "1px solid " + C.border, overflow: "hidden", background: C.surface, minHeight: 0, position: "relative" }}>
+                        <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+                            {[0, .25, .5, .75, 1].map(f => {
+                                const y = 10 + (1 - f) * (H - 30); return (
+                                    <g key={f}><line x1={28} y1={y} x2={W - 16} y2={y} stroke={C.borderLight} strokeWidth={.5} />
+                                        <text x={26} y={y + 3} textAnchor="end" fill={C.textDim} style={{ fontSize: 7, fontFamily: C.font }}>{(maxL * f).toFixed(3)}</text>
+                                    </g>);
+                            })}
+                            {pts && <polyline points={pts} fill="none" stroke={C.accent} strokeWidth={2} strokeLinejoin="round" opacity={.9} />}
+                            {vpts && <polyline points={vpts} fill="none" stroke={C.purple} strokeWidth={2} strokeDasharray="4 3" strokeLinejoin="round" opacity={.9} />}
+                            {history.length < 2 && <text x={W / 2} y={H / 2} textAnchor="middle" fill={C.textDim} style={{ fontSize: 11, fontFamily: C.fontSans }}>Press Train to start</text>}
+                        </svg>
+                        <div style={{ position: "absolute", top: 6, right: 10, display: "flex", gap: 10, fontSize: 9, fontFamily: C.font }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: C.textDim }}><span style={{ width: 14, height: 0, borderTop: "2px solid " + C.accent }} />Train</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: C.textDim }}><span style={{ width: 14, height: 0, borderTop: "2px dashed " + C.purple }} />Val</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CONFUSION MATRIX
+        // ═══════════════════════════════════════════════════════════════
+        function ConfusionMatrix({ networkRef, data, outputNames, renderTick, valAcc, testAcc }) {
+            const net = networkRef.current;
+            const dim = outputNames.length;
+            const matrix = Array.from({ length: dim }, () => new Array(dim).fill(0));
+            let correct = 0, total = data.length;
+            if (net && data.length > 0) {
+                for (const s of data) {
+                    const { output } = forwardCNN(net, s.input);
+                    const pred = output.indexOf(Math.max(...output)), actual = s.output.indexOf(Math.max(...s.output));
+                    if (pred >= 0 && pred < dim && actual >= 0 && actual < dim) matrix[actual][pred]++;
+                    if (pred === actual) correct++;
+                }
+            }
+            const accuracy = total > 0 ? (correct / total * 100) : 0;
+            const maxVal = Math.max(1, ...matrix.flat());
+            return (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        <span style={secLabel}>Confusion (train)</span>
+                        <Pill label="Train" value={accuracy.toFixed(1) + "%"} color={accuracy > 90 ? C.accent2 : accuracy > 60 ? C.orange : C.danger} />
+                        {valAcc != null && <Pill label="Val" value={valAcc.toFixed(1) + "%"} color={C.purple} />}
+                        {testAcc != null && <Pill label="Test" value={testAcc.toFixed(1) + "%"} color={C.accent2} />}
+                    </div>
+                    <div style={{ flex: 1, borderRadius: 6, border: "1px solid " + C.border, overflow: "auto", background: C.surface, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 10 }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <div style={{ fontSize: 7, color: C.textDim, fontFamily: C.font, marginBottom: 3, letterSpacing: .5 }}>PREDICTED →</div>
+                            <div style={{ display: "flex", marginBottom: 2 }}>
+                                <div style={{ width: 46 }} />
+                                {outputNames.map((l, i) => <div key={i} style={{ width: Math.max(34, 130 / dim), textAlign: "center", fontSize: 8, fontFamily: C.font, color: C.accent, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.slice(0, 6)}</div>)}
+                            </div>
+                            {outputNames.map((l, i) => (
+                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                    <div style={{ width: 44, textAlign: "right", fontSize: 8, fontFamily: C.font, color: C.accent2, fontWeight: 700, paddingRight: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.slice(0, 6)}</div>
+                                    {outputNames.map((_, j) => {
+                                        const v = matrix[i][j], isDiag = i === j, intensity = v / maxVal;
+                                        const bg = isDiag ? "rgba(26,154,110," + (intensity * .35 + .05) + ")" : "rgba(217,68,68," + (intensity * .3 + .02) + ")";
+                                        return <div key={j} style={{ width: Math.max(34, 130 / dim), height: Math.max(28, 110 / dim), display: "flex", alignItems: "center", justifyContent: "center", background: bg, border: "1px solid " + C.borderLight, fontSize: dim <= 4 ? 12 : 10, fontWeight: 700, fontFamily: C.font, color: isDiag ? C.accent2 : v > 0 ? C.danger : C.textDim + "66", borderRadius: 2 }}>{v}</div>;
+                                    })}
+                                </div>
+                            ))}
+                            <div style={{ fontSize: 7, color: C.textDim, fontFamily: C.font, marginTop: 4, letterSpacing: .5 }}>↑ ACTUAL</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // WIDTH DIALOG
+        // ═══════════════════════════════════════════════════════════════
+        function WidthDialog({ pending, onCancel, onConfirm }) {
+            const [width, setWidth] = useState(pending.autoWidth || 1);
+            const pc = pending.pixelCount;
+            const height = Math.floor(pc / width);
+            const valid = width >= 1 && width <= 28 && height >= 1 && height <= 28 && width * height === pc;
+            return (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+                    <div style={{ background: C.surface, borderRadius: 10, border: "1px solid " + C.border, padding: 20, width: 320, fontFamily: C.fontSans, boxShadow: "0 8px 40px rgba(0,0,0,0.25)" }}>
+                        <h3 style={{ fontSize: 15, fontFamily: C.font, color: C.text, marginBottom: 12 }}>Set Image Width</h3>
+                        <p style={{ fontSize: 12, color: C.textDim, marginBottom: 4 }}>Detected {pc} pixels.</p>
+                        <p style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>Auto-detected: {pending.autoWidth} × {Math.floor(pc / (pending.autoWidth || 1))}</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                            <label style={{ fontSize: 12, fontFamily: C.font, color: C.text }}>Width:</label>
+                            <input type="number" min={1} max={28} value={width} onChange={e => setWidth(Math.max(1, Math.min(28, parseInt(e.target.value) || 1)))}
+                                style={{ width: 70, padding: "5px 8px", border: "1px solid " + C.border, borderRadius: 5, fontFamily: C.font, fontSize: 13 }} />
+                            <span style={{ fontSize: 12, fontFamily: C.font, color: valid ? C.accent2 : C.danger }}>→ Height: {height}</span>
+                        </div>
+                        {!valid && <p style={{ fontSize: 11, color: C.danger, marginBottom: 10 }}>width × height must equal {pc} and both ≤ 28</p>}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                            <button onClick={onCancel} style={{ padding: "7px 14px", borderRadius: 6, border: "1px solid " + C.border, background: C.surface2, color: C.text, fontFamily: C.fontSans, fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+                            <button onClick={() => onConfirm(width)} disabled={!valid} style={{ padding: "7px 14px", borderRadius: 6, border: "none", background: valid ? C.accent : C.surface2, color: valid ? "#fff" : C.textDim, fontFamily: C.fontSans, fontWeight: 700, cursor: valid ? "pointer" : "default", fontSize: 12 }}>Load Dataset</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MAIN APP
+        // ═══════════════════════════════════════════════════════════════
+        const DEBUG = new URLSearchParams(location.search).get('debug') === 'true';
+
+        function App() {
+            const initial = useMemo(() => makePatterns(), []);
+            const [preset, setPreset] = useState("Patterns");
+            const [data, setData] = useState(initial.samples);
+            const [imgW, setImgW] = useState(initial.width);
+            const [imgH, setImgH] = useState(initial.height);
+            const [outputNames, setOutputNames] = useState(initial.outputNames);
+            const [inputNames, setInputNames] = useState(initial.inputNames);
+            const [arch, setArch] = useState(() => defaultArch(initial.width, initial.height, initial.outputNames.length));
+            const [seed, setSeed] = useState(42);
+            const [splits, setSplits] = useState(() => splitData(initial.samples, mulberry32(42)));
+            const [batchSize, setBatchSize] = useState(() => Math.min(32, splitData(initial.samples, mulberry32(42)).train.length));
+            const [shuffle, setShuffle] = useState(true);
+
+            const [lr, setLr] = useState(0.05);
+            const [epoch, setEpoch] = useState(0);
+            const [loss, setLoss] = useState(0);
+            const [valLoss, setValLoss] = useState(null);
+            const [valLossHistory, setValLossHistory] = useState([]);
+            const [valAcc, setValAcc] = useState(null);
+            const [running, setRunning] = useState(false);
+            const [lossHistory, setLossHistory] = useState([]);
+            const [renderTick, setRenderTick] = useState(0);
+            const [selected, setSelected] = useState(0);
+            const [testAcc, setTestAcc] = useState(null);
+            const [highlightConv, setHighlightConv] = useState(null);
+            const [widthPending, setWidthPending] = useState(null);
+
+            const netRef = useRef(null), runRef = useRef(false), epochRef = useRef(0), lrRef = useRef(lr);
+            const trainRef = useRef(splits.train), skipBuildRef = useRef(false), debugRanRef = useRef(false), lossMaxRef = useRef(0), csvFileRef = useRef(null);
+            const seedRef = useRef(seed), batchRef = useRef(batchSize), shuffleRef = useRef(shuffle);
+            const orderRef = useRef([]), cursorRef = useRef(0), trainRngRef = useRef(Math.random);
+            useEffect(() => { lrRef.current = lr; }, [lr]);
+            useEffect(() => { trainRef.current = splits.train; }, [splits]);
+            useEffect(() => { seedRef.current = seed; }, [seed]);
+            useEffect(() => { batchRef.current = batchSize; }, [batchSize]);
+            useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
+
+            const numClasses = outputNames.length;
+            const dimInfo = useMemo(() => computeDims(arch, imgW, imgH, numClasses), [arch, imgW, imgH, numClasses]);
+
+            // Map each sample object → its split, for the gallery border colours.
+            const splitTag = useMemo(() => {
+                const m = new Map();
+                splits.train.forEach(s => m.set(s, 'train'));
+                splits.val.forEach(s => m.set(s, 'val'));
+                splits.test.forEach(s => m.set(s, 'test'));
+                return m;
+            }, [splits]);
+
+            // Re-split deterministically whenever the dataset or seed changes.
+            useEffect(() => { setSplits(splitData(data, mulberry32(seed))); }, [data, seed]);
+
+            const resetTraining = () => {
+                runRef.current = false; setRunning(false); epochRef.current = 0;
+                setEpoch(0); setLoss(0); setValLoss(null); setValAcc(null); setLossHistory([]); setValLossHistory([]); setTestAcc(null);
+                lossMaxRef.current = 0; debugRanRef.current = false; setRenderTick(t => t + 1);
+            };
+
+            const buildNetwork = useCallback(() => {
+                if (!dimInfo.valid) { netRef.current = null; resetTraining(); return; }
+                seedRng(seed);                 // reproducible weight init
+                netRef.current = buildCNN(arch, imgW, imgH, numClasses);
+                unseedRng();
+                resetTraining();
+            }, [arch, imgW, imgH, numClasses, dimInfo.valid, seed]);
+
+            useEffect(() => { if (skipBuildRef.current) { skipBuildRef.current = false; return; } buildNetwork(); }, [buildNetwork]);
+
+            // ── Dataset loading ────────────────────────────────────────
+            const loadDataset = (ds, presetName) => {
+                runRef.current = false; setRunning(false);
+                setData(ds.samples); setImgW(ds.width); setImgH(ds.height);
+                setOutputNames(ds.outputNames); setInputNames(ds.inputNames);
+                setArch(defaultArch(ds.width, ds.height, ds.outputNames.length));
+                setBatchSize(Math.max(1, Math.min(32, Math.round(ds.samples.length * 0.6))));
+                setSelected(0); setPreset(presetName);
+            };
+
+            const loadPatterns = () => loadDataset(makePatterns(), "Patterns");
+
+            const onImportCSV = (text) => {
+                let parsed;
+                try { parsed = parseImageCSV(text); } catch (e) { alert("CSV: " + e.message); return; }
+                if (!hasValidDims(parsed.pixelCount)) { alert("No valid image dimensions found for " + parsed.pixelCount + " pixels (max 28×28)"); return; }
+                setWidthPending({ ...parsed, autoWidth: autoDetectWidth(parsed.pixelCount) });
+            };
+            const confirmWidth = (width) => {
+                const p = widthPending;
+                let ds;
+                try { ds = buildDataset(p.pixels, p.labels, p.pixelCount, width, (m) => alert(m)); }
+                catch (e) { alert(e.message); return; }
+                setWidthPending(null);
+                loadDataset(ds, "Custom");
+            };
+
+            // ── Architecture editing ───────────────────────────────────
+            const onArchChange = (newArch) => { setArch(newArch); };
+            const onPoolChange = (i, newPool) => {
+                const old = arch.convLayers[i].pool;
+                const newArch = { ...arch, convLayers: arch.convLayers.map((c, j) => j === i ? { ...c, pool: newPool } : { ...c }) };
+                // Max ↔ Avg: preserve weights, only reset training state (dims unchanged).
+                if (old !== 'none' && newPool !== 'none' && netRef.current) {
+                    const convs = netRef.current.filter(l => l.type === 'conv');
+                    if (convs[i]) convs[i].pool = newPool;
+                    skipBuildRef.current = true;
+                    setArch(newArch);
+                    resetTraining();
+                } else {
+                    setArch(newArch); // triggers rebuild (dims change)
+                }
+            };
+
+            // ── Training ────────────────────────────────────────────────
+            const UPDATES_PER_FRAME = 50;
+            const trainLoop = useCallback(() => {
+                if (!runRef.current || !netRef.current) return;
+                const train = trainRef.current;
+                if (!train.length) { runRef.current = false; setRunning(false); return; }
+                if (DEBUG && !debugRanRef.current) { debugRanRef.current = true; verifyGradients(netRef.current, train[0]); }
+                const order = orderRef.current;
+                if (order.length !== train.length) {
+                    order.length = 0; for (let i = 0; i < train.length; i++) order.push(i);
+                    if (shuffleRef.current) shuffleInPlace(order, trainRngRef.current);
+                    cursorRef.current = 0;
+                }
+                const bs = Math.max(1, Math.min(batchRef.current, train.length));
+                let lossAcc = 0, lossN = 0;
+                for (let u = 0; u < UPDATES_PER_FRAME; u++) {
+                    if (cursorRef.current >= order.length) {
+                        cursorRef.current = 0; epochRef.current++;
+                        if (shuffleRef.current) shuffleInPlace(order, trainRngRef.current);
+                    }
+                    const batch = [];
+                    for (let b = 0; b < bs && cursorRef.current < order.length; b++, cursorRef.current++) batch.push(train[order[cursorRef.current]]);
+                    if (batch.length) { lossAcc += trainStepCNN(netRef.current, batch, lrRef.current); lossN++; }
+                }
+                const l = lossN ? lossAcc / lossN : 0;
+                setLoss(l); setEpoch(epochRef.current);
+                if (lossMaxRef.current === 0 && l > 0) lossMaxRef.current = l * 1.15;
+                setLossHistory(prev => { const h = prev.concat([l]); return h.length > 300 ? h.slice(-300) : h; });
+                if (splits.val.length) {
+                    const { loss: vl, acc: va } = computeLossAndAcc(netRef.current, splits.val);
+                    setValLoss(vl); setValAcc(va);
+                    setValLossHistory(prev => { const h = prev.concat([vl]); return h.length > 300 ? h.slice(-300) : h; });
+                }
+                setRenderTick(t => t + 1);
+                if (runRef.current) requestAnimationFrame(trainLoop);
+            }, [splits.val]);
+
+            const onTrain = () => {
+                if (!dimInfo.valid || !trainRef.current.length) return;
+                if (!netRef.current) buildNetwork();
+                // Seed the batch-shuffle RNG (distinct from init/split, still deterministic per seed).
+                trainRngRef.current = mulberry32((seedRef.current ^ 0x9e3779b9) >>> 0);
+                const order = []; for (let i = 0; i < trainRef.current.length; i++) order.push(i);
+                if (shuffleRef.current) shuffleInPlace(order, trainRngRef.current);
+                orderRef.current = order; cursorRef.current = 0;
+                runRef.current = true; setRunning(true); requestAnimationFrame(trainLoop);
+            };
+            const onStop = () => { runRef.current = false; setRunning(false); };
+            const onReset = () => { runRef.current = false; setRunning(false); buildNetwork(); };
+            const onEvaluate = () => {
+                if (!netRef.current || !splits.test.length) return;
+                let correct = 0;
+                for (const s of splits.test) { const { output } = forwardCNN(netRef.current, s.input); if (output.indexOf(Math.max(...output)) === s.output.indexOf(Math.max(...s.output))) correct++; }
+                setTestAcc(correct / splits.test.length * 100);
+            };
+
+            const trainDisabled = running || !dimInfo.valid || !trainRef.current.length;
+            const btnBase = { border: "none", padding: "7px 16px", borderRadius: 6, fontSize: 12, fontFamily: C.fontSans, fontWeight: 700, cursor: "pointer" };
+            const selectedSample = data[selected] || null;
+
+            // ── Import / Export network ────────────────────────────────
+            const onExportNet = () => {
+                if (!netRef.current) { alert("No network to export"); return; }
+                try {
+                    const json = exportNetwork(netRef.current, { inputLabels: inputNames, outputLabels: outputNames, imageWidth: imgW, imageHeight: imgH, networkName: preset === "Custom" ? "custom_cnn" : preset.toLowerCase() + "_cnn" });
+                    downloadFile(JSON.stringify(json, null, 2), json.network_name + ".json", "application/json");
+                } catch (e) { alert("Export failed: " + e.message); }
+            };
+            const onImportNet = () => {
+                const input = document.createElement('input');
+                input.type = 'file'; input.accept = '.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0]; if (!file) return;
+                    try {
+                        const cfg = importNetwork(JSON.parse(await file.text()));
+                        skipBuildRef.current = true;
+                        netRef.current = cfg.network;
+                        setImgW(cfg.imageWidth); setImgH(cfg.imageHeight);
+                        setInputNames(cfg.inputNames); setOutputNames(cfg.outputNames);
+                        setArch(cfg.arch); setPreset("Custom");
+                        resetTraining();
+                    } catch (err) { alert("Import failed: " + (err.message || err)); }
+                };
+                input.click();
+            };
+
+            return (
+                <div style={{ width: 1200, minHeight: 800, background: C.bg, color: C.text, fontFamily: C.fontSans, display: "flex", flexDirection: "column", borderRadius: 10, border: "1px solid " + C.border, boxShadow: "0 2px 24px rgba(0,0,0,0.08)" }}>
+                    {/* HEADER */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid " + C.border, flexShrink: 0, background: C.surface }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                            <h1 style={{ fontSize: 16, fontWeight: 700, margin: 0, fontFamily: C.font, letterSpacing: -.5, color: C.text }}>CNN Grayscale Trainer</h1>
+                            <span style={{ fontSize: 10, color: C.textDim, fontFamily: C.font }}>{preset === "Custom" ? "Custom Dataset" : preset}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <button onClick={loadPatterns} style={{ background: preset === "Patterns" ? C.accent + "18" : "transparent", border: "1px solid " + (preset === "Patterns" ? C.accent + "66" : C.border), color: preset === "Patterns" ? C.accent : C.textDim, padding: "4px 11px", borderRadius: 5, fontSize: 10, cursor: "pointer", fontFamily: C.font, fontWeight: preset === "Patterns" ? 700 : 400 }}>Patterns</button>
+                        </div>
+                    </div>
+
+                    {/* CONTROLS */}
+                    <div style={{ padding: "6px 16px", borderBottom: "1px solid " + C.border, flexShrink: 0, background: C.surface, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <button onClick={onTrain} disabled={trainDisabled} style={{ ...btnBase, background: trainDisabled ? C.surface2 : C.accent, color: trainDisabled ? C.textDim : "#fff" }}>▶ Train</button>
+                        <button onClick={onStop} disabled={!running} style={{ ...btnBase, background: !running ? C.surface2 : C.orange, color: !running ? C.textDim : "#fff" }}>■ Stop</button>
+                        <button onClick={onReset} style={{ ...btnBase, background: C.surface2, color: C.text, border: "1px solid " + C.border }}>↺ Reset</button>
+                        <button onClick={onEvaluate} disabled={!splits.test.length} style={{ ...btnBase, background: C.accent2, color: "#fff" }}>✓ Evaluate</button>
+                        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, fontSize: 10, fontFamily: C.font }}>
+                            <span style={{ color: C.textDim, fontWeight: 600 }}>Learning Rate</span>
+                            <input type="range" min={-4} max={0} step={.05} value={Math.log10(lr)} onChange={e => setLr(Math.pow(10, parseFloat(e.target.value)))} style={{ width: 80, accentColor: C.accent }} />
+                            <span style={{ color: C.text, minWidth: 50, fontWeight: 600 }}>{lr.toFixed(4)}</span>
+                        </div>
+                    </div>
+
+                    {/* TOP ROW: Gallery | Architecture | Training | Diagram */}
+                    <div style={{ flex: "0 0 380px", display: "flex", overflow: "hidden", borderBottom: "1px solid " + C.border }}>
+                        <div style={{ width: 300, flexShrink: 0, padding: 10, display: "flex", flexDirection: "column", borderRight: "1px solid " + C.border, minHeight: 0 }}>
+                            <SampleGallery data={data} width={imgW} height={imgH} outputNames={outputNames} splits={{ train: splits.train.length, val: splits.val.length, test: splits.test.length }} splitTag={splitTag} selected={selected} onSelect={setSelected} />
+                        </div>
+                        <div style={{ width: 270, flexShrink: 0, padding: 10, overflow: "auto", borderRight: "1px solid " + C.border }}>
+                            <CNNConfig arch={arch} imgW={imgW} imgH={imgH} numClasses={numClasses} dimInfo={dimInfo} onArchChange={onArchChange} onPoolChange={onPoolChange} />
+                        </div>
+                        <div style={{ width: 170, flexShrink: 0, padding: 10, overflow: "auto", borderRight: "1px solid " + C.border }}>
+                            <TrainingConfig trainSize={splits.train.length} batchSize={batchSize} onBatch={setBatchSize} shuffle={shuffle} onShuffle={setShuffle} seed={seed} onSeed={setSeed} />
+                        </div>
+                        <div style={{ flex: 1, padding: 10, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+                            <ArchitectureDiagram dimInfo={dimInfo} onHoverConv={setHighlightConv} />
+                        </div>
+                    </div>
+
+                    {/* PREDICTION STRIP */}
+                    <div style={{ background: C.surface, borderBottom: "1px solid " + C.border, flexShrink: 0 }}>
+                        <PredictionStrip networkRef={netRef} sample={selectedSample} sampleIndex={selected} width={imgW} height={imgH} outputNames={outputNames} renderTick={renderTick} />
+                    </div>
+
+                    {/* BOTTOM ROW: Loss | Confusion | Kernels */}
+                    <div style={{ height: 280, display: "flex", overflow: "hidden" }}>
+                        <div style={{ flex: 1, padding: 10, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, borderRight: "1px solid " + C.border }}>
+                            <LossChart history={lossHistory} valHistory={valLossHistory} loss={loss} valLoss={valLoss} epoch={epoch} fixedMax={lossMaxRef.current} />
+                        </div>
+                        <div style={{ flex: 1, padding: 10, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, borderRight: "1px solid " + C.border }}>
+                            <ConfusionMatrix networkRef={netRef} data={splits.train} outputNames={outputNames} renderTick={renderTick} valAcc={valAcc} testAcc={testAcc} />
+                        </div>
+                        <div style={{ width: 400, flexShrink: 0, padding: 10, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
+                            <KernelVisualization networkRef={netRef} renderTick={renderTick} highlightConv={highlightConv} />
+                        </div>
+                    </div>
+
+                    {/* FOOTER */}
+                    <div style={{ padding: "12px 16px", borderTop: "1px solid " + C.border, flexShrink: 0, background: C.surface, display: "flex", gap: 8, justifyContent: "center", alignItems: "center" }}>
+                        <input ref={csvFileRef} type="file" accept=".csv,.tsv,.txt" style={{ display: "none" }} onChange={(e) => {
+                            const file = e.target.files && e.target.files[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => onImportCSV(ev.target.result);
+                            reader.readAsText(file); e.target.value = "";
+                        }} />
+                        <button onClick={() => csvFileRef.current && csvFileRef.current.click()} style={{ ...btnBase, background: "#e8f0fe", color: "#2a5db0", border: "1px solid #b8cfe8" }}>📂 Import CSV</button>
+                        <button onClick={() => downloadFile(exportImageCSV(data, outputNames), 'dataset.csv', 'text/csv')} style={{ ...btnBase, background: "#e8f0fe", color: "#2a5db0", border: "1px solid #b8cfe8" }}>💾 Export CSV</button>
+                        <div style={{ width: 16 }} />
+                        <button onClick={onImportNet} style={{ ...btnBase, background: "#ecf8f3", color: "#16724e", border: "1px solid #b0dcc8" }}>🧠 Import Net (.json)</button>
+                        <button onClick={onExportNet} style={{ ...btnBase, background: "#ecf8f3", color: "#16724e", border: "1px solid #b0dcc8" }}>🔬 Export Net (.json)</button>
+                    </div>
+
+                    {widthPending && <WidthDialog pending={widthPending} onCancel={() => setWidthPending(null)} onConfirm={confirmWidth} />}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+</body>
+
+</html>
