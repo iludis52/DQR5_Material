@@ -156,53 +156,53 @@
         {
                 "text": "Welche spezifische Funktion erfüllt der `MedianPruner` in Optuna?",
                 "options": [
+                        "Er passt die Lernrate dynamisch während einer einzelnen Epoche an, basierend auf der Steigung des Trainingsverlusts.",
                         "Er vergleicht den aktuellen Loss mit dem Median aller bisherigen Trials und bricht den aktuellen Trial ab, wenn er deutlich schlechter ist.",
                         "Er wählt die nächsten Hyperparameter zufällig aus, um eine gleichmäßige Abdeckung des gesamten Suchraums zu gewährleisten.",
-                        "Er speichert die Gewichte des Modells nur dann, wenn der Validierungsverlust unter einen bestimmten Schwellenwert fällt.",
-                        "Er passt die Lernrate dynamisch während einer einzelnen Epoche an, basierend auf der Steigung des Trainingsverlusts."
+                        "Er speichert die Gewichte des Modells nur dann, wenn der Validierungsverlust unter einen bestimmten Schwellenwert fällt."
                 ],
-                "correct": 0,
+                "correct": 1,
                 "explanation": "Der MedianPruner stoppt Trials frühzeitig, wenn deren Performance schlechter als der Median der bisher abgeschlossenen Trials ist, was Rechenressourcen spart."
         },
         {
                 "text": "Warum ist das 'Final Retraining' nach der Optuna-Suche notwendig?",
                 "options": [
-                        "Weil die Suche oft mit wenigen Epochen durchgeführt wird und das finale Modell vollständig konvergieren muss.",
-                        "Weil Optuna die Modellgewichte aller Trials im Arbeitsspeicher behält und diese vor dem Deployment gelöscht werden müssen.",
+                        "Weil Optuna am Ende nur die besten Hyperparameter (und Metriken) speichert, nicht aber das in den Trials trainierte Modell – dieses muss mit den besten Parametern neu trainiert werden.",
                         "Weil der TPE-Sampler nur dann funktioniert, wenn das Modell nach der Suche erneut von Grund auf neu trainiert wird.",
+                        "Weil Optuna die Modellgewichte aller Trials im Arbeitsspeicher behält und diese vor dem Deployment gelöscht werden müssen.",
                         "Weil die Hyperparameter während der Suchphase kontinuierlich geändert werden und am Ende inkonsistent sind."
                 ],
                 "correct": 0,
-                "explanation": "Während der Suche wird oft early stopping oder pruning angewendet und die Epochenzahl begrenzt. Das finale Training nutzt die besten Parameter, trainiert aber länger für maximale Performance."
+                "explanation": "Optuna behält in der Study nur study.best_params und die Kennzahlen, nicht die trainierten Trial-Modelle. Um ein einsatzfähiges Modell zu erhalten, wird es mit diesen besten Parametern noch einmal vollständig trainiert (oft auf den kompletten Trainingsdaten)."
         },
         {
                 "text": "Welchen Zweck erfüllt das Argument `log=True` bei `trial.suggest_float`?",
                 "options": [
-                        "Es ermöglicht eine gleichmäßigere Erkundung des Parameterraums über mehrere Größenordnungen hinweg.",
-                        "Es erzwingt, dass der Hyperparameter nur ganzzahlige Werte annimmt, statt float-Werte.",
+                        "Es sorgt dafür, dass der Optimierer logarithmische Verlustfunktionen anstelle von Cross-Entropy verwendet.",
                         "Es aktiviert eine automatische Skalierung der Daten, bevor sie in das neuronale Netzwerk eingegeben werden.",
-                        "Es sorgt dafür, dass der Optimierer logarithmische Verlustfunktionen anstelle von Cross-Entropy verwendet."
+                        "Es ermöglicht eine gleichmäßigere Erkundung des Parameterraums über mehrere Größenordnungen hinweg.",
+                        "Es erzwingt, dass der Hyperparameter nur ganzzahlige Werte annimmt, statt float-Werte."
                 ],
-                "correct": 0,
+                "correct": 2,
                 "explanation": "Viele Hyperparameter wie die Lernrate wirken logarithmisch. `log=True` sorgt dafür, dass der Suchraum in logarithmischer Skala abgedeckt wird, was effizienter ist."
         },
         {
                 "text": "Was ist die Hauptaufgabe der `objective`-Funktion in Optuna?",
                 "options": [
-                        "Sie definiert den Suchraum, trainiert das Modell und gibt den zu optimierenden Wert zurück.",
                         "Sie speichert die besten Modellgewichte auf der Festplatte für jede einzelne Testkonfiguration.",
-                        "Sie visualisiert den Trainingsfortschritt in Echtzeit während der Hyperparameter-Suche.",
-                        "Sie initialisiert die Datenpipeline und teilt die Daten in Trainings-, Validierungs- und Testsets auf."
+                        "Sie definiert den Suchraum, trainiert das Modell und gibt den zu optimierenden Wert zurück.",
+                        "Sie initialisiert die Datenpipeline und teilt die Daten in Trainings-, Validierungs- und Testsets auf.",
+                        "Sie visualisiert den Trainingsfortschritt in Echtzeit während der Hyperparameter-Suche."
                 ],
-                "correct": 0,
+                "correct": 1,
                 "explanation": "Die objective-Funktion wird für jeden Trial aufgerufen, um Parameter zu sampeln, das Modell zu trainieren und den Zielwert (z.B. Loss) zurückzugeben."
         },
         {
                 "text": "Wie behandelt Optuna einen Trial, der durch Pruning abgebrochen wird?",
                 "options": [
                         "Er wird als 'pruned' markiert und zählt nicht als vollständiger Erfolg, aber auch nicht als Fehler.",
-                        "Er wird als 'failed' markiert und führt zu einem Abbruch der gesamten Optimierungsstudie.",
                         "Er wird automatisch wiederholt mit leicht veränderten Parametern, um die Stabilität zu prüfen.",
+                        "Er wird als 'failed' markiert und führt zu einem Abbruch der gesamten Optimierungsstudie.",
                         "Seine Ergebnisse werden ignoriert und nicht in der Historie der Studie gespeichert."
                 ],
                 "correct": 0,
@@ -211,20 +211,20 @@
         {
                 "text": "Welchen Vorteil bietet der TPESampler gegenüber einem reinen Random Search?",
                 "options": [
-                        "Er nutzt Informationen aus vorherigen Trials, um vielversprechendere Regionen im Parameterraum zu erkunden.",
-                        "Er testet systematisch jede mögliche Kombination von Hyperparametern, um das globale Optimum zu finden.",
                         "Er benötigt keine Definition eines Suchraums und wählt Parameter komplett frei basierend auf Zufall.",
-                        "Er beschleunigt das Training einzelner Epochen durch parallele Berechnung auf mehreren GPUs."
+                        "Er testet systematisch jede mögliche Kombination von Hyperparametern, um das globale Optimum zu finden.",
+                        "Er beschleunigt das Training einzelner Epochen durch parallele Berechnung auf mehreren GPUs.",
+                        "Er nutzt Informationen aus vorherigen Trials, um vielversprechendere Regionen im Parameterraum zu erkunden."
                 ],
-                "correct": 0,
+                "correct": 3,
                 "explanation": "TPE ist ein bayessches Optimierungsverfahren, das lernfähige Muster erkennt und somit effizienter konvergiert als blinde Zufallssuche."
         },
         {
                 "text": "Warum wird im Code `trial.report(val_loss, epoch)` aufgerufen?",
                 "options": [
                         "Um den aktuellen Fortschritt an den Pruner zu melden, damit dieser eine Abbruchentscheidung treffen kann.",
-                        "Um den Trainingsverlust in einer Datenbank zu speichern, damit er später für die Visualisierung genutzt werden kann.",
                         "Um die Lernrate des Optimierers automatisch anzupassen, falls der Verlust zu stark ansteigt.",
+                        "Um den Trainingsverlust in einer Datenbank zu speichern, damit er später für die Visualisierung genutzt werden kann.",
                         "Um sicherzustellen, dass das Modell nach jeder Epoche auf das GPU-Gerät zurückkopiert wird."
                 ],
                 "correct": 0,
@@ -233,34 +233,34 @@
         {
                 "text": "Welches Problem löst Optuna im Vergleich zur manuellen Hyperparameter-Anpassung?",
                 "options": [
-                        "Es automatisiert die Suche und vermeidet die Ineffizienz und Subjektivität manueller Ansätze.",
-                        "Es eliminiert die Notwendigkeit, Validierungsdaten zur Bewertung der Modellperformance zu verwenden.",
                         "Es garantiert, dass jedes trainierte Modell eine Genauigkeit von 100 % erreicht.",
+                        "Es eliminiert die Notwendigkeit, Validierungsdaten zur Bewertung der Modellperformance zu verwenden.",
+                        "Es automatisiert die Suche und vermeidet die Ineffizienz und Subjektivität manueller Ansätze.",
                         "Es ersetzt die Notwendigkeit, neuronale Netzwerke überhaupt zu trainieren."
                 ],
-                "correct": 0,
+                "correct": 2,
                 "explanation": "Manuelle Suche ist ineffizient und subjektiv. Optuna automatisiert diesen Prozess durch intelligente Sampling-Strategien und Pruning."
         },
         {
                 "text": "Was bedeutet der Begriff 'Study' im Kontext von Optuna?",
                 "options": [
-                        "Ein Container, der die Optimierungsziele, die Historie und die Konfiguration der gesamten Suche definiert.",
-                        "Eine einzelne Trainingsiteration, bei der eine spezifische Kombination von Hyperparametern getestet wird.",
+                        "Eine Funktion, die die Daten vor dem Training skaliert und normalisiert.",
                         "Ein Algorithmus, der die Lernrate während des Trainings dynamisch anpasst.",
-                        "Eine Funktion, die die Daten vor dem Training skaliert und normalisiert."
+                        "Eine einzelne Trainingsiteration, bei der eine spezifische Kombination von Hyperparametern getestet wird.",
+                        "Ein Container, der die Optimierungsziele, die Historie und die Konfiguration der gesamten Suche definiert."
                 ],
-                "correct": 0,
+                "correct": 3,
                 "explanation": "Die Study ist der übergeordnete Container für die Optimierung, der Trials verwaltet und die Ergebnisse speichert."
         },
         {
                 "text": "Warum werden im Code `study.best_params` gespeichert und nicht nur die Modellgewichte?",
                 "options": [
-                        "Um das 'Rezept' der Optimierung zu dokumentieren, wodurch die Reproduzierbarkeit und Transparenz gewährleistet wird.",
-                        "Weil die Modellgewichte zu groß sind, um in einer JSON-Datei gespeichert zu werden.",
                         "Weil Optuna keine Modellgewichte speichern kann und dies ein technischer Fehler ist.",
-                        "Um sicherzustellen, dass das Modell bei jedem Neustart des Notebooks automatisch neu trainiert wird."
+                        "Um das 'Rezept' der Optimierung zu dokumentieren, wodurch die Reproduzierbarkeit und Transparenz gewährleistet wird.",
+                        "Um sicherzustellen, dass das Modell bei jedem Neustart des Notebooks automatisch neu trainiert wird.",
+                        "Weil die Modellgewichte zu groß sind, um in einer JSON-Datei gespeichert zu werden."
                 ],
-                "correct": 0,
+                "correct": 1,
                 "explanation": "Die Parameter sind das 'Rezept'. Das Speichern ermöglicht es, die optimale Konfiguration nachzuvollziehen und bei Bedarf genau so wieder zu trainieren."
         }
 ];

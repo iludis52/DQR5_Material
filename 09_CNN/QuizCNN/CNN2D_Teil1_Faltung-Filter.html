@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN Wissens-Check 1 — Faltung & Filter</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; color: #333; }
+        .status-bar { position: sticky; top: 0; background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .status-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; }
+        .mistakes { color: #dc3545; }
+        .progress-container { width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
+        .quiz-container { max-width: 800px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
+        .quiz-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #1B3A5C; margin-top: 40px; margin-bottom: 4px; }
+        .subtitle { max-width: 800px; margin: 0 auto; padding: 0 20px; text-align: center; color: #2E75B6; font-weight: 600; }
+        .question-title { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .question-text { font-size: 1.2rem; color: #1B3A5C; margin-bottom: 20px; font-weight: 600; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px 15px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; text-align: left; }
+        button:hover:not([disabled]) { background-color: #eaf1f8; border-color: #2E75B6; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        button.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; text-decoration: line-through; }
+        .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .feedback.correct-feedback { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback.wrong-feedback { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .final-result { display: none; text-align: center; background: #eaf1f8; border: 2px solid #2E75B6; padding: 2rem; border-radius: 12px; margin-bottom: 40px; }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>CNN Wissens-Check 1</h1>
+<p class="subtitle">Faltung &amp; Filter — Grundprinzip, Conv-Filter, Padding, Stride, Feature Map, ReLU</p>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Check abgeschlossen!</h2>
+        <p>Du hast alle Fragen gelöst. Insgesamt hattest du <strong id="final-mistakes">0</strong> Fehlversuche.</p>
+        <p>Nutze diesen Check als Selbsttest: Begriffe, die du erst im zweiten Anlauf getroffen hast, lohnt es sich noch einmal anzuschauen.</p>
+        <button onclick="location.reload()" style="background: #2E75B6; color: white; border: none; text-align: center; margin-top: 15px;">Check neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Warum eignet sich ein vollvernetztes (Dense-)Netz schlecht, um direkt auf den Rohpixeln eines Bildes zu arbeiten?",
+                "options": [
+                        "Es entstehen extrem viele Gewichte, und die räumliche Nähe der Pixel geht dabei verloren.",
+                        "Ein Dense-Netz kann Zahlen aus einem Bild grundsätzlich gar nicht erst verarbeiten.",
+                        "Dense-Netze arbeiten ausschließlich mit Farbbildern und niemals mit reinen Graustufen.",
+                        "Ein Dense-Netz betrachtet immer nur ein einzelnes Pixel zur gleichen Zeit."
+                ],
+                "correct": 0,
+                "explanation": "Schon ein 64×64-Bild hat 4096 Eingänge — ein vollvernetztes Netz bräuchte enorm viele Gewichte. Außerdem geht beim Flatten die Information verloren, welche Pixel benachbart sind. Genau das löst die Faltung."
+        },
+        {
+                "text": "Was ist ein Convolutional Filter (Kernel)?",
+                "options": [
+                        "Ein fertiges Vergleichsbild, das man direkt über das Eingabebild legt und abgleicht.",
+                        "Eine vollständige Liste sämtlicher Pixelwerte des gesamten Eingabebildes.",
+                        "Eine kleine Matrix aus Gewichten, die Schritt für Schritt über das Bild geschoben wird.",
+                        "Eine Funktion, die das Eingabebild zuerst komplett in Schwarz-Weiß umwandelt."
+                ],
+                "correct": 2,
+                "explanation": "Ein Kernel ist eine kleine Gewichtsmatrix (z. B. 3×3). Er wird systematisch über das Bild geschoben und erzeugt an jeder Position einen Ausgabewert."
+        },
+        {
+                "text": "Was berechnet der Filter an jeder Position, über die er geschoben wird?",
+                "options": [
+                        "Den größten einzelnen Pixelwert, der gerade im aktuellen Fenster zu finden ist.",
+                        "Den Durchschnitt sämtlicher Pixel über das komplette Eingabebild hinweg.",
+                        "Die Differenz aus größtem und kleinstem Pixelwert innerhalb des Fensters.",
+                        "Die elementweise Multiplikation mit den Gewichten und danach die Summe der Produkte."
+                ],
+                "correct": 3,
+                "explanation": "Pro Position: überlappende Pixel mit den Kernel-Gewichten multiplizieren und alle Produkte aufaddieren — das ergibt einen Wert der Feature Map. Den größten Wert eines Fensters zu nehmen, gehört dagegen zu MaxPooling."
+        },
+        {
+                "text": "Was ist eine Feature Map?",
+                "options": [
+                        "Das Ergebnisbild, das nach dem Schieben eines Filters über die Eingabe entsteht.",
+                        "Die Tabelle mit den einzelnen Gewichten, aus denen der Filter zusammengesetzt ist.",
+                        "Die Liste aller Klassen, die das Netz am Ende voneinander unterscheiden soll.",
+                        "Das ursprüngliche Eingabebild, nur in einer deutlich höheren Auflösung."
+                ],
+                "correct": 0,
+                "explanation": "Die Feature Map ist das Ausgabebild der Faltung. Achtung auf die Verwechslung: Die Gewichtsmatrix ist der Filter (Kernel), nicht die Feature Map."
+        },
+        {
+                "text": "Wofür wird Padding (z. B. „Same“) verwendet?",
+                "options": [
+                        "Um den verwendeten Filter insgesamt deutlich größer und breiter zu machen.",
+                        "Um die einzelnen Pixelwerte schon vor der Faltung auf 0 bis 1 zu normieren.",
+                        "Um einen Rand zu ergänzen, damit die Feature Map nicht so stark schrumpft.",
+                        "Um das farbige Eingabebild noch vor der Faltung in Graustufen umzuwandeln."
+                ],
+                "correct": 2,
+                "explanation": "Padding legt einen Rand um das Bild. Bei „Same“ bleibt die Feature Map (bei Stride 1) genauso groß wie die Eingabe; bei „Valid“ (kein Rand) schrumpft sie."
+        },
+        {
+                "text": "Was bewirkt ein größerer Stride (Schrittweite), also Stride 2 statt 1?",
+                "options": [
+                        "Der Filter springt in größeren Schritten weiter, und die Feature Map wird kleiner.",
+                        "Der Filter springt in größeren Schritten weiter, und die Feature Map wird größer.",
+                        "Alle Pixelwerte des Eingabebildes werden vor der Faltung schlicht verdoppelt.",
+                        "Das gesamte Eingabebild wird noch vor der Berechnung um zwei Pixel gedreht."
+                ],
+                "correct": 0,
+                "explanation": "Bei Stride 2 springt der Filter um zwei Pixel weiter — es gibt weniger Positionen, also wird die Feature Map kleiner. (Die beiden ersten Optionen unterscheiden sich nur im letzten Wort — genau hinsehen!)"
+        },
+        {
+                "text": "Eingabe 8×8, Filter 3×3, Padding „Valid“ (kein Rand), Stride 1. Wie groß ist die Feature Map?",
+                "options": [
+                        "8×8",
+                        "5×5",
+                        "6×6",
+                        "3×3"
+                ],
+                "correct": 2,
+                "explanation": "(8 − 3 + 0)/1 + 1 = 6, also 6×6. Häufige Fehler: 8×8 (vergessen, dass „Valid“ schrumpft), 5×5 (das „+1“ vergessen), 3×3 (Feature Map mit Filtergröße verwechselt)."
+        },
+        {
+                "text": "Was macht die ReLU-Funktion mit den Werten der Feature Map?",
+                "options": [
+                        "Sie setzt umgekehrt alle positiven Werte auf 0 und behält dafür die negativen bei.",
+                        "Sie setzt alle negativen Werte auf 0, die positiven Werte bleiben unverändert.",
+                        "Sie verdoppelt jeden einzelnen Wert in der gesamten Feature Map gleichmäßig.",
+                        "Sie sortiert die Werte der Feature Map einfach der Größe nach von klein nach groß."
+                ],
+                "correct": 1,
+                "explanation": "ReLU (Rectified Linear Unit) lässt positive Werte durch und setzt alles Negative auf 0 — eine einfache, aber wichtige Nichtlinearität. Die erste Option ist genau die Umkehrung."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+        if (card.classList.contains('completed')) return;
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            card.querySelectorAll('button').forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

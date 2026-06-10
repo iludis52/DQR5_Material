@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNN Wissens-Check 2 — Vom Filter zum Netz</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; color: #333; }
+        .status-bar { position: sticky; top: 0; background: white; padding: 15px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        .status-info { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; }
+        .mistakes { color: #dc3545; }
+        .progress-container { width: 100%; background-color: #e0e0e0; border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
+        .quiz-container { max-width: 800px; margin: 30px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 30px; }
+        .quiz-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #1B3A5C; margin-top: 40px; margin-bottom: 4px; }
+        .subtitle { max-width: 800px; margin: 0 auto; padding: 0 20px; text-align: center; color: #2E75B6; font-weight: 600; }
+        .question-title { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .question-text { font-size: 1.2rem; color: #1B3A5C; margin-bottom: 20px; font-weight: 600; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 12px 15px; border: 2px solid #e0e0e0; background: white; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s; text-align: left; }
+        button:hover:not([disabled]) { background-color: #eaf1f8; border-color: #2E75B6; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        button.correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+        button.wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; text-decoration: line-through; }
+        .feedback { margin-top: 15px; padding: 15px; border-radius: 8px; display: none; font-size: 0.95rem; line-height: 1.5; }
+        .feedback.correct-feedback { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback.wrong-feedback { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .final-result { display: none; text-align: center; background: #eaf1f8; border: 2px solid #2E75B6; padding: 2rem; border-radius: 12px; margin-bottom: 40px; }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>CNN Wissens-Check 2</h1>
+<p class="subtitle">Vom Filter zum Netz — Conv-Layer, ReLU, MaxPooling, rezeptives Feld, Flatten, Dense (kumulativ)</p>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Check abgeschlossen!</h2>
+        <p>Du hast alle Fragen gelöst. Insgesamt hattest du <strong id="final-mistakes">0</strong> Fehlversuche.</p>
+        <p>Damit hast du den Weg vom einzelnen Filter bis zur fertigen Klassifikation einmal komplett durchlaufen.</p>
+        <button onclick="location.reload()" style="background: #2E75B6; color: white; border: none; text-align: center; margin-top: 15px;">Check neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Wiederholung: Eingabe 8×8, Filter 3×3, Padding „Valid“, Stride 1. Wie groß ist die Feature Map?",
+                "options": [
+                        "6×6",
+                        "4×4",
+                        "8×8",
+                        "3×3"
+                ],
+                "correct": 0,
+                "explanation": "(8 − 3 + 0)/1 + 1 = 6, also 6×6. Ohne Padding schrumpft die Feature Map an jedem Rand."
+        },
+        {
+                "text": "Eine Conv-Schicht verwendet meist nicht nur einen, sondern mehrere Filter parallel. Warum?",
+                "options": [
+                        "Damit jeder Filter ein anderes Merkmal erkennt, etwa verschiedene Kantenrichtungen.",
+                        "Damit das fertige Ausgabebild am Ende deutlich bunter und farbenfroher wirkt.",
+                        "Damit das Training insgesamt langsamer abläuft und dadurch am Ende genauer wird.",
+                        "Weil ein einzelner Filter rein mathematisch gar nicht funktionieren würde."
+                ],
+                "correct": 0,
+                "explanation": "Jeder Filter erzeugt eine eigene Feature Map und spezialisiert sich auf ein anderes Merkmal. So „sieht“ die Schicht z. B. horizontale UND vertikale Kanten gleichzeitig."
+        },
+        {
+                "text": "Was ist typisch für die Spezialisierung der Filter in einem tiefen CNN?",
+                "options": [
+                        "Alle Schichten im Netz erkennen am Ende letztlich immer genau dasselbe Merkmal.",
+                        "Frühe Schichten erkennen schon ganze Gesichter, spätere nur noch einzelne Kanten.",
+                        "Frühe Schichten erkennen einfache Kanten, spätere zunehmend komplexere Strukturen.",
+                        "Ausschließlich die allerletzte Schicht erkennt im gesamten Netz überhaupt Merkmale."
+                ],
+                "correct": 2,
+                "explanation": "Frühe Schichten reagieren auf Kanten und Texturen, spätere kombinieren diese zu komplexeren Mustern — deshalb lohnt es sich, einfache Merkmale zuerst zu lernen. Option 2 dreht das genau um."
+        },
+        {
+                "text": "Was macht eine MaxPooling-Schicht (2×2)?",
+                "options": [
+                        "Sie addiert die vier Werte jedes 2×2-Bereichs zu einem einzigen Wert zusammen.",
+                        "Sie behält pro 2×2-Bereich nur den größten Wert und verkleinert so die Feature Map.",
+                        "Sie vergrößert die Feature Map auf das Doppelte ihrer bisherigen Seitenlänge.",
+                        "Sie ersetzt jeden Wert durch den Mittelwert des kompletten Eingabebildes."
+                ],
+                "correct": 1,
+                "explanation": "MaxPooling behält pro 2×2-Bereich nur den größten Wert. Das verkleinert die Feature Map und macht das Netz robuster gegen kleine Verschiebungen."
+        },
+        {
+                "text": "Eine Feature Map ist 8×8. Wie groß ist sie nach einer MaxPooling-Schicht (2×2)?",
+                "options": [
+                        "16×16",
+                        "8×8",
+                        "2×2",
+                        "4×4"
+                ],
+                "correct": 3,
+                "explanation": "2×2-Pooling halbiert jede Seite: aus 8×8 wird 4×4."
+        },
+        {
+                "text": "Was bezeichnet das „rezeptive Feld“ eines Neurons in einer Feature Map?",
+                "options": [
+                        "Die Anzahl der Filter, die in dieser einen Schicht insgesamt verwendet werden.",
+                        "Die Farbe des hellsten Pixels, das irgendwo im gesamten Eingabebild zu finden ist.",
+                        "Die Position dieses Neurons innerhalb der am Ende ausgegebenen Klasse.",
+                        "Den Bereich im Originalbild, der den Wert genau dieses Neurons beeinflusst."
+                ],
+                "correct": 3,
+                "explanation": "Das rezeptive Feld ist der Ausschnitt des Originalbildes, der einen bestimmten Wert „mitbestimmt“. Bei einer einzelnen Schicht entspricht es genau dem Kernel-Fenster."
+        },
+        {
+                "text": "Zwei Conv-Schichten mit je 3×3-Filtern (kein Pooling). Wie groß ist das rezeptive Feld im Originalbild nach der zweiten Schicht?",
+                "options": [
+                        "9×9",
+                        "5×5",
+                        "6×6",
+                        "3×3"
+                ],
+                "correct": 1,
+                "explanation": "(k − 1)·L + 1 = (3 − 1)·2 + 1 = 5, also 5×5. Mit jeder Schicht wächst das rezeptive Feld — das Netz „sieht“ größere Zusammenhänge."
+        },
+        {
+                "text": "Was passiert beim „Flatten“ am Ende des Conv-Teils?",
+                "options": [
+                        "Alle Feature Maps werden zu einem einzigen langen Vektor aneinandergereiht.",
+                        "Die größte vorhandene Feature Map wird ausgewählt, alle anderen werden verworfen.",
+                        "Sämtliche Werte werden noch vor dem nächsten Schritt auf 0 oder 1 gerundet.",
+                        "Die Feature Maps werden wieder zu einem fertigen Farbbild zusammengesetzt."
+                ],
+                "correct": 0,
+                "explanation": "Flatten „rollt“ alle Feature Maps zu einem eindimensionalen Vektor aus. Dieser Vektor ist die Eingabe für die abschließende Dense-Schicht."
+        },
+        {
+                "text": "Eine Conv-Schicht hat 4 Filter, jede Feature Map ist 6×6. Wie viele Werte enthält der Flatten-Vektor?",
+                "options": [
+                        "36",
+                        "144",
+                        "16",
+                        "4"
+                ],
+                "correct": 1,
+                "explanation": "4 Maps × 6 × 6 = 144 Werte. 36 wäre nur eine einzelne Map, 4 nur die Anzahl der Filter."
+        },
+        {
+                "text": "Welche Aufgabe übernimmt die abschließende Dense-Schicht (nach dem Flatten)?",
+                "options": [
+                        "Sie schiebt die einzelnen Filter wie zuvor noch einmal über das Eingabebild.",
+                        "Sie ordnet den Merkmalsvektor einer der möglichen Klassen zu (Klassifikation).",
+                        "Sie verkleinert die Feature Map auf die Hälfte ihrer bisherigen Seitenlänge.",
+                        "Sie erzeugt aus dem Vektor wieder vollständig neue Eingabebilder zum Üben."
+                ],
+                "correct": 1,
+                "explanation": "Conv und Pooling verdichten das Bild zu einem kleinen Merkmalsvektor — genau diesen kann die Dense-Schicht nun einer Klasse zuordnen. Deshalb scheitert Dense nur auf Rohpixeln, nicht hier."
+        },
+        {
+                "text": "In welcher Reihenfolge durchläuft ein Bild typischerweise die Pipeline?",
+                "options": [
+                        "Dense → Flatten → MaxPool → ReLU → Conv → Eingabe → Klasse",
+                        "Eingabe → Flatten → Conv → ReLU → Dense → MaxPool → Klasse",
+                        "Eingabe → Conv → ReLU → MaxPool → Flatten → Dense → Klasse",
+                        "Eingabe → MaxPool → Conv → ReLU → Flatten → Dense → Klasse"
+                ],
+                "correct": 2,
+                "explanation": "Erst Merkmale extrahieren (Conv + ReLU), dann verdichten (MaxPool), dann ausrollen (Flatten) und schließlich klassifizieren (Dense)."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+        if (card.classList.contains('completed')) return;
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            card.querySelectorAll('button').forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
