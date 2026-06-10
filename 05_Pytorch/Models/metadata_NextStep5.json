@@ -1,0 +1,30 @@
+{
+  "feature_names": [
+    "A_id",
+    "Size",
+    "Weight",
+    "Sweetness",
+    "Crunchiness",
+    "Juiciness",
+    "Ripeness",
+    "Acidity"
+  ],
+  "class_names": [
+    "bad",
+    "good"
+  ],
+  "class_mapping": {
+    "0": "bad",
+    "1": "good"
+  },
+  "scaler_type": "standard",
+  "architecture": {
+    "input_dim": 7,
+    "hidden_dim": 5,
+    "output_dim": 2
+  },
+  "best_val_loss": 0.40446311235427856,
+  "test_accuracy": 0.795,
+  "seed": 42,
+  "torch_version": "2.8.0"
+}
