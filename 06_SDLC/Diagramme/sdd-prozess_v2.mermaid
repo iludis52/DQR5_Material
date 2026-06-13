@@ -1,0 +1,62 @@
+flowchart TD
+    START(["Projektidee"]):::term
+    CONST["constitution.md<br/>(optional – nur bei mehreren<br/>Specs, Personen oder Agenten)"]:::opt
+
+    subgraph G1["Spezifikation"]
+        S1["1 — Spec anstoßen<br/>(Metaprompt)"]:::step
+        Q1{"Alle Lücken<br/>geklärt?"}:::dec
+        SPEC[("spec.md")]:::file
+        S2["2 — Spec-Review<br/>(anderes Modell)"]:::step
+        Q2{"Lücken oder<br/>Widersprüche?"}:::dec
+        S1 --> Q1
+        Q1 -- "nein: nachhaken" --> S1
+        Q1 -- "ja" --> SPEC --> S2 --> Q2
+        Q2 -- "ja: Spec überarbeiten" --> S1
+    end
+
+    subgraph G2["Planung"]
+        S3["3 — plan.md erstellen"]:::step
+        PLAN[("plan.md")]:::file
+        S4["4 — tasks.md erstellen"]:::step
+        TASKS[("tasks.md")]:::file
+        S3 --> PLAN --> S4 --> TASKS
+    end
+
+    subgraph G3["Umsetzung – je Task"]
+        S5["5 — Tests zuerst<br/>(TDD: rot)"]:::step
+        S6["6 — Implementieren"]:::step
+        Q3{"Tests grün?"}:::dec
+        CB{"2× derselbe<br/>Fehlschlag?"}:::warn
+        ASK["STOPP: Hypothesen<br/>nennen, Mensch fragen"]:::warn
+        COMMIT["Git-Commit<br/>= Speicherstand"]:::ok
+        Q4{"Weitere<br/>Tasks?"}:::dec
+        S5 --> S6 --> Q3
+        Q3 -- "nein" --> CB
+        CB -- "nein: korrigieren" --> S6
+        CB -- "ja" --> ASK --> S6
+        Q3 -- "ja" --> COMMIT --> Q4
+        Q4 -- "ja: neue Session" --> S5
+    end
+
+    DONE(["Fertig"]):::term
+    PAUSE(("Unterbrechung")):::warn
+    S7["7 — Wiederaufnahme"]:::step
+    STATUS[("STATUS.md +<br/>nur relevante Dateien")]:::file
+    BUG(("Bug entdeckt")):::warn
+    S8["8 — Bugfixing<br/>diagnostizieren → Test → Fix"]:::step
+
+    START --> S1
+    CONST -.-> S1
+    Q2 -- "nein" --> S3
+    TASKS --> S5
+    Q4 -- "nein" --> DONE
+    PAUSE -.-> S7 --> STATUS -.-> S5
+    BUG -.-> S8 --> COMMIT
+
+    classDef step fill:#0969DA,stroke:#0a4da0,color:#ffffff,stroke-width:1px;
+    classDef file fill:#eef1f4,stroke:#8c959f,color:#1f2328;
+    classDef dec fill:#eaf2fb,stroke:#0969DA,color:#1f2328;
+    classDef warn fill:#ffe3c2,stroke:#b45309,color:#7a3a00,stroke-width:1.5px;
+    classDef ok fill:#e8f5ea,stroke:#1a7f37,color:#0f4d22;
+    classDef opt fill:#f4f5f7,stroke:#8c959f,color:#57606a,stroke-dasharray:4 3;
+    classDef term fill:#1f2328,stroke:#1f2328,color:#ffffff;
