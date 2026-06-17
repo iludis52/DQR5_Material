@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rezeptives Feld bei CNNs – iludis.de</title>
+<style>
+  :root{
+    --accent:#0969DA; --accent-soft:#dbeafe; --accent-line:#93c5fd;
+    --ink:#1c2128; --muted:#57606a; --line:#d0d7de; --bg:#f6f8fa; --card:#fff;
+    --warn:#9a3412; --warn-soft:#fff1e6;
+    --mono:"Consolas","SFMono-Regular",ui-monospace,monospace;
+    --sans:Arial,Helvetica,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased}
+  header{border-bottom:1px solid var(--line);background:var(--card);padding:18px 28px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  header .brand{font-weight:700;letter-spacing:.5px;color:var(--accent);font-size:15px;text-transform:lowercase}
+  header h1{font-size:19px;margin:0;font-weight:700}
+  header .sub{color:var(--muted);font-size:13px}
+  main{max-width:1320px;margin:0 auto;padding:24px 28px 60px;display:grid;grid-template-columns:minmax(360px,430px) 1fr;gap:28px;align-items:start}
+  @media (max-width:960px){ main{grid-template-columns:1fr} }
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 16px;font-weight:700}
+  .field{margin-bottom:18px}.field:last-child{margin-bottom:0}
+  .field > label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}
+  .field .val{font-family:var(--mono);color:var(--accent);font-weight:700}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{border:0;background:var(--card);padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted);border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed=true]{background:var(--accent);color:#fff;font-weight:700}
+  .seg button:disabled{opacity:.4;cursor:not-allowed}
+  .layer{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:14px 16px;margin-bottom:12px;background:#fcfdff}
+  .layer h3{margin:0 0 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .layer h3 .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .layer .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
+  .layer .row:last-child{margin-bottom:0}
+  .layer .row > span{font-size:13px;font-weight:700;color:var(--muted)}
+  .hint{font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:7px 10px;margin-top:10px;display:none}
+  .hint.show{display:block}
+  .hint code{font-family:var(--mono);font-size:11.5px}
+  svg.cascade{display:block;width:100%;max-width:360px;height:auto;margin:0 auto}
+  .legend{font-size:12.5px;color:var(--muted);margin-top:14px;display:flex;flex-direction:column;gap:7px}
+  .legend .item{display:flex;align-items:center;gap:8px}
+  .swatch{width:18px;height:14px;border-radius:3px;flex:none}
+  .stat-row{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .stat{flex:1;min-width:130px;border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fcfdff}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+  .stat .v{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1.1;margin-top:3px}
+  .stat.rf .v{color:var(--accent)}
+  .stat .note{font-size:11.5px;color:var(--muted);margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--line)}
+  td.num{font-family:var(--mono)}
+  tr.op-input td{color:var(--muted)}
+  td .delta{color:var(--accent);font-weight:700}
+  .col-r{border-left:2px solid var(--accent-line)}
+  th.col-r{color:var(--accent)}
+  .banner{border:1px solid #f0b78f;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px;display:none}
+  .banner.show{display:block}
+  .formula{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:11px 13px;margin-top:14px;white-space:pre-line;line-height:1.7}
+  .legendkey{margin-top:14px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+  .lk-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin-bottom:9px}
+  .lk{display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:baseline;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .lk:last-child{margin-bottom:0}
+  .lk code{font-family:var(--mono);color:var(--accent);font-weight:700}
+  .lk b{color:var(--ink);font-weight:700}
+  .keypoints{font-size:13.5px;color:var(--muted);display:flex;flex-direction:column;gap:11px}
+  .keypoints code{font-family:var(--mono)}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">iludis.de</span>
+  <h1>Vom Bild zur Feature-Map</h1>
+  <span class="sub">Faltung, Stride, Pooling und das rezeptive Feld · PyTorch-Konvention</span>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Architektur</h2>
+      <div class="field">
+        <label>Bildgröße <span class="val" id="imgVal">10 × 10</span></label>
+        <input type="range" id="imgSize" min="8" max="28" value="10">
+      </div>
+      <div class="field">
+        <label>Conv-Schichten <span class="val" id="layerVal">2</span></label>
+        <input type="range" id="layerCount" min="1" max="2" value="2">
+      </div>
+      <div id="layers"></div>
+      <div class="field" style="margin-top:16px">
+        <label>Pooling</label>
+        <div style="font-size:12.5px;color:var(--muted)">
+          Nach jeder Conv-Schicht fest <code style="font-family:var(--mono)">MaxPool2d(2)</code> – Stride 2, kachelt überlappungsfrei.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Berechnung pro Operation</h2>
+      <div class="banner" id="banner"></div>
+      <table>
+        <thead><tr><th>Operation</th><th>n</th><th>Überlapp</th><th>j</th><th class="col-r">r</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="legendkey">
+        <div class="lk-title">Formelzeichen</div>
+        <div class="lk"><code>n</code><span>Kantenlänge der <b>Ausgabe</b> dieser Operation (Neuronen je Zeile)</span></div>
+        <div class="lk"><code>n_ein</code><span>Kantenlänge der <b>Eingabe</b> = Feature-Map der Stufe direkt darüber</span></div>
+        <div class="lk"><code>k</code><span>Kernelgröße · <code>s</code> Stride · <code>p</code> Padding (same: ⌊k/2⌋, valid: 0)</span></div>
+        <div class="lk"><code>⌊ ⌋</code><span><b>abrunden</b> auf die nächstkleinere ganze Zahl</span></div>
+        <div class="lk"><code>j</code><span>kumulierter Sprung (Produkt aller Strides bis hier)</span></div>
+        <div class="lk"><code>r</code><span>rezeptives Feld – wie viele Eingabepixel das Neuron sieht</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Worauf es ankommt</h2>
+      <div class="keypoints">
+        <div><b>Innerhalb ≠ zwischen den Fenstern.</b> Ein k×k-Kernel liest immer <code>k</code> <i>benachbarte</i> Zellen (Dilation 1) – unabhängig vom Stride. Der <b>Stride</b> bestimmt nur, wie weit das <i>nächste</i> Fenster springt. Darum ändert Stride die Neuronenzahl und den Überlapp, nicht aber, was ein einzelnes Neuron lückenlos sieht.</div>
+        <div><b style="color:#0969DA">Conv gleitet, MaxPool kachelt.</b> Conv-Fenster überlappen sich um <code>k − s</code> Zellen (durchgezogen + gestrichelt im Bild, Überlapp gefüllt). MaxPool (k=2, s=2) hat Überlapp 0 – die Fenster grenzen lückenlos aneinander.</div>
+        <div><b>valid + Stride verwirft Ränder.</b> Passt am Rand kein vollständiges Fenster mehr, fällt der Pixel weg (schraffiert). Bei 10×10, k=3, s=2 bleibt so Pixel 9 unbenutzt.</div>
+        <div><b style="color:var(--accent)">Das rezeptive Feld</b> ist die Verkettung aller Fenster über die Stufen hinweg – die gestrichelte Box auf dem Eingabebild zeigt, was das Neuron der letzten Schicht insgesamt sieht.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat rf"><div class="k">Rezeptives Feld</div><div class="v" id="statRF">—</div><div class="note">letzte Schicht, auf Eingabe</div></div>
+        <div class="stat"><div class="k">Ausgabe-Auflösung</div><div class="v" id="statN">—</div><div class="note">Feature-Map letzte Schicht</div></div>
+      </div>
+      <svg class="cascade" id="svg" role="img" aria-label="Rechenstufen des CNN von oben nach unten"></svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+</main>
+
+<footer>iludis.de · Lernwerkzeug Faltung &amp; rezeptives Feld</footer>
+
+<script>
+"use strict";
+
+// Palette: pro Schicht Conv (hell) + Pool (dunkel)
+const PALETTE = [
+  {conv:{fill:"#dbeafe", line:"#0969DA", txt:"#0a3d7a"}, pool:{fill:"#1e40af", line:"#1e3a8a", txt:"#1e3a8a"}},
+  {conv:{fill:"#dcfce7", line:"#16a34a", txt:"#14532d"}, pool:{fill:"#166534", line:"#14532d", txt:"#14532d"}},
+];
+
+const state = {
+  imgSize: 10,
+  layerCount: 2,
+  layers: [ {k:3,s:1,padding:"valid"}, {k:3,s:1,padding:"valid"} ],
+};
+
+// ---------- Pipeline ----------
+function buildPipeline(){
+  const ops=[];
+  for(let i=0;i<state.layerCount;i++){
+    const L=state.layers[i];
+    const p=(L.padding==="same")?Math.floor(L.k/2):0;
+    ops.push({kind:"conv",layer:i,k:L.k,s:L.s,p,padding:L.padding,name:`Conv ${i+1} · ${L.k}×${L.k} · s${L.s} · ${L.padding}`,short:`Conv ${i+1}`});
+    ops.push({kind:"pool",layer:i,k:2,s:2,p:0,padding:"valid",name:`MaxPool ${i+1} · 2×2 · s2`,short:`MaxPool ${i+1}`});
+  }
+  const stages=[{kind:"input",n:state.imgSize,op:null,j:1,r:1}];
+  let n=state.imgSize, j=1, r=1, degenerate=false;
+  for(const o of ops){
+    const no=Math.floor((n+2*o.p-o.k)/o.s)+1;
+    if(no<1){ degenerate=true; break; }
+    r = r + (o.k-1)*j;
+    j = j*o.s;
+    stages.push({kind:o.kind,layer:o.layer,n:no,op:o,j,r});
+    n=no;
+  }
+  return {stages,degenerate};
+}
+
+// rezeptives Feld des Zentrums der letzten Stufe auf Eingabe-Indizes
+function rfBlock(stages){
+  const ops=stages.slice(1).map(s=>s.op);
+  const last=stages[stages.length-1];
+  let lo=Math.floor((last.n-1)/2), hi=lo;
+  for(let i=ops.length-1;i>=0;i--){ const{k,s,p}=ops[i]; lo=lo*s-p; hi=hi*s-p+k-1; }
+  return {lo,hi};
+}
+
+// ---------- Steuerung ----------
+function buildLayers(){
+  const box=document.getElementById("layers"); box.innerHTML="";
+  for(let i=0;i<state.layerCount;i++){
+    const L=state.layers[i], c=PALETTE[i].conv;
+    const el=document.createElement("div");
+    el.className="layer"; el.style.borderLeftColor=c.line;
+    el.innerHTML=`
+      <h3 style="color:${c.line}"><span class="dot" style="background:${c.line}"></span>Conv-Schicht ${i+1}</h3>
+      <div class="row"><span>Kernel</span><div class="seg" data-prop="k" data-idx="${i}">
+        <button data-v="3" aria-pressed="${L.k===3}">3 × 3</button><button data-v="5" aria-pressed="${L.k===5}">5 × 5</button></div></div>
+      <div class="row"><span>Stride</span><div class="seg" data-prop="s" data-idx="${i}">
+        <button data-v="1" aria-pressed="${L.s===1}">1</button><button data-v="2" aria-pressed="${L.s===2}">2</button></div></div>
+      <div class="row"><span>Padding</span><div class="seg" data-prop="padding" data-idx="${i}">
+        <button data-v="same" aria-pressed="${L.padding==='same'}" ${L.s===2?'disabled':''}>same</button><button data-v="valid" aria-pressed="${L.padding==='valid'}">valid</button></div></div>
+      <div class="hint ${L.s===2?'show':''}"><code>same</code> ist ein Stride-1-Konzept – bei Stride 2 auf <code>valid</code> gesetzt.</div>`;
+    box.appendChild(el);
+  }
+  box.querySelectorAll(".seg button").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      if(btn.disabled) return;
+      const seg=btn.parentElement, idx=+seg.dataset.idx, prop=seg.dataset.prop;
+      let v=btn.dataset.v; if(prop==="k"||prop==="s") v=+v;
+      state.layers[idx][prop]=v;
+      if(prop==="s"&&v===2&&state.layers[idx].padding==="same") state.layers[idx].padding="valid";
+      buildLayers(); render();
+    });
+  });
+}
+
+// ---------- Tabelle ----------
+function renderTable(model){
+  const tb=document.getElementById("tbody"); tb.innerHTML="";
+  model.stages.forEach(st=>{
+    const tr=document.createElement("tr");
+    let firstStyle="", ov="–";
+    if(st.kind==="input"){ tr.className="op-input"; }
+    else{
+      const c=PALETTE[st.layer][st.kind];
+      tr.style.background = st.kind==="conv" ? c.fill : "#f3f4f6";
+      firstStyle=`color:${c.txt};font-weight:700;border-left:3px solid ${c.line}`;
+      ov = Math.max(0, st.op.k - st.op.s);
+    }
+    const name = st.kind==="input" ? "Eingang" : st.op.name;
+    const dr = (st.kind!=="input" && (st.op.k-1)*0===0) ? "" : "";
+    tr.innerHTML=`<td style="${firstStyle}">${name}</td>
+      <td class="num">${st.n}</td>
+      <td class="num">${st.kind==="input"?"–":ov}</td>
+      <td class="num">${st.j}</td>
+      <td class="num col-r">${st.r}</td>`;
+    tb.appendChild(tr);
+  });
+  const b=document.getElementById("banner");
+  if(model.degenerate){ b.classList.add("show"); b.textContent="Auflösung kollabiert (n < 1). Reduziere Stride/Schichten oder vergrößere das Bild – in PyTorch nicht baubar."; }
+  else b.classList.remove("show");
+}
+
+function renderStats(model){
+  const last=model.stages[model.stages.length-1];
+  document.getElementById("statRF").textContent=`${last.r} × ${last.r}`;
+  document.getElementById("statN").textContent=`${last.n} × ${last.n}`;
+}
+
+// ---------- Legende ----------
+function renderLegend(model){
+  const box=document.getElementById("legend"); let h="";
+  model.stages.forEach(st=>{
+    if(st.kind==="input"){ h+=`<div class="item"><span class="swatch" style="background:#fff;border:1px solid #c4ccd4"></span>Eingabebild (${st.n}×${st.n} Pixel)</div>`; return; }
+    const c=PALETTE[st.layer][st.kind];
+    h+=`<div class="item"><span class="swatch" style="background:${c.fill};border:1.5px solid ${c.line}"></span>${st.op.short} (${st.n}×${st.n})</div>`;
+  });
+  h+=`<div class="item"><span class="swatch" style="background:transparent;border:2px solid #444"></span>ein Neuron-Fenster · <span style="border:2px dashed #444;padding:0 3px;margin-left:2px">Nachbar</span></div>`;
+  h+=`<div class="item"><span class="swatch" style="background:repeating-linear-gradient(45deg,#e7a,#e7a 2px,#fff 2px,#fff 5px);opacity:.6"></span>verworfene Randpixel (valid)</div>`;
+  h+=`<div class="item"><span class="swatch" style="border:1.5px dashed var(--accent);background:var(--accent-soft)"></span>rezeptives Feld der letzten Schicht</div>`;
+  box.innerHTML=h;
+}
+
+// ---------- Kaskade (SVG) ----------
+function renderViz(model){
+  const svg=document.getElementById("svg");
+  const stages=model.stages, N=state.imgSize;
+  const cell=Math.max(9, Math.min(20, Math.floor(190/N)));
+  const LBL=22, ARROW=16, ALH=13;   // ALH = Zeilenhöhe Annotation
+  let maxP=0; stages.forEach(s=>{ if(s.op&&s.op.p>maxP) maxP=s.op.p; });
+  const ring=maxP*cell;
+  const lane=N*cell;
+  const SIDE=ring+10;
+  const cxLane=SIDE+lane/2;
+  const GAP=ARROW+ring+14;
+  const textX=SIDE+lane+ring+18;     // Beginn der Formelspalte
+  const TEXTW=232;
+  const W=textX+TEXTW;
+
+  // SVG-escape + Subskript-Renderer für "_wort"
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function mathT(str){
+    let html="", last=0, mm, up=false;
+    const re=/_([A-Za-zÄÖÜäöüß]+)/g;
+    const norm=t=>{ if(!t) return; html+=`<tspan${up?' dy="-3"':''}>${esc(t)}</tspan>`; up=false; };
+    while((mm=re.exec(str))){ norm(str.slice(last,mm.index)); html+=`<tspan dy="3" font-size="8.5">${esc(mm[1])}</tspan>`; up=true; last=re.lastIndex; }
+    norm(str.slice(last));
+    return html;
+  }
+
+  // Annotation (Formeln) je Stufe aufbauen
+  function annoOf(i){
+    const st=stages[i];
+    if(st.kind==="input") return {head:"Eingabe", color:"#57606a", lines:[
+      `Startwerte: n = ${st.n}, r = 1, j = 1`,
+      `jedes Pixel ist sein eigenes Feld`]};
+    const prev=stages[i-1], O=st.op, c=PALETTE[st.layer][st.kind];
+    const nEin=prev.n, k=O.k, s=O.s, p=O.p, n=st.n;
+    const rEin=prev.r, jEin=prev.j, grow=(k-1)*jEin, ov=Math.max(0,k-s);
+    const lines=[];
+    if(st.kind==="pool") lines.push(`für diese Berechnung gilt: s_MaxPool = 2`);
+    lines.push(`Ausgabe:  n = ⌊(n_ein + 2p − k) / s⌋ + 1`);
+    lines.push(`= ⌊(${nEin} + ${2*p} − ${k}) / ${s}⌋ + 1 = ${n}`);
+    lines.push(`Überlapp = k − s = ${k} − ${s} = ${ov}`);
+    lines.push(`Feld:  r = r_ein + (k−1)·j_ein`);
+    lines.push(`= ${rEin} + ${k-1}·${jEin} = ${st.r}`);
+    return {head:O.short, color:c.line, lines};
+  }
+
+  // Layout: y rückt um max(Gridhöhe, Annotationshöhe) vor
+  let y=10+ring;
+  const lay=stages.map((st,i)=>{
+    const gx=cxLane-st.n*cell/2;
+    const labelY=y, gridY=y+LBL;
+    const anno=annoOf(i);
+    const annoH=(anno.lines.length+1)*ALH+8;
+    const block=Math.max(st.n*cell, annoH);
+    const pos={st, x:gx, y:gridY, labelY, anno, block};
+    y=gridY+block+GAP;
+    return pos;
+  });
+  const H=y-GAP+ring+8;
+
+  const px=(x,c)=>x+c*cell;
+  let out="";
+
+  out+=`<defs>
+    <pattern id="drop" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="5" height="5" fill="#fff"/><rect width="2.2" height="5" fill="#e9a0a0"/></pattern>
+  </defs>`;
+
+  // Stufen + Annotationen
+  lay.forEach((P,i)=>{
+    const st=P.st, isInput=st.kind==="input";
+    const col=isInput?{fill:"#ffffff",line:"#c4ccd4",txt:"#57606a"}:PALETTE[st.layer][st.kind];
+    const gw=st.n*cell;
+    const lname=isInput?`Eingabebild · ${st.n}×${st.n}`:st.op.name;
+    out+=`<text x="${cxLane}" y="${P.labelY+13}" text-anchor="middle" font-family="Arial" font-size="11.5" font-weight="700" fill="${isInput?'#57606a':col.txt}">${esc(lname)}</text>`;
+
+    if(i>0){
+      const prev=lay[i-1];
+      const ay0=prev.y+prev.st.n*cell, ay1=P.labelY-2;
+      out+=`<line x1="${cxLane}" y1="${ay0+4}" x2="${cxLane}" y2="${ay1}" stroke="#b8c0c8" stroke-width="1.5"/>`;
+      out+=`<path d="M${cxLane-4},${ay1-5} L${cxLane},${ay1} L${cxLane+4},${ay1-5}" fill="none" stroke="#b8c0c8" stroke-width="1.5"/>`;
+    }
+
+    out+=`<rect x="${P.x}" y="${P.y}" width="${gw}" height="${gw}" fill="${col.fill}" stroke="${col.line}" stroke-width="1.5"/>`;
+    const glc=(st.kind==="pool")?"rgba(255,255,255,0.35)":"rgba(0,0,0,0.10)";
+    let gl="";
+    for(let t=1;t<st.n;t++){
+      gl+=`<line x1="${px(P.x,t)}" y1="${P.y}" x2="${px(P.x,t)}" y2="${P.y+gw}"/>`;
+      gl+=`<line x1="${P.x}" y1="${px(P.y,t)}" x2="${P.x+gw}" y2="${px(P.y,t)}"/>`;
+    }
+    out+=`<g stroke="${glc}" stroke-width="1">${gl}</g>`;
+
+    // Formel-Annotation rechts
+    const A=P.anno;
+    let ty=P.labelY+11;
+    out+=`<text x="${textX}" y="${ty}" font-family="Arial" font-size="11.5" font-weight="700" fill="${A.color}">${esc(A.head)}</text>`;
+    A.lines.forEach((ln,j)=>{
+      ty+=ALH; const indent = ln.trim().startsWith("=") ? 12 : 0;
+      out+=`<text x="${textX+indent}" y="${ty}" font-family="Consolas,monospace" font-size="10.3" fill="#3a424b">${mathT(ln)}</text>`;
+    });
+  });
+
+  // Overlays
+  lay.forEach((P,i)=>{
+    if(i>=lay.length-1) return;
+    const child=lay[i+1], O=child.st.op;
+    const c=PALETTE[child.st.layer][child.st.kind];
+    const pn=P.st.n;
+
+    if(O.p>0){
+      const w=O.p*cell, ox=P.x-w, oy=P.y-w, ow=pn*cell+2*w;
+      const band=(x,y,bw,bh)=>`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="url(#drop)" opacity="0.25" stroke="#b0b8c0" stroke-width="0.8" stroke-dasharray="2 2"/>`;
+      out+=band(ox,oy,ow,w)+band(ox,P.y+pn*cell,ow,w)+band(ox,P.y,w,pn*cell)+band(P.x+pn*cell,P.y,w,pn*cell);
+    }
+
+    const lastCov=(child.st.n-1)*O.s - O.p + O.k - 1;
+    const covMax=Math.min(pn-1,lastCov);
+    if(covMax<pn-1){
+      for(let d=covMax+1; d<pn; d++){
+        out+=`<rect x="${px(P.x,d)}" y="${P.y}" width="${cell}" height="${pn*cell}" fill="url(#drop)"/>`;
+        out+=`<rect x="${P.x}" y="${px(P.y,d)}" width="${pn*cell}" height="${cell}" fill="url(#drop)"/>`;
+      }
+    }
+
+    const hasNeighbor=child.st.n>=2;
+    const a0=-O.p, b0=O.s-O.p, k=O.k;
+    const winX=(start)=>px(P.x,start), wpx=k*cell, winY=px(P.y,a0);
+    const ovStart=b0, ovEnd=a0+k-1;
+    if(hasNeighbor && O.s<k){
+      out+=`<rect x="${px(P.x,ovStart)}" y="${winY}" width="${(ovEnd-ovStart+1)*cell}" height="${wpx}" fill="${c.line}" opacity="0.30"/>`;
+    }
+    out+=`<rect x="${winX(a0)}" y="${winY}" width="${wpx}" height="${wpx}" fill="none" stroke="${c.line}" stroke-width="2.2"/>`;
+    if(hasNeighbor) out+=`<rect x="${winX(b0)}" y="${winY}" width="${wpx}" height="${wpx}" fill="none" stroke="${c.line}" stroke-width="1.8" stroke-dasharray="3.5 2.5"/>`;
+
+    const aCx=winX(a0)+wpx/2, bCx=winX(b0)+wpx/2, srcY=winY+wpx;
+    const n0x=child.x+0.5*cell, n1x=child.x+1.5*cell, dstY=child.y;
+    out+=`<line x1="${aCx}" y1="${srcY}" x2="${n0x}" y2="${dstY}" stroke="${c.line}" stroke-width="1" opacity="0.45"/>`;
+    out+=`<rect x="${child.x}" y="${child.y}" width="${cell}" height="${cell}" fill="none" stroke="${c.line}" stroke-width="2.2"/>`;
+    if(hasNeighbor){
+      out+=`<line x1="${bCx}" y1="${srcY}" x2="${n1x}" y2="${dstY}" stroke="${c.line}" stroke-width="1" opacity="0.45" stroke-dasharray="3 2"/>`;
+      out+=`<rect x="${child.x+cell}" y="${child.y}" width="${cell}" height="${cell}" fill="none" stroke="${c.line}" stroke-width="1.8" stroke-dasharray="3.5 2.5"/>`;
+    }
+  });
+
+  if(stages.length>1){
+    const rf=rfBlock(stages), P0=lay[0];
+    const lo=Math.max(0,rf.lo), hi=Math.min(N-1,rf.hi);
+    out+=`<rect x="${px(P0.x,lo)}" y="${px(P0.y,lo)}" width="${(hi-lo+1)*cell}" height="${(hi-lo+1)*cell}" fill="var(--accent)" fill-opacity="0.10" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 3"/>`;
+  }
+
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.style.maxWidth = W + "px";
+  svg.innerHTML=out;
+}
+
+function render(){
+  document.getElementById("imgVal").textContent=`${state.imgSize} × ${state.imgSize}`;
+  document.getElementById("layerVal").textContent=state.layerCount;
+  const model=buildPipeline();
+  renderTable(model); renderStats(model); renderLegend(model); renderViz(model);
+}
+
+document.getElementById("imgSize").addEventListener("input",e=>{ state.imgSize=+e.target.value; render(); });
+document.getElementById("layerCount").addEventListener("input",e=>{
+  state.layerCount=+e.target.value;
+  while(state.layers.length<state.layerCount) state.layers.push({k:3,s:1,padding:"valid"});
+  buildLayers(); render();
+});
+
+buildLayers(); render();
+</script>
+</body>
+</html>

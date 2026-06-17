@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "label_encoding": {
+    "dreieck": 0,
+    "kreis": 1,
+    "linie": 2,
+    "rechteck": 3
+  },
+  "image_height": 24,
+  "image_width": 24,
+  "num_features": 576,
+  "n_pro_klasse": 100,
+  "seed": 42,
+  "save_png": false,
+  "transforms": [
+    {
+      "name": "RandomResizedCrop",
+      "enabled": true,
+      "order": 1,
+      "value": 0.7
+    },
+    {
+      "name": "RandomHorizontalFlip",
+      "enabled": true,
+      "order": 2,
+      "value": true
+    },
+    {
+      "name": "RandomVerticalFlip",
+      "enabled": true,
+      "order": 3,
+      "value": true
+    },
+    {
+      "name": "RandomRotation",
+      "enabled": true,
+      "order": 4,
+      "value": 35
+    },
+    {
+      "name": "RandomPerspective",
+      "enabled": true,
+      "order": 5,
+      "value": 0.2
+    },
+    {
+      "name": "RandomAdjustSharpness",
+      "enabled": true,
+      "order": 6,
+      "value": 0.5
+    },
+    {
+      "name": "RandomAutocontrast",
+      "enabled": false,
+      "order": 7,
+      "value": 0
+    }
+  ]
+}
