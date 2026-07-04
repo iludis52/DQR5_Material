@@ -94,7 +94,7 @@
 <div class="card">
   <div class="controls">
     <div class="ctrl degree-ctrl">
-      <label>Polynomgrad (Ansicht 1 &amp; 2): <span class="val" id="v-deg">3</span></label>
+      <label>Polynomgrad (Ansicht 1, 2 &amp; 4): <span class="val" id="v-deg">3</span></label>
       <input type="range" id="s-deg" min="1" max="12" step="1" value="3">
     </div>
     <div class="ctrl">
@@ -118,6 +118,7 @@
   <button data-view="v1" class="active">1 · Einzelfits: Jede Ziehung ein anderes Modell</button>
   <button data-view="v2">2 · Überlagerung: Bias &amp; Varianz werden sichtbar</button>
   <button data-view="v3">3 · Komplexitäts-Matrix: Der Tradeoff</button>
+  <button data-view="v4">4 · Fehlerraum: Pythagoras der Modellwahl</button>
 </div>
 
 <!-- ================= ANSICHT 1 ================= -->
@@ -197,6 +198,35 @@
     Diese Zerlegung konnten wir nur berechnen, weil wir „Gott spielen“: Wir kennen f(x) und σ² und dürfen beliebig oft
     neue Datensätze ziehen. Im echten Projekt kennt ihr beides nicht – dort ersetzen Validierungskurven,
     Cross-Validation und Lernkurven diesen allwissenden Blick. Das Prinzip dahinter bleibt aber exakt dieses.
+  </div>
+</div>
+
+<!-- ================= ANSICHT 4 ================= -->
+<div class="view" id="v4">
+  <div class="callout co-info">
+    <b>Der Fehlerraum: Pythagoras trifft Modellwahl</b>
+    Jeder Polynomgrad wird zu einem Punkt in der Ebene aus |Bias| (x-Achse) und √Varianz (y-Achse).
+    Der Abstand zum Ursprung ist nach Pythagoras der reduzierbare Fehler – die gestrichelten Viertelkreise
+    sind Orte gleichen Gesamtfehlers. Das Rauschen σ steht orthogonal auf dieser Ebene und steckt in der
+    Kreis-Beschriftung: Selbst der Ursprung (das perfekte Modell) hat RMSE = σ.
+  </div>
+  <div class="card">
+    <div id="errorspace-svg"></div>
+    <div id="errorspace-note" style="font-size:0.92rem; color:var(--slate-dark); margin-top:10px;"></div>
+  </div>
+  <div class="callout co-warn">
+    <b>Gekoppelt, aber nicht auf einem Kreis</b>
+    Die Punkte liegen auf einer Trajektorie, nicht auf einem Iso-Kreis: Es gibt kein Erhaltungsgesetz
+    Bias² + Varianz = konstant. Läge alles auf einem Kreis, hätte jeder Grad denselben Fehler – Modellwahl
+    wäre sinnlos. Der Tradeoff heißt: Der Komplexitätsregler bewegt beide Koordinaten gegenläufig, und die
+    Kunst ist, den Punkt der Trajektorie zu finden, der dem Ursprung am nächsten kommt. Orthogonal sind die
+    Fehleranteile als Vektoren im Fehlerraum – gekoppelt sind sie entlang des Reglers.
+  </div>
+  <div class="callout co-merk">
+    <b>Experimente</b>
+    (1) Erhöhe σ: Die Trajektorie hebt sich (mehr Rauschen → mehr Varianz), und die Kreis-Beschriftungen
+    wachsen – der Bias jedes Grades bleibt dagegen liegen. (2) Erhöhe n: Die Trajektorie sinkt nach unten,
+    das Optimum rutscht zu höheren Graden. (3) Bewege den Grad-Regler und verfolge den markierten Punkt.
   </div>
 </div>
 
@@ -542,6 +572,79 @@ function renderUCurve(bestIdx){
   document.getElementById("ucurve-svg").innerHTML = svg;
 }
 
+/* ================= Ansicht 4: Fehlerraum (Bias-Varianz-Ebene) ================= */
+function renderView4(){
+  const sig = state.sigma;
+  const pts = stats.map((st, i) => ({
+    d: i + 1,
+    b: Math.sqrt(st.bias2),
+    s: Math.sqrt(st.vari),
+    tot: Math.sqrt(st.total)
+  }));
+  let best = 0;
+  for (let i = 1; i < pts.length; i++) if (pts[i].tot < pts[best].tot) best = i;
+
+  // Achsenskala: explodierende Varianz hoher Grade kappen, damit die Region ums Optimum lesbar bleibt
+  const cap = Math.max(6 * pts[best].tot, 1.25 * Math.max(pts[0].b, pts[0].s));
+  const visible = [];
+  let axisMax = 0;
+  for (const p of pts){
+    if (Math.max(p.b, p.s) <= cap){ visible.push(p); axisMax = Math.max(axisMax, p.b, p.s); }
+  }
+  axisMax *= 1.22;
+  const omitted = pts.length - visible.length;
+
+  const size = 540, mL = 62, mB = 50, mT = 18, mR = 20;
+  const w = size + mL + mR, h = size + mT + mB;
+  const X = v => mL + (v / axisMax) * size;
+  const Y = v => mT + size - (v / axisMax) * size;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img" style="width:100%;max-width:680px;height:auto;display:block;margin:0 auto;">`;
+  // Achsen
+  svg += `<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + size}" stroke="var(--border)"/>`;
+  svg += `<line x1="${mL}" y1="${mT + size}" x2="${mL + size}" y2="${mT + size}" stroke="var(--border)"/>`;
+  svg += `<text x="${mL + size / 2}" y="${h - 8}" font-size="13" text-anchor="middle" fill="var(--slate)" font-weight="bold">|Bias|  (systematischer Fehler) →</text>`;
+  svg += `<text x="16" y="${mT + size / 2}" font-size="13" text-anchor="middle" fill="var(--slate)" font-weight="bold" transform="rotate(-90 16 ${mT + size / 2})">√Varianz  (Streuung der Modelle) →</text>`;
+
+  // Iso-Kreise gleichen Gesamtfehlers (Viertelkreise um den Ursprung)
+  const nCirc = 4;
+  for (let i = 1; i <= nCirc; i++){
+    const r = (i / nCirc) * axisMax * 0.95;
+    const R = (r / axisMax) * size;
+    svg += `<path d="M ${X(r).toFixed(1)} ${Y(0).toFixed(1)} A ${R.toFixed(1)} ${R.toFixed(1)} 0 0 0 ${X(0).toFixed(1)} ${Y(r).toFixed(1)}" fill="none" stroke="var(--slate)" stroke-dasharray="5 5" opacity="0.45"/>`;
+    const tot = Math.sqrt(r * r + sig * sig);
+    const lx = X(r * 0.74), ly = Y(r * 0.74);
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly - 5).toFixed(1)}" font-size="11" fill="var(--slate)" font-family="Consolas,monospace" text-anchor="middle" transform="rotate(-45 ${lx.toFixed(1)} ${ly.toFixed(1)})">RMSE ${tot.toFixed(2)}</text>`;
+  }
+  // Ursprung: das (unerreichbare) perfekte Modell
+  svg += `<circle cx="${X(0)}" cy="${Y(0)}" r="4.5" fill="var(--slate)"/>`;
+  svg += `<text x="${X(0) + 9}" y="${Y(0) - 9}" font-size="11.5" fill="var(--slate)">perfektes Modell: RMSE = σ = ${sig.toFixed(2)}</text>`;
+
+  // Trajektorie der Modellkomplexität
+  let tp = "";
+  visible.forEach((p, i) => { tp += (i ? "L" : "M") + X(p.b).toFixed(1) + "," + Y(p.s).toFixed(1); });
+  svg += `<path d="${tp}" fill="none" stroke="var(--cyan)" stroke-width="2.5" opacity="0.85"/>`;
+
+  // Punkte (ein Grad = ein Punkt), Optimum grün, Regler-Auswahl indigo
+  for (const p of visible){
+    const isBest = (p.d === best + 1), isSel = (p.d === state.deg);
+    const fill = isBest ? "var(--green)" : (isSel ? "var(--indigo)" : "#fff");
+    const stroke = isSel ? "var(--indigo)" : (isBest ? "var(--green)" : "var(--slate)");
+    svg += `<circle cx="${X(p.b).toFixed(1)}" cy="${Y(p.s).toFixed(1)}" r="${(isSel || isBest) ? 9 : 7}" fill="${fill}" stroke="${stroke}" stroke-width="2"/>`;
+    svg += `<text x="${X(p.b).toFixed(1)}" y="${(Y(p.s) + 3.5).toFixed(1)}" font-size="9.5" text-anchor="middle" font-weight="bold" fill="${(isBest || isSel) ? "#fff" : "var(--slate-dark)"}">${p.d}</text>`;
+  }
+  if (omitted > 0)
+    svg += `<text x="${mL + size - 6}" y="${mT + 16}" font-size="11.5" text-anchor="end" fill="var(--amber)" font-weight="bold">↑ ${omitted} höhere Grade außerhalb (Varianz explodiert)</text>`;
+  svg += `</svg>`;
+  document.getElementById("errorspace-svg").innerHTML = svg;
+
+  const bp = pts[best];
+  document.getElementById("errorspace-note").innerHTML =
+    `Optimum: <b style="color:var(--green)">Grad ${best + 1}</b> – der Punkt der Trajektorie mit dem kleinsten Abstand zum Ursprung ` +
+    `(Gesamt-RMSE = √(Bias² + Varianz + σ²) = <b>${bp.tot.toFixed(3)}</b>). ` +
+    `Reglerauswahl: <b style="color:var(--indigo)">Grad ${state.deg}</b>.`;
+}
+
 /* ================= Orchestrierung ================= */
 function recomputeAll(){
   drawDatasets();
@@ -552,6 +655,7 @@ function renderAll(){
   renderView1();
   renderView2();
   renderView3();
+  renderView4();
 }
 
 /* ================= UI-Verdrahtung ================= */
@@ -561,7 +665,7 @@ function bind(id, valId, key, isFloat, fullRecompute){
     state[key] = isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
     document.getElementById(valId).textContent = isFloat ? state[key].toFixed(2) : state[key];
     if (fullRecompute) recomputeAll();
-    else { renderView1(); renderView2(); } // nur Grad-Wechsel: Fits sind schon berechnet
+    else { renderView1(); renderView2(); renderView4(); } // nur Grad-Wechsel: Fits sind schon berechnet
   });
 }
 bind("s-deg", "v-deg", "deg",   false, false);
