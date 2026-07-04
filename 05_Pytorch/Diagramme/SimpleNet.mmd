@@ -1,0 +1,45 @@
+flowchart TD
+    S1["<b>1 – Daten laden</b><br/><i>pd.read_csv: Iris.csv</i>"]
+
+    subgraph Datenaufbereitung ["Datenaufbereitung"]
+        S2["<b>2 – Features / Target trennen</b><br/><i>X: 4 Merkmale, y: species</i>"]
+        S3["<b>3 – Label-Encoding</b><br/><i>LabelEncoder: Text → 0, 1, 2<br/>(alphabetisch sortiert)</i>"]
+        S4["<b>4 – Train/Test-Split</b><br/><i>80/20, random_state=42</i>"]
+        S5["<b>5 – Train/Val-Split</b><br/><i>80/20, random_state=0</i>"]
+    end
+
+    subgraph Modellierung ["Modellierung & Training"]
+        S6["<b>6 – Netz definieren</b><br/><i>4 → 5 (ReLU) → 3<br/>Adam, lr=0.01</i>"]
+        S7["<b>7 – Epoche trainieren</b><br/><i>Forward, Loss, Update</i>"]
+        S8["<b>8 – Validierung</b><br/><i>Val-Loss pro Epoche</i>"]
+        S9{"<b>9 – 100 Epochen erreicht?</b>"}
+    end
+
+    subgraph Evaluation ["Evaluation & Speichern"]
+        S10["<b>10 – Testgenauigkeit</b><br/><i>accuracy_score auf Testdaten</i>"]
+        S11["<b>11 – Persistierung</b><br/><i>Modell + LabelEncoder speichern</i>"]
+    end
+
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+    S6 --> S7
+    S7 --> S8
+    S8 --> S9
+    S9 -->|"Nein, nächste Epoche"| S7
+    S9 -->|"Ja ✓"| S10
+    S10 --> S11
+
+    style S1 fill:#e1f5ee,stroke:#0f6e56,color:#04342c
+    style S2 fill:#e1f5ee,stroke:#0f6e56,color:#04342c
+    style S3 fill:#e1f5ee,stroke:#0f6e56,color:#04342c
+    style S4 fill:#eeedfe,stroke:#534ab7,color:#26215c
+    style S5 fill:#eeedfe,stroke:#534ab7,color:#26215c
+    style S6 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S7 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S8 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S9 fill:#faece7,stroke:#993c1d,color:#4a1b0c
+    style S10 fill:#faeeda,stroke:#854f0b,color:#412402
+    style S11 fill:#faeeda,stroke:#854f0b,color:#412402

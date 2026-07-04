@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hierarchische Merkmalsextraktion – Didaktische Analogie</title>
+<style>
+    :root {
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --ink: #1e2433;
+        --muted: #5b6478;
+        --line: #e4e7f0;
+        --node-idle: #cdd3e1;
+        --edge-idle: #dde1eb;
+
+        /* Kennfarben pro Schicht */
+        --l1: #4f46e5;  --l1-soft: #eef0fe;
+        --l2: #0891b2;  --l2-soft: #e6f7fb;
+        --l3: #059669;  --l3-soft: #e6f6f0;
+        --l4: #d97706;  --l4-soft: #fdf3e3;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background:
+            radial-gradient(1200px 500px at 50% -10%, #eef0fa 0%, transparent 70%),
+            var(--bg);
+        color: var(--ink);
+        line-height: 1.6;
+        padding: 2.5rem 1.5rem 3rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+    }
+
+    header { text-align: center; max-width: 780px; margin-bottom: 2rem; }
+    header .eyebrow {
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+    }
+    header h1 {
+        font-size: clamp(1.6rem, 3.5vw, 2.3rem);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-bottom: 0.5rem;
+    }
+    header p { color: var(--muted); font-size: 1.02rem; }
+
+    .stage {
+        width: 100%;
+        max-width: 1150px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 12px 30px rgba(30, 36, 51, 0.06);
+        padding: 1.5rem 1.75rem;
+    }
+
+    .card-title {
+        font-size: 0.82rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 1rem;
+    }
+
+    /* ---------- Netzwerk-Diagramm ---------- */
+    #network-svg { width: 100%; height: auto; display: block; }
+
+    .net-edge {
+        stroke: var(--edge-idle);
+        stroke-width: 1.2;
+        transition: stroke 0.35s ease, stroke-width 0.35s ease;
+    }
+    .net-edge.lit { stroke-width: 1.8; }
+
+    .net-node {
+        fill: #fff;
+        stroke: var(--node-idle);
+        stroke-width: 2;
+        transition: fill 0.35s ease, stroke 0.35s ease, r 0.35s ease;
+    }
+    .net-node.lit { stroke-width: 2.5; }
+
+    .net-label {
+        font-size: 12px;
+        font-weight: 600;
+        fill: var(--muted);
+        text-anchor: middle;
+        transition: fill 0.35s ease;
+    }
+    .net-sublabel {
+        font-size: 10px;
+        fill: #9aa2b5;
+        text-anchor: middle;
+    }
+    .layer-hit { cursor: pointer; }
+    .layer-hit:focus-visible rect { outline: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+    .hit-rect { fill: transparent; }
+
+    .layer-glow {
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        pointer-events: none;
+    }
+    .layer-glow.lit { opacity: 1; }
+
+    /* ---------- Untere Zeile: Steuerung + Visualisierung ---------- */
+    .dashboard {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 1.5rem;
+        align-items: stretch;
+    }
+    @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+
+    .layer-selector { display: flex; flex-direction: column; gap: 0.7rem; }
+
+    .layer-btn {
+        --lc: var(--l1);
+        --lc-soft: var(--l1-soft);
+        background: var(--card);
+        border: 1.5px solid var(--line);
+        border-left: 5px solid var(--lc);
+        border-radius: 12px;
+        padding: 0.85rem 1rem;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        font: inherit;
+        color: inherit;
+        transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .layer-btn:hover { background: var(--lc-soft); border-color: var(--lc); }
+    .layer-btn:focus-visible { outline: 2px solid var(--lc); outline-offset: 2px; }
+    .layer-btn.active {
+        background: var(--lc-soft);
+        border-color: var(--lc);
+        box-shadow: 0 6px 16px rgba(30, 36, 51, 0.08);
+        transform: translateX(4px);
+    }
+
+    .layer-number {
+        background: var(--lc);
+        color: #fff;
+        font-weight: 700;
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+    .layer-btn:not(.active) .layer-number { background: var(--node-idle); color: var(--ink); }
+    .layer-info-title { font-weight: 650; font-size: 0.98rem; }
+    .layer-info-sub { font-size: 0.82rem; color: var(--muted); }
+
+    .b1 { --lc: var(--l1); --lc-soft: var(--l1-soft); }
+    .b2 { --lc: var(--l2); --lc-soft: var(--l2-soft); }
+    .b3 { --lc: var(--l3); --lc-soft: var(--l3-soft); }
+    .b4 { --lc: var(--l4); --lc-soft: var(--l4-soft); }
+
+    /* ---------- Visualisierungspanel ---------- */
+    .visualization-panel { display: flex; flex-direction: column; gap: 1.1rem; }
+
+    .canvas-container {
+        background: linear-gradient(180deg, #fdfdff 0%, #f8f9fd 100%);
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        height: 290px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .vis-svg { width: 100%; height: 100%; display: none; }
+    .vis-svg.active { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .grid-lines { stroke: #e9ecf4; stroke-width: 1; stroke-dasharray: 4; }
+
+    .explanation-box {
+        --lc: var(--l1);
+        background: var(--card);
+        padding: 1.1rem 1.25rem;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--lc);
+        flex-grow: 1;
+        transition: border-top-color 0.35s ease;
+    }
+    .explanation-box h3 { margin-bottom: 0.4rem; font-size: 1.12rem; letter-spacing: -0.01em; }
+    .explanation-box p { color: var(--muted); font-size: 0.94rem; }
+
+    footer { margin-top: 2rem; color: #9aa2b5; font-size: 0.8rem; text-align: center; }
+
+    @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; animation: none !important; }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="eyebrow">Didaktische Analogie · Deep Learning</div>
+    <h1>Hierarchische Merkmalsextraktion</h1>
+    <p>Wie ein tiefes neuronales Netz Schicht für Schicht aus Kanten Häuser und aus Häusern Stadtviertel zusammensetzt.</p>
+</header>
+
+<div class="stage">
+
+    <!-- ============ NETZWERK-DIAGRAMM ============ -->
+    <div class="card">
+        <div class="card-title">Architektur des Netzwerks — aktive Schicht anklicken</div>
+        <svg id="network-svg" viewBox="0 0 1060 300" role="img"
+             aria-label="Diagramm eines neuronalen Netzes mit Eingabeschicht, vier versteckten Schichten und Ausgabeschicht. Die ausgewählte Schicht ist farbig hervorgehoben.">
+            <!-- Kanten (per JS erzeugt) -->
+            <g id="edges"></g>
+            <!-- Glow-Hintergründe pro Schicht -->
+            <g id="glows"></g>
+            <!-- Knoten (per JS erzeugt) -->
+            <g id="nodes"></g>
+            <!-- Beschriftungen (per JS erzeugt) -->
+            <g id="labels"></g>
+            <!-- Klickflächen (per JS erzeugt) -->
+            <g id="hits"></g>
+        </svg>
+    </div>
+
+    <!-- ============ STEUERUNG + VISUALISIERUNG ============ -->
+    <div class="dashboard">
+        <div class="card">
+            <div class="card-title">Schicht auswählen</div>
+            <div class="layer-selector">
+                <button class="layer-btn b1 active" id="btn-1" onclick="switchLayer(1)">
+                    <div class="layer-number">1</div>
+                    <div>
+                        <div class="layer-info-title">Erste versteckte Schicht</div>
+                        <div class="layer-info-sub">Einfache Muster / Kanten</div>
+                    </div>
+                </button>
+                <button class="layer-btn b2" id="btn-2" onclick="switchLayer(2)">
+                    <div class="layer-number">2</div>
+                    <div>
+                        <div class="layer-info-title">Zweite versteckte Schicht</div>
+                        <div class="layer-info-sub">Zusammengesetzte Formen / Zimmer</div>
+                    </div>
+                </button>
+                <button class="layer-btn b3" id="btn-3" onclick="switchLayer(3)">
+                    <div class="layer-number">3</div>
+                    <div>
+                        <div class="layer-info-title">Dritte versteckte Schicht</div>
+                        <div class="layer-info-sub">Ganze Objekte / Haustypen</div>
+                    </div>
+                </button>
+                <button class="layer-btn b4" id="btn-4" onclick="switchLayer(4)">
+                    <div class="layer-number">4</div>
+                    <div>
+                        <div class="layer-info-title">Vierte versteckte Schicht</div>
+                        <div class="layer-info-sub">Komplexe Szenen / Stadtviertel</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div class="card visualization-panel">
+            <div class="card-title">Was diese Schicht "sieht"</div>
+
+            <div class="canvas-container">
+                <svg id="svg-layer-1" class="vis-svg active" viewBox="0 0 400 280">
+                    <line x1="100" y1="0" x2="100" y2="280" class="grid-lines" />
+                    <line x1="200" y1="0" x2="200" y2="280" class="grid-lines" />
+                    <line x1="300" y1="0" x2="300" y2="280" class="grid-lines" />
+                    <line x1="0" y1="140" x2="400" y2="140" class="grid-lines" />
+
+                    <path d="M 20,40 L 80,40 M 20,60 L 80,60 M 20,80 L 80,80 M 50,40 L 50,60 M 35,60 L 35,80 M 65,60 L 65,80" stroke="#4f46e5" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M 130,80 L 170,40 M 145,85 L 185,45 M 120,75 L 160,35" stroke="#0891b2" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M 240,40 L 240,90 M 255,40 L 255,90 M 270,40 L 270,90" stroke="#059669" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M 330,40 L 330,80 M 330,80 L 370,80 M 350,40 L 350,60 M 350,60 L 370,60" stroke="#d97706" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+                    <text x="50" y="115" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Horizontale Kanten</text>
+                    <text x="160" y="115" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Schräge Winkel</text>
+                    <text x="255" y="115" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Vertikale Linien</text>
+                    <text x="350" y="115" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Ecken &amp; Kreuzungen</text>
+
+                    <text x="200" y="210" text-anchor="middle" font-size="14" fill="#1e2433" font-weight="bold">Abstraktion: Pixel &amp; elementare Geometrie</text>
+                    <text x="200" y="235" text-anchor="middle" font-size="12" fill="#5b6478">Das Netz erkennt hier nur mathematische Kontraste und Linien.</text>
+                </svg>
+
+                <svg id="svg-layer-2" class="vis-svg" viewBox="0 0 400 280">
+                    <line x1="200" y1="0" x2="200" y2="280" class="grid-lines" />
+                    <g transform="translate(40, 30)">
+                        <polygon points="50,10 10,60 90,60" fill="none" stroke="#0891b2" stroke-width="3" stroke-linejoin="round"/>
+                        <line x1="25" y1="41" x2="75" y2="41" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="3"/>
+                        <text x="50" y="80" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Dach-Struktur</text>
+                    </g>
+                    <g transform="translate(250, 30)">
+                        <rect x="20" y="10" width="50" height="50" fill="none" stroke="#0891b2" stroke-width="3" stroke-linejoin="round"/>
+                        <line x1="45" y1="10" x2="45" y2="60" stroke="#0891b2" stroke-width="1.5"/>
+                        <line x1="20" y1="35" x2="70" y2="35" stroke="#0891b2" stroke-width="1.5"/>
+                        <text x="45" y="80" text-anchor="middle" font-size="12" fill="#5b6478" font-weight="600">Fenster / Räume</text>
+                    </g>
+                    <text x="200" y="180" text-anchor="middle" font-size="14" fill="#1e2433" font-weight="bold">Abstraktion: Zusammengesetzte Formen</text>
+                    <text x="200" y="205" text-anchor="middle" font-size="12" fill="#5b6478">Aus den Kanten der 1. Schicht entstehen komplexe Bauteile,</text>
+                    <text x="200" y="225" text-anchor="middle" font-size="12" fill="#5b6478">die funktionalen Bereichen (wie Zimmern/Dächern) ähneln.</text>
+                </svg>
+
+                <svg id="svg-layer-3" class="vis-svg" viewBox="0 0 400 280">
+                    <g transform="translate(50, 40)">
+                        <polygon points="40,10 5,40 75,40" fill="#e6f6f0" stroke="#059669" stroke-width="2"/>
+                        <rect x="12" y="40" width="56" height="50" fill="none" stroke="#059669" stroke-width="2"/>
+                        <rect x="22" y="50" width="14" height="14" fill="none" stroke="#059669" stroke-width="1.5"/>
+                        <rect x="44" y="65" width="14" height="25" fill="none" stroke="#059669" stroke-width="1.5"/>
+                        <text x="40" y="110" text-anchor="middle" font-size="12" fill="#1e2433" font-weight="600">Einfamilienhaus</text>
+                    </g>
+                    <g transform="translate(230, 40)">
+                        <rect x="10" y="30" width="100" height="60" fill="none" stroke="#059669" stroke-width="2"/>
+                        <rect x="20" y="10" width="60" height="20" fill="#e6f6f0" stroke="#059669" stroke-width="2"/>
+                        <rect x="25" y="45" width="30" height="30" fill="none" stroke="#059669" stroke-width="1.5"/>
+                        <rect x="70" y="45" width="30" height="30" fill="none" stroke="#059669" stroke-width="1.5"/>
+                        <text x="60" y="110" text-anchor="middle" font-size="12" fill="#1e2433" font-weight="600">Moderne Villa</text>
+                    </g>
+                    <text x="200" y="195" text-anchor="middle" font-size="14" fill="#1e2433" font-weight="bold">Abstraktion: Komplette Objekte</text>
+                    <text x="200" y="220" text-anchor="middle" font-size="12" fill="#5b6478">Die Kombination spezifischer Bauteile erlaubt es dem Netz,</text>
+                    <text x="200" y="240" text-anchor="middle" font-size="12" fill="#5b6478">konkrete, komplexe Objekttypen voneinander zu unterscheiden.</text>
+                </svg>
+
+                <svg id="svg-layer-4" class="vis-svg" viewBox="0 0 400 280">
+                    <path d="M 0,110 L 400,110 M 0,135 L 400,135" stroke="#cbd5e1" stroke-width="4" stroke-dasharray="8 5"/>
+                    <g transform="translate(20, 40) scale(0.5)">
+                        <polygon points="30,10 0,40 60,40" fill="none" stroke="#d97706" stroke-width="2"/>
+                        <rect x="5" y="40" width="50" height="40" fill="none" stroke="#d97706" stroke-width="2"/>
+                    </g>
+                    <g transform="translate(100, 30) scale(0.5)">
+                        <rect x="5" y="20" width="70" height="60" fill="none" stroke="#d97706" stroke-width="2"/>
+                    </g>
+                    <g transform="translate(180, 40) scale(0.5)">
+                        <polygon points="30,10 0,40 60,40" fill="none" stroke="#d97706" stroke-width="2"/>
+                        <rect x="5" y="40" width="50" height="40" fill="none" stroke="#d97706" stroke-width="2"/>
+                    </g>
+                    <circle cx="280" cy="65" r="15" fill="#059669" opacity="0.7"/>
+                    <line x1="280" y1="65" x2="280" y2="85" stroke="#1e2433" stroke-width="2"/>
+                    <circle cx="340" cy="60" r="18" fill="#059669" opacity="0.7"/>
+                    <line x1="340" y1="60" x2="340" y2="85" stroke="#1e2433" stroke-width="2"/>
+                    <g transform="translate(60, 160) scale(0.6)">
+                        <rect x="5" y="20" width="80" height="50" fill="none" stroke="#d97706" stroke-width="2"/>
+                    </g>
+                    <g transform="translate(220, 160) scale(0.5)">
+                        <polygon points="30,10 0,40 60,40" fill="none" stroke="#d97706" stroke-width="2"/>
+                        <rect x="5" y="40" width="50" height="40" fill="none" stroke="#d97706" stroke-width="2"/>
+                    </g>
+                    <text x="200" y="230" text-anchor="middle" font-size="14" fill="#1e2433" font-weight="bold">Abstraktion: Kontext &amp; komplexe Szenen</text>
+                    <text x="200" y="252" text-anchor="middle" font-size="12" fill="#5b6478">Das Netz begreift das Zusammenspiel („Viertel" mit Straßen &amp; Bäumen).</text>
+                </svg>
+            </div>
+
+            <div class="explanation-box" id="explanation-box">
+                <h3 id="exp-title">Schicht 1: Grundbausteine (Kanten &amp; Linien)</h3>
+                <p id="exp-text">Auf der untersten Ebene analysiert das neuronale Netz feine Helligkeitsunterschiede im Bild. Es erkennt isolierte mathematische Strukturen wie horizontale, vertikale oder diagonale Linien. Zu diesem Zeitpunkt "weiß" das Netz absolut nicht, was ein Haus ist – es sieht lediglich die einzelnen, abstrakten Rohmaterialien.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer>Interaktive Lernvisualisierung · Klick auf Schicht-Buttons oder direkt auf die Schichten im Netzdiagramm</footer>
+
+<script>
+    // ================= Konfiguration =================
+    const layerColors = {
+        1: { main: '#4f46e5', soft: '#eef0fe' },
+        2: { main: '#0891b2', soft: '#e6f7fb' },
+        3: { main: '#059669', soft: '#e6f6f0' },
+        4: { main: '#d97706', soft: '#fdf3e3' }
+    };
+
+    const explanations = {
+        1: {
+            title: "Schicht 1: Grundbausteine (Kanten & Linien)",
+            text: "Auf der untersten Ebene analysiert das neuronale Netz feine Helligkeitsunterschiede im Bild. Es erkennt isolierte mathematische Strukturen wie horizontale, vertikale oder diagonale Linien. Zu diesem Zeitpunkt 'weiß' das Netz absolut nicht, was ein Haus ist – es sieht lediglich die einzelnen, abstrakten Rohmaterialien (Kanten, Kontraste, Pixelübergänge)."
+        },
+        2: {
+            title: "Schicht 2: Zusammengesetzte Formen (Zimmer & Bauteile)",
+            text: "Hier fusionieren die Signale aus Schicht 1. Aus mehreren Kanten entstehen geometrische Formen: Ein Dreieck wird als potenzielles 'Dach' sichtbar, rechtwinklige Formen bilden 'Fenster' oder Raumstrukturen. Das Netz beginnt, Muster zu Mustern zusammenzufügen, was deiner Idee von 'Zimmern, Küchen oder Bädern' perfekt entspricht."
+        },
+        3: {
+            title: "Schicht 3: Ganze Objekte (Die Haustypen)",
+            text: "In dieser tiefen Schicht setzt das Netzwerk die Bauteile zusammen. Erkennt es ein spitzes Dach kombiniert mit Fenstern und einer Tür, feuert das Konzept für 'Einfamilienhaus'. Sieht es ein Flachbau-Konstrukt mit großen Fensterfronten, erkennt es eine 'Villa'. Das Netz kann hier komplexe, eigenständige Objekte klassifizieren."
+        },
+        4: {
+            title: "Schicht 4: Übergreifender Kontext (Das Stadtviertel)",
+            text: "Auf der höchsten Abstraktionsebene betrachtet das Netz das gesamte Bildgefüge. Es erkennt nicht mehr nur ein einzelnes Objekt, sondern das semantische Zusammenspiel: Viele Häuser nebeneinander, unterbrochen von Linien (Straßen) und grünen Mustern (Bäumen), ergeben das logische Konzept eines 'Stadtviertels'. Deine Analogie trägt hier absolut perfekt!"
+        }
+    };
+
+    // Spalten des Diagramms: Input, H1–H4, Output
+    // hidden: Index der versteckten Schicht (1–4) oder null
+    const columns = [
+        { x: 90,  count: 6, r: 9,  hidden: null, label: "Eingabe",  sub: "Bild (Pixel)" },
+        { x: 270, count: 5, r: 11, hidden: 1,    label: "Schicht 1", sub: "Kanten" },
+        { x: 450, count: 5, r: 11, hidden: 2,    label: "Schicht 2", sub: "Formen" },
+        { x: 630, count: 4, r: 11, hidden: 3,    label: "Schicht 3", sub: "Objekte" },
+        { x: 810, count: 3, r: 11, hidden: 4,    label: "Schicht 4", sub: "Szenen" },
+        { x: 970, count: 2, r: 9,  hidden: null, label: "Ausgabe",  sub: "Klassifikation" }
+    ];
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const H = 300, TOP = 30, BOTTOM = 235;
+
+    function nodeYs(count) {
+        const span = BOTTOM - TOP;
+        const gap = span / (count + 1);
+        return Array.from({ length: count }, (_, i) => TOP + gap * (i + 1));
+    }
+
+    // -------- Aufbau des Diagramms --------
+    const gEdges = document.getElementById('edges');
+    const gGlows = document.getElementById('glows');
+    const gNodes = document.getElementById('nodes');
+    const gLabels = document.getElementById('labels');
+    const gHits = document.getElementById('hits');
+
+    const nodeEls = {};   // hiddenIndex -> [circle, ...]
+    const edgeEls = {};   // hiddenIndex -> [line, ...] (eingehende Kanten)
+    const glowEls = {};   // hiddenIndex -> rect
+    const labelEls = {};  // hiddenIndex -> [text, ...]
+
+    columns.forEach((col, ci) => {
+        const ys = nodeYs(col.count);
+
+        // Glow-Hintergrund für versteckte Schichten
+        if (col.hidden) {
+            const glow = document.createElementNS(svgNS, 'rect');
+            glow.setAttribute('x', col.x - 34);
+            glow.setAttribute('y', TOP - 14);
+            glow.setAttribute('width', 68);
+            glow.setAttribute('height', BOTTOM - TOP + 28);
+            glow.setAttribute('rx', 18);
+            glow.setAttribute('class', 'layer-glow');
+            glow.setAttribute('fill', layerColors[col.hidden].soft);
+            gGlows.appendChild(glow);
+            glowEls[col.hidden] = glow;
+        }
+
+        // Kanten zur vorherigen Spalte
+        if (ci > 0) {
+            const prev = columns[ci - 1];
+            const prevYs = nodeYs(prev.count);
+            const bucket = [];
+            prevYs.forEach(y1 => {
+                ys.forEach(y2 => {
+                    const line = document.createElementNS(svgNS, 'line');
+                    line.setAttribute('x1', prev.x); line.setAttribute('y1', y1);
+                    line.setAttribute('x2', col.x);  line.setAttribute('y2', y2);
+                    line.setAttribute('class', 'net-edge');
+                    gEdges.appendChild(line);
+                    bucket.push(line);
+                });
+            });
+            if (col.hidden) edgeEls[col.hidden] = bucket;
+        }
+
+        // Knoten
+        const circles = [];
+        ys.forEach(y => {
+            const c = document.createElementNS(svgNS, 'circle');
+            c.setAttribute('cx', col.x); c.setAttribute('cy', y);
+            c.setAttribute('r', col.r);
+            c.setAttribute('class', 'net-node');
+            gNodes.appendChild(c);
+            circles.push(c);
+        });
+        if (col.hidden) nodeEls[col.hidden] = circles;
+
+        // Beschriftungen
+        const t1 = document.createElementNS(svgNS, 'text');
+        t1.setAttribute('x', col.x); t1.setAttribute('y', H - 28);
+        t1.setAttribute('class', 'net-label');
+        t1.textContent = col.label;
+        gLabels.appendChild(t1);
+
+        const t2 = document.createElementNS(svgNS, 'text');
+        t2.setAttribute('x', col.x); t2.setAttribute('y', H - 12);
+        t2.setAttribute('class', 'net-sublabel');
+        t2.textContent = col.sub;
+        gLabels.appendChild(t2);
+
+        if (col.hidden) labelEls[col.hidden] = [t1];
+
+        // Klickfläche für versteckte Schichten
+        if (col.hidden) {
+            const a = document.createElementNS(svgNS, 'g');
+            a.setAttribute('class', 'layer-hit');
+            a.setAttribute('tabindex', '0');
+            a.setAttribute('role', 'button');
+            a.setAttribute('aria-label', col.label + ' auswählen: ' + col.sub);
+            const hit = document.createElementNS(svgNS, 'rect');
+            hit.setAttribute('x', col.x - 40); hit.setAttribute('y', TOP - 20);
+            hit.setAttribute('width', 80); hit.setAttribute('height', H - TOP);
+            hit.setAttribute('rx', 18);
+            hit.setAttribute('class', 'hit-rect');
+            a.appendChild(hit);
+            const idx = col.hidden;
+            a.addEventListener('click', () => switchLayer(idx));
+            a.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchLayer(idx); }
+            });
+            gHits.appendChild(a);
+        }
+    });
+
+    // -------- Umschalten --------
+    function switchLayer(layerNum) {
+        const color = layerColors[layerNum];
+
+        // Buttons
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById('btn-' + i).classList.toggle('active', i === layerNum);
+        }
+
+        // Netzdiagramm: alles zurücksetzen, dann aktive Schicht färben
+        for (let i = 1; i <= 4; i++) {
+            const lit = (i === layerNum);
+            nodeEls[i].forEach(c => {
+                c.classList.toggle('lit', lit);
+                c.style.fill = lit ? color.main : '#fff';
+                c.style.stroke = lit ? color.main : '';
+            });
+            edgeEls[i].forEach(l => {
+                l.classList.toggle('lit', lit);
+                l.style.stroke = lit ? color.main : '';
+                l.style.opacity = lit ? 0.45 : '';
+            });
+            glowEls[i].classList.toggle('lit', lit);
+            labelEls[i].forEach(t => { t.style.fill = lit ? color.main : ''; });
+        }
+
+        // Visualisierungspanel
+        document.querySelectorAll('.vis-svg').forEach(svg => svg.classList.remove('active'));
+        document.getElementById('svg-layer-' + layerNum).classList.add('active');
+
+        // Erklärungsbox
+        document.getElementById('explanation-box').style.borderTopColor = color.main;
+        document.getElementById('exp-title').innerText = explanations[layerNum].title;
+        document.getElementById('exp-text').innerText = explanations[layerNum].text;
+    }
+
+    // Initialzustand
+    switchLayer(1);
+</script>
+</body>
+</html>

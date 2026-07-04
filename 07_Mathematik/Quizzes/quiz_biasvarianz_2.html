@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias-Varianz Wissens-Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixierte Statusleiste -->
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Bias-Varianz-Tradeoff: Vernetztes Verständnis</h1>
+
+<!-- Hier werden alle Fragen dynamisch reingeladen -->
+<div class="quiz-container" id="quiz-container"></div>
+
+<!-- Abschlussmeldung -->
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // MODULARITÄT: Hier einfach weitere Objekte hinzufügen, um neue Fragen zu generieren.
+    const questions = [
+        {
+            text: "Zwei Thermometer: Gerät A zeigt konstant 0,8 °C zu viel an. Gerät B schwankt zufällig um ±2 °C um den wahren Wert. Du darfst beliebig oft messen und die Ergebnisse mitteln. Welche Aussage stimmt?",
+            options: [
+                "Der Fehler von A verschwindet durch Mittelung, der Fehler von B nicht.",
+                "Der Fehler von B verschwindet durch Mittelung, der Fehler von A nicht.",
+                "Beide Fehler lassen sich durch ausreichend häufiges Mitteln beseitigen.",
+                "Keiner der beiden Fehler wird durch Mittelung auch nur verkleinert."
+            ],
+            correct: 1,
+            explanation: "B ist ein Varianz-Problem: Zufällige Schwankungen mitteln sich weg (Gesetz der großen Zahlen). A ist ein Bias-Problem: Ein systematischer Fehler überlebt jede Mittelung. Genau dieselbe Asymmetrie erklärt, warum Ensemble-Methoden gegen Varianz helfen, aber nie gegen Bias."
+        },
+        {
+            text: "Ein Random Forest mittelt hunderte tiefe Entscheidungsbäume – jeder einzelne ein klassischer Overfitter. Warum funktioniert das Ensemble trotzdem so gut?",
+            options: [
+                "Die Bäume gleichen ihr Datenrauschen gegenseitig aus, sodass σ² sinkt.",
+                "Das Mitteln senkt vor allem den Bias, die hohe Varianz spielt keine Rolle.",
+                "Viele Bäume haben zusammen mehr Parameter und lernen komplexere Muster.",
+                "Das Mitteln senkt die Varianz; der niedrige Bias tiefer Bäume bleibt erhalten."
+            ],
+            correct: 3,
+            explanation: "Tiefe Bäume sind das 'Grad-12-Polynom' unter den Modellen: wenig Bias, viel Varianz. Bagging wählt gezielt diese Ecke des Tradeoffs und repariert dann die Varianz durch Mittelung – wie beim Thermometer B. Der irreduzible Fehler σ² bleibt dagegen für jedes Verfahren unantastbar."
+        },
+        {
+            text: "Warum lässt sich das Minimum der U-Kurve grundsätzlich nicht am Trainingsfehler ablesen?",
+            options: [
+                "Der Trainingsfehler misst nur den Bias-Anteil, niemals aber die Varianz.",
+                "Der Trainingsfehler schwankt zu stark, um ein Minimum erkennen zu lassen.",
+                "Der Trainingsfehler sinkt mit der Komplexität monoton – er hat gar kein Minimum.",
+                "Der Trainingsfehler liegt immer exakt um den Rauschanteil σ² zu niedrig."
+            ],
+            correct: 2,
+            explanation: "Ein flexibleres Modell passt sich den Trainingsdaten immer besser an – der Trainingsfehler fällt monoton und belohnt damit genau das Auswendiglernen des Rauschens, das die Varianz explodieren lässt. Die U-Form entsteht erst auf ungesehenen Daten. Deshalb ist die Trennung von Trainings- und Testdaten keine Konvention, sondern eine logische Notwendigkeit."
+        },
+        {
+            text: "Du verdoppelst deinen Trainingsdatensatz, indem du jeden Punkt exakt kopierst (n → 2n). Ein Kollege erwartet nun die halbierte Varianz wie bei 2n frischen Punkten. Was passiert beim Kleinste-Quadrate-Fit wirklich?",
+            options: [
+                "Nichts – der Fit bleibt identisch, Kopien enthalten keine neue Information.",
+                "Die Varianz halbiert sich, denn für die Statistik zählt nur die Punktanzahl.",
+                "Die Varianz steigt, weil doppelte Punkte das Gleichungssystem destabilisieren.",
+                "Der Bias sinkt deutlich, die Varianz bleibt dagegen vollkommen unverändert."
+            ],
+            correct: 0,
+            explanation: "Jeder Punkt geht doppelt in die Fehlersumme ein – das Minimum liegt an exakt derselben Stelle. Varianz sinkt nur durch neue, unabhängige Information über f(x). Merkregel: Nicht die Zeilenzahl der Tabelle zählt, sondern der Informationsgehalt. (Verwandtes Praxisproblem: Near-Duplicates in Datensätzen gaukeln Stichprobengröße vor.)"
+        },
+        {
+            text: "In der Simulation wird das Rauschen auf σ = 0 gestellt – alle Punkte liegen exakt auf f(x) = sin(2πx). Welche Fehleranteile bleiben beim Polynom-Fit bestehen?",
+            options: [
+                "Gar keine – ohne Rauschen trifft jedes Modell die Funktion fehlerfrei.",
+                "Nur der Bias, denn Varianz ist ohne Rauschen gar nicht mehr definiert.",
+                "Bias und Varianz bleiben beide bestehen – nur der Anteil σ² fällt weg.",
+                "Nur die Varianz verschwindet, denn sie entsteht allein aus dem Rauschen ε."
+            ],
+            correct: 2,
+            explanation: "Querdenker-Falle! Der Bias bleibt, weil kein Polynom endlichen Grades einen Sinus exakt darstellt. Und die Varianz bleibt ebenfalls: Verschiedene Ziehungen liefern verschiedene x-Positionen, und wo das Modell die Funktion nicht exakt treffen kann, hängt der beste Kompromiss-Fit davon ab, WO die Punkte liegen. Varianz hat also zwei Quellen – Rauschen UND Stichprobenlage."
+        },
+        {
+            text: "Gedankenexperiment: Trainingsdaten sind praktisch unbegrenzt verfügbar (n → ∞). Welche Modellwahl-Strategie wird dann optimal?",
+            options: [
+                "Ein möglichst einfaches Modell, denn sonst dominiert irgendwann die Varianz.",
+                "Ein möglichst flexibles Modell – vermeidbar bleibt dann nur noch der Bias.",
+                "Die Wahl wird egal, denn alle drei Fehleranteile gehen gegen null.",
+                "Ein mittleres Modell, denn das U-Kurven-Minimum hängt nicht von n ab."
+            ],
+            correct: 1,
+            explanation: "Mit n → ∞ geht die Varianz gegen null – übrig bleibt Bias² + σ². Der einzige noch beeinflussbare Fehler ist der Bias, und den senkt Flexibilität. Das erklärt eine reale Entwicklung: Im Big-Data-Regime lohnen sich hochkomplexe Modelle (tiefe Netze), die bei kleinen Datensätzen hoffnungslos überfitten würden. Das U-Kurven-Minimum wandert mit wachsendem n nach rechts."
+        },
+        {
+            text: "Du erhöhst bei einer Ridge-Regression den Regularisierungsparameter α deutlich. Wie bewegt sich das Verfahren in der Bias-Varianz-Landschaft?",
+            options: [
+                "Richtung Underfitting: Varianz sinkt, Bias steigt – wie weniger Komplexität.",
+                "Richtung Overfitting: Varianz steigt, Bias sinkt – wie mehr Komplexität.",
+                "Beide Anteile sinken zugleich, deshalb ist Regularisierung stets vorteilhaft.",
+                "Vor allem σ² wird kleiner, denn die Glättung filtert das Datenrauschen heraus."
+            ],
+            correct: 0,
+            explanation: "Regularisierung ist ein stufenloser Komplexitätsregler: α einschränken heißt, die effektive Flexibilität zu drosseln – Varianz runter, Bias rauf. Der Nutzen entsteht nur, wenn man mehr Varianz spart als man Bias einkauft; zu viel α landet im Underfitting. Ridge, Dropout, Early Stopping, Pruning: alles Varianten desselben Tauschgeschäfts."
+        },
+        {
+            text: "Ein Modell erreicht Trainingsfehler ≈ 0, aber hohen Testfehler. Zusätzlich fällt auf: Nach jedem Training auf neu gesammelten Daten sehen die Vorhersagen völlig anders aus. Welche Diagnose passt zum Gesamtbild?",
+            options: [
+                "Hoher Bias – das Modell ist strukturell zu einfach für diese Aufgabe.",
+                "Hoher irreduzibler Fehler – die Daten sind schlicht zu stark verrauscht.",
+                "Ein Datenleck – Trainings- und Testdaten überschneiden sich vermutlich.",
+                "Hohe Varianz – das Verfahren klammert sich an die Eigenheiten jeder Ziehung."
+            ],
+            correct: 3,
+            explanation: "Beide Symptome zeigen in dieselbe Richtung: Trainingsfehler null bedeutet, das Modell KANN die Struktur abbilden (Bias unwahrscheinlich), und instabile Vorhersagen über Datenziehungen hinweg sind die Definition von Varianz. Hoher σ²-Anteil würde dagegen auch den Trainingsfehler anheben, und ein Datenleck würde den TESTfehler künstlich senken, nicht erhöhen."
+        },
+        {
+            text: "Du legst die k = 10 Modelle einer Cross-Validation als Kurvenschar übereinander und misst ihre Streuung. Warum unterschätzt diese Streuung die wahre Varianz des Verfahrens systematisch?",
+            options: [
+                "Weil jedes Fold-Modell auf weniger Daten trainiert und dadurch stabiler wird.",
+                "Weil die CV das Rauschen σ² aus den Validierungsdaten herausrechnet.",
+                "Weil sich die Fold-Trainingsmengen zu ~90 % überlappen – die Modelle sind korreliert.",
+                "Weil zehn Modelle statistisch zu wenige sind, um Streuung sichtbar zu machen."
+            ],
+            correct: 2,
+            explanation: "Je zwei 10-fold-Trainingsmengen teilen sich 8 von 9 Neunteln der Daten – die Modelle sind fast Geschwister und streuen deshalb weniger als echte unabhängige Ziehungen. Die Fold-Schar ist eine 'Arme-Leute-Modellschar': strukturell ähnlich, aber korreliert. Achtung, Distraktor a) behauptet das Gegenteil der Wahrheit: Weniger Trainingsdaten machen Modelle instabiler, nicht stabiler."
+        },
+        {
+            text: "Zurück in der Realität, ohne Gott-Modus: Welche Größe aus der Zerlegung Fehler = Bias² + Varianz + σ² kann ein Praktiker aus seinen Daten direkt schätzen?",
+            options: [
+                "Den Bias², über den Abstand der Vorhersagen zum Mittelwert der Zielgröße.",
+                "Die Varianz, über die Streuung der Residuen auf dem Testdatensatz.",
+                "Alle drei Anteile einzeln, sofern der Testdatensatz nur groß genug ist.",
+                "Nur die Gesamtsumme – etwa über den Testfehler oder Cross-Validation."
+            ],
+            correct: 3,
+            explanation: "Für die Zerlegung bräuchte man f(x) (für den Bias) und viele unabhängige Trainingsdatensätze (für die Varianz) – beides hat man nie. Test- und CV-Fehler schätzen die unzerlegte Summe; das reicht aber völlig, um das Minimum der U-Kurve zu finden. Die Zerlegung ist das Denkmodell, das erklärt WARUM die U-Kurve existiert – CV ist das Messinstrument, das ihr Minimum lokalisiert."
+        },
+        {
+            text: "Du hast nur 200 Datenpunkte und wählst k = 2 statt k = 10, um Rechenzeit zu sparen. Der CV-Fehler fällt spürbar höher aus als erwartet. Was steckt am wahrscheinlichsten dahinter?",
+            options: [
+                "Zufall – die Wahl von k hat keinen systematischen Einfluss auf die Schätzung.",
+                "Bei k = 2 werden zu wenige Einzelschätzungen gemittelt, das erhöht den Fehler.",
+                "Jedes Fold-Modell sieht nur die halben Daten – die Schätzung wird pessimistisch.",
+                "Der Wert ist korrekt, denn k = 2 misst den Fehler des finalen Modells exakter."
+            ],
+            correct: 2,
+            explanation: "Der Bias-Varianz-Gedanke auf der Meta-Ebene: Diesmal geht es um Bias und Varianz des SCHÄTZERS. Bei k = 2 trainiert jedes Fold-Modell auf nur 100 Punkten – es ist schlechter als das finale Modell, das alle 200 nutzt. Die CV schätzt also den Fehler eines künstlich benachteiligten Verfahrens: systematisch zu pessimistisch (Bias des Schätzers). k = 5 oder 10 ist der übliche Kompromiss – aus exakt demselben Denkmuster, das du von der Modellkomplexität kennst."
+        },
+        {
+            text: "Vor dem Start der 10-fold-CV skalierst du alle Features und wählst die 20 besten anhand ihrer Korrelation mit der Zielgröße aus – berechnet auf dem GESAMTEN Datensatz. Welche Folge hat das?",
+            options: [
+                "Keine – Vorverarbeitung gehört nicht zum Modell und darf global geschehen.",
+                "Der CV-Fehler wird pessimistisch, weil die Skalierung die Fold-Varianz erhöht.",
+                "Die CV bricht methodisch zusammen, weil die Folds nicht mehr disjunkt sind.",
+                "Der CV-Fehler wird zu optimistisch – Validierungs-Wissen floss in die Auswahl."
+            ],
+            correct: 3,
+            explanation: "Die Feature-Auswahl hat die Zielwerte ALLER Punkte gesehen – auch derer, die später als 'ungesehene' Validierungsdaten dienen sollen. Ein klassisches Datenleck: Die Validierungs-Folds sind nicht mehr wirklich ungesehen, die Schätzung schönt sich selbst. Regel: Jeder Schritt, der aus Daten lernt (Selektion, Skalierung, Imputation), gehört IN die Pipeline und wird pro Fold neu gefittet. sklearn erzwingt das elegant über Pipeline + cross_val_score."
+        },
+        {
+            text: "Du prognostizierst Maschinenausfälle aus Sensor-Zeitreihen und nutzt gewöhnliche 10-fold-CV mit zufälliger Fold-Zuordnung. Die CV glänzt, der Live-Betrieb enttäuscht. Woran liegt es am ehesten?",
+            options: [
+                "Durch das zufällige Mischen lernen Modelle aus der Zukunft der Validierungspunkte.",
+                "Zehn Folds sind für Zeitreihen zu viele; mit k = 3 wäre die Schätzung robuster.",
+                "Sensordaten haben ein zu hohes σ², dagegen ist jede Validierung machtlos.",
+                "Im Live-Betrieb kommen weniger Daten an, dadurch steigt zwangsläufig der Bias."
+            ],
+            correct: 0,
+            explanation: "Zufälliges Mischen zerreißt die Zeitachse: Das Modell trainiert auf Messpunkten, die zeitlich NACH den Validierungspunkten liegen – und benachbarte Sensorwerte sind fast identisch, das Modell 'erkennt' seine Nachbarn wieder. Im Live-Betrieb gibt es diese Zukunftsinformation nicht. Lösung: zeitlich geordnete Validierung (Forward Chaining, sklearn: TimeSeriesSplit) – trainiere auf Vergangenheit, validiere auf Zukunft. Die i.i.d.-Annahme der Standard-CV ist bei Zeitreihen schlicht verletzt."
+        },
+        {
+            text: "Du testest 50 Hyperparameter-Kombinationen per 10-fold-CV und berichtest den CV-Fehler der besten Kombination als erwartete Modellgüte. Warum ist diese Zahl mit Vorsicht zu genießen?",
+            options: [
+                "Weil 10-fold-CV grundsätzlich pessimistisch schätzt und die Güte untertreibt.",
+                "Wer aus 50 verrauschten Schätzwerten das Minimum wählt, erwischt auch Glückstreffer.",
+                "Weil Hyperparameter den irreduziblen Fehler σ² verändern und die Folds entwerten.",
+                "Gar nicht – die Zahl stimmt, solange alle 50 Läufe dieselben Folds verwendet haben."
+            ],
+            correct: 1,
+            explanation: "Jeder CV-Wert ist eine Schätzung MIT Streuung (die Varianz des Schätzers schlägt wieder zu). Wählt man aus 50 solchen Werten das Minimum, selektiert man systematisch auch die, die zufällig nach unten ausgerissen sind – der berichtete Wert ist optimistisch verzerrt ('Winner's Curse'). Sauber: die CV nur zur AUSWAHL nutzen und die Güte auf einem unberührten Test-Set oder per verschachtelter (nested) CV messen. Auswahl und Bewertung brauchen getrennte Daten – dasselbe Prinzip wie Training vs. Test, eine Ebene höher."
+        },
+        {
+            text: "Die Cross-Validation ist abgeschlossen, Polynomgrad 4 hat gewonnen. Welches Modell lieferst du an den Kunden aus – und warum?",
+            options: [
+                "Das Fold-Modell mit dem niedrigsten Validierungsfehler, denn es ist erwiesen das beste.",
+                "Den Durchschnitt aller zehn Fold-Modelle, denn Mittelung senkt bekanntlich die Varianz.",
+                "Ein frisch auf ALLEN Daten trainiertes Grad-4-Modell – die CV bewertete das Verfahren.",
+                "Ein beliebiges der zehn Fold-Modelle, denn sie sind alle statistisch gleichwertig."
+            ],
+            correct: 2,
+            explanation: "Hier schließt sich der Kreis zur Kernidee des ganzen Themas: Die CV bewertet – wie Bias und Varianz selbst – ein VERFAHREN, kein Einzelmodell. Steht das beste Verfahren fest (Grad 4), wendet man es auf alle verfügbaren Daten an; das finale Modell ist tendenziell sogar etwas besser als die CV-Schätzung, weil es mehr Daten sah. Antwort a) ist der Winner's Curse aus der Vorfrage im Kleinen. Antwort b) ist übrigens nicht absurd – das wäre ein Ensemble! Aber dann hat man ein ANDERES Verfahren gebaut, für das die CV-Schätzung nicht mehr gilt."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>

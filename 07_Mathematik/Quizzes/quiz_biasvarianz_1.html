@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bias-Varianz Quiz</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fixierte Statusleiste -->
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Bias-Varianz-Dilemma: Wissens-Check</h1>
+
+<!-- Hier werden alle Fragen dynamisch reingeladen -->
+<div class="quiz-container" id="quiz-container"></div>
+
+<!-- Abschlussmeldung -->
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // MODULARITÄT: Die neuen Fragen zum Bias-Varianz-Tradeoff
+    const questions = [
+        {
+            text: "Was beschreibt der 'Bias' (Verzerrung) in einem Machine-Learning-Modell?",
+            options: [
+                "Die Abweichung auf den Testdaten.",
+                "Den Fehler durch systematisch falsche oder zu stark vereinfachende Annahmen.",
+                "Die Empfindlichkeit des Modells auf kleine Änderungen in den Daten.",
+                "Das fundamentale Rauschen in den Daten."
+            ],
+            correct: 1,
+            explanation: "Richtig! Der Bias entsteht, wenn ein Modell zu simpel ist (Underfitting) und die wahren, komplexen Zusammenhänge nicht erfassen kann."
+        },
+        {
+            text: "Was misst die 'Varianz' eines Modells?",
+            options: [
+                "Wie empfindlich das Modell auf kleine Schwankungen oder Rauschen in den Trainingsdaten reagiert.",
+                "Wie gut das Modell die wahren Muster verstanden hat.",
+                "Die Rechenzeit, die das Modell für eine Vorhersage benötigt.",
+                "Den Unterschied zwischen dem irreduziblen Fehler und dem Bias."
+            ],
+            correct: 0,
+            explanation: "Genau. Eine hohe Varianz bedeutet, dass das Modell das Rauschen im Trainingsset auswendig lernt (Overfitting) und bei neuen Daten stark abweichende Vorhersagen liefert."
+        },
+        {
+            text: "Ein Modell leidet unter 'Underfitting'. Welche Fehlerkombination liegt vor?",
+            options: [
+                "Niedriger Bias, hohe Varianz.",
+                "Niedriger Bias, niedrige Varianz.",
+                "Hoher Bias, hohe Varianz.",
+                "Hoher Bias, niedrige Varianz."
+            ],
+            correct: 3,
+            explanation: "Korrekt! Ein Modell, das underfittet, ist zu starr. Es ändert seine Vorhersagen bei neuen Daten kaum (niedrige Varianz), macht aber systematisch Fehler (hoher Bias)."
+        },
+        {
+            text: "Welches Szenario ist ein klassisches Beispiel für 'Overfitting'?",
+            options: [
+                "Eine lineare Regression zur Vorhersage einer stark kurvigen Verteilung.",
+                "Ein extrem tiefer Entscheidungsbaum, der jeden einzelnen Datenpunkt im Training auswendig gelernt hat.",
+                "Ein Modell, das zufällig Ergebnisse zwischen 0 und 1 rät.",
+                "Die Annahme, dass der Fehler eines Modells null werden kann."
+            ],
+            correct: 1,
+            explanation: "Exakt. Ein solcher Baum lernt auch die Ausreißer und Messfehler (das Rauschen) mit und versagt dann bei neuen Testdaten."
+        },
+        {
+            text: "Was bedeutet 'Irreducible Noise' (Nicht reduzierbares Rauschen)?",
+            options: [
+                "Fehler, die durch falsche Wahl der Hyperparameter entstehen.",
+                "Fehler, die man durch mehr Trainingszeit beseitigen kann.",
+                "Natürliche Ungenauigkeiten in den Daten, die von keinem Modell jemals vollständig gelernt oder vermieden werden können.",
+                "Rauschen, das nur in Deep-Learning-Modellen auftritt."
+            ],
+            correct: 2,
+            explanation: "Richtig. Dieser Fehler ist eine fundamentale Grenze. Ursachen können Messfehler, unvorhersehbare Zufälle oder fehlende relevante Variablen sein."
+        },
+        {
+            text: "Wie verhält sich der Bias typischerweise, wenn Du die Komplexität deines Modells erhöhst (z.B. ein höheres Polynom wählst)?",
+            options: [
+                "Er sinkt.",
+                "Er steigt.",
+                "Er bleibt exakt konstant.",
+                "Er wird gleich der Varianz."
+            ],
+            correct: 0,
+            explanation: "Richtig. Ein komplexeres Modell kann sich besser an die Trainingsdaten anpassen, wodurch die systematische Abweichung (der Bias) sinkt."
+        },
+        {
+            text: "Was ist das Hauptziel beim Navigieren des Bias-Varianz-Tradeoffs?",
+            options: [
+                "Sowohl Bias als auch Varianz auf exakt Null zu bringen.",
+                "Den Gesamtfehler auf den Trainingsdaten zu minimieren.",
+                "Den 'Sweet Spot' zu finden, an dem die Summe aus Bias² und Varianz am geringsten ist, um auf neuen Daten gut zu generalisieren.",
+                "Ein Modell zu wählen, das maximale Komplexität aufweist."
+            ],
+            correct: 2,
+            explanation: "Korrekt! Das Ziel des Machine Learnings ist Generalisierung auf *unbekannten* Daten, weshalb wir den Punkt des minimalen Gesamtfehlers suchen."
+        },
+        {
+            text: "Dein Modell erreicht auf den Trainingsdaten eine Genauigkeit von 99.9%, auf den Testdaten aber nur 60%. Was ist das wahrscheinlichste Problem?",
+            options: [
+                "Underfitting (zu hoher Bias).",
+                "Overfitting (zu hohe Varianz).",
+                "Der irreduzible Fehler ist zu groß.",
+                "Die Daten sind linear separierbar."
+            ],
+            correct: 1,
+            explanation: "Genau. Das Modell hat die Trainingsdaten quasi auswendig gelernt, inklusive des Rauschens, und kann dieses Wissen nicht auf neue Daten anwenden (Overfitting)."
+        },
+        {
+            text: "Welche Maßnahme ist *nicht* dazu geeignet, die Varianz eines Modells zu verringern?",
+            options: [
+                "Mehr qualitativ hochwertige Trainingsdaten sammeln.",
+                "Regularisierungstechniken (wie Ridge oder Lasso) anwenden.",
+                "Die Modellkomplexität reduzieren (z.B. Pruning bei Entscheidungsbäumen).",
+                "Das Modell noch länger und intensiver trainieren oder komplexe Layer hinzufügen."
+            ],
+            correct: 3,
+            explanation: "Korrekt! Das Modell noch intensiver zu trainieren oder komplexer zu machen erhöht die Varianz in der Regel weiter, da es sich noch enger an die Trainingsdaten anpasst."
+        },
+        {
+            text: "In der 'Viele-Welten-Betrachtung' der Statistik (wie in der Simulation vorhin): Warum schwanken die Vorhersagen eines komplexen Modells so stark?",
+            options: [
+                "Weil das Modell stark auf die zufälligen Abweichungen im jeweils gezogenen Trainingsdatensatz reagiert.",
+                "Weil das wahre Muster der Funktion f(x) nicht existiert.",
+                "Weil der Bias-Wert in den negativen Bereich abrutscht.",
+                "Weil das Modell Rauschen und Signal perfekt voneinander trennen kann."
+            ],
+            correct: 0,
+            explanation: "Exakt. Zieht man unterschiedliche Trainingssets aus derselben Verteilung, wird ein zu komplexes Modell jedes Mal komplett andere Kurven fitten. Das erzeugt optisch einen breiten 'Schlauch' – die Varianz."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>

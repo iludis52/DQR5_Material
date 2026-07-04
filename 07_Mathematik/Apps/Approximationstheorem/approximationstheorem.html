@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universelles Approximationstheorem – Interaktive Demo</title>
+<style>
+    :root {
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --ink: #1e2433;
+        --muted: #5b6478;
+        --line: #e4e7f0;
+
+        --target: #1e2433;     /* Zielfunktion */
+        --net: #4f46e5;        /* Netz-Ausgabe */
+        --net-soft: #eef0fe;
+        --neuron: #0891b2;     /* Einzelneuronen */
+        --good: #059669;
+        --warn: #d97706;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background:
+            radial-gradient(1200px 500px at 50% -10%, #eef0fa 0%, transparent 70%),
+            var(--bg);
+        color: var(--ink);
+        line-height: 1.6;
+        padding: 2.5rem 1.5rem 3rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+    }
+
+    header { text-align: center; max-width: 820px; margin-bottom: 2rem; }
+    header .eyebrow {
+        font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; margin-bottom: 0.4rem;
+    }
+    header h1 {
+        font-size: clamp(1.5rem, 3.4vw, 2.2rem);
+        font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.5rem;
+    }
+    header p { color: var(--muted); font-size: 1.0rem; }
+
+    .stage { width: 100%; max-width: 1150px; display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 12px 30px rgba(30, 36, 51, 0.06);
+        padding: 1.5rem 1.75rem;
+    }
+    .card-title {
+        font-size: 0.82rem; letter-spacing: 0.12em; text-transform: uppercase;
+        font-weight: 700; color: var(--muted); margin-bottom: 1rem;
+    }
+
+    .dashboard {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+    @media (max-width: 950px) { .dashboard { grid-template-columns: 1fr; } }
+
+    /* ---------- Steuerung ---------- */
+    .controls { display: flex; flex-direction: column; gap: 1.3rem; }
+
+    .control-group label {
+        display: flex; justify-content: space-between; align-items: baseline;
+        font-weight: 600; font-size: 0.92rem; margin-bottom: 0.35rem;
+    }
+    .control-group label .value {
+        font-variant-numeric: tabular-nums;
+        color: var(--net); font-weight: 700;
+    }
+
+    input[type="range"] {
+        width: 100%;
+        accent-color: var(--net);
+        cursor: pointer;
+    }
+
+    select {
+        width: 100%;
+        padding: 0.5rem 0.7rem;
+        border: 1.5px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+        background: var(--card);
+        color: var(--ink);
+        cursor: pointer;
+    }
+    select:focus-visible { outline: 2px solid var(--net); outline-offset: 1px; }
+
+    .btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .btn {
+        flex: 1;
+        min-width: 120px;
+        padding: 0.65rem 0.9rem;
+        border-radius: 10px;
+        border: 1.5px solid var(--line);
+        background: var(--card);
+        font: inherit;
+        font-weight: 650;
+        font-size: 0.92rem;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+    .btn:hover { border-color: var(--net); background: var(--net-soft); }
+    .btn:active { transform: scale(0.98); }
+    .btn:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+    .btn.primary { background: var(--net); border-color: var(--net); color: #fff; }
+    .btn.primary:hover { background: #4338ca; }
+
+    .toggle-row {
+        display: flex; align-items: center; gap: 0.6rem;
+        font-size: 0.92rem; font-weight: 600;
+        cursor: pointer; user-select: none;
+    }
+    .toggle-row input { accent-color: var(--neuron); width: 17px; height: 17px; cursor: pointer; }
+
+    .stat-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
+        margin-top: 0.2rem;
+    }
+    .stat {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.6rem 0.8rem;
+    }
+    .stat .k { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+    .stat .v { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat .v.good { color: var(--good); }
+
+    /* ---------- Plot ---------- */
+    .plot-wrap { position: relative; }
+    canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        background: linear-gradient(180deg, #fdfdff 0%, #f8f9fd 100%);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+    }
+
+    .legend {
+        display: flex; gap: 1.4rem; flex-wrap: wrap;
+        margin-top: 0.8rem;
+        font-size: 0.85rem; color: var(--muted); font-weight: 600;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+    .swatch { width: 22px; height: 4px; border-radius: 2px; display: inline-block; }
+    .sw-target { background: var(--target); }
+    .sw-net { background: var(--net); }
+    .sw-neuron { background: var(--neuron); opacity: 0.5; }
+
+    .hint {
+        margin-top: 1rem;
+        background: var(--net-soft);
+        border: 1px solid #dfe3fc;
+        border-radius: 12px;
+        padding: 0.9rem 1.1rem;
+        font-size: 0.9rem;
+        color: #3730a3;
+    }
+    .hint b { color: #312e81; }
+
+    /* ---------- Netz-Diagramm ---------- */
+    #net-svg { width: 100%; height: auto; display: block; }
+    .nd-edge { stroke: #dde1eb; stroke-width: 1; }
+    .nd-node-io { fill: #fff; stroke: #cdd3e1; stroke-width: 2; }
+    .nd-node-hidden { fill: var(--net); stroke: var(--net); }
+    .nd-glow { fill: var(--net-soft); }
+    .nd-label {
+        font-size: 11px; font-weight: 600; fill: var(--muted);
+        text-anchor: middle;
+        font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    }
+    .nd-label.lit { fill: var(--net); }
+
+    footer { margin-top: 2rem; color: #9aa2b5; font-size: 0.8rem; text-align: center; max-width: 700px; }
+
+    @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; animation: none !important; }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="eyebrow">Didaktische Demo · Deep Learning</div>
+    <h1>Das universelle Approximationstheorem</h1>
+    <p>Ein neuronales Netz mit nur <b>einer</b> versteckten Schicht kann jede stetige Funktion beliebig genau annähern — wenn es genügend Neuronen hat. Hier kannst du dabei zusehen.</p>
+</header>
+
+<div class="stage">
+    <div class="dashboard">
+
+        <!-- ============ STEUERUNG ============ -->
+        <div class="card controls">
+            <div class="card-title">Experiment steuern</div>
+
+            <div class="control-group">
+                <label for="neurons">Versteckte Neuronen <span class="value" id="neurons-val">8</span></label>
+                <input type="range" id="neurons" min="1" max="60" value="8">
+            </div>
+
+            <div class="control-group">
+                <label for="complexity">Komplexität der Zielfunktion <span class="value" id="complexity-val">4</span></label>
+                <input type="range" id="complexity" min="1" max="8" value="4">
+            </div>
+
+            <div class="control-group">
+                <label for="activation">Aktivierungsfunktion</label>
+                <select id="activation">
+                    <option value="tanh" selected>tanh</option>
+                    <option value="relu">ReLU</option>
+                    <option value="sigmoid">Sigmoid</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="lr">Lernrate <span class="value" id="lr-val">0.05</span></label>
+                <input type="range" id="lr" min="-3" max="-0.3" step="0.05" value="-1.3">
+            </div>
+
+            <div class="btn-row">
+                <button class="btn primary" id="btn-train">▶ Training starten</button>
+                <button class="btn" id="btn-reset">Netz zurücksetzen</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn" id="btn-newfn">Neue Zufallsfunktion</button>
+            </div>
+
+            <label class="toggle-row">
+                <input type="checkbox" id="show-neurons">
+                Beiträge der einzelnen Neuronen zeigen
+            </label>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <div class="k">Epoche</div>
+                    <div class="v" id="stat-epoch">0</div>
+                </div>
+                <div class="stat">
+                    <div class="k">Fehler (MSE)</div>
+                    <div class="v" id="stat-loss">—</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card-title" style="margin-top:0.4rem;">Architektur des Netzwerks</div>
+                <svg id="net-svg" viewBox="0 0 280 340" role="img"
+                     aria-label="Diagramm des neuronalen Netzes: ein Eingabeneuron, eine versteckte Schicht mit einstellbarer Neuronenzahl, ein Ausgabeneuron."></svg>
+            </div>
+        </div>
+
+        <!-- ============ PLOT ============ -->
+        <div class="card">
+            <div class="card-title">Zielfunktion vs. Netz-Ausgabe</div>
+            <div class="plot-wrap">
+                <canvas id="plot" width="1200" height="640"></canvas>
+            </div>
+            <div class="legend">
+                <span><i class="swatch sw-target"></i> Zufällige Zielfunktion f(x)</span>
+                <span><i class="swatch sw-net"></i> Netz-Ausgabe ŷ(x)</span>
+                <span id="legend-neurons" style="display:none"><i class="swatch sw-neuron"></i> Beitrag einzelner Neuronen</span>
+            </div>
+            <div class="hint" id="hint">
+                <b>Experimentieridee:</b> Starte mit 2–3 Neuronen und beobachte, wie das Netz die Funktion nur grob trifft. Erhöhe dann schrittweise die Neuronenzahl (Netz wird dabei neu initialisiert) — die Approximation wird beliebig gut. Genau das besagt das Theorem.
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer>
+    Das Netz (1 versteckte Schicht) wird live im Browser per Gradientenabstieg (Adam) auf 200 Stützstellen trainiert.
+    Die Zielfunktion ist eine zufällige Überlagerung von Sinusschwingungen — bei jeder „Neue Zufallsfunktion" entsteht eine andere.
+</footer>
+
+<script>
+"use strict";
+
+// ==================== Zielfunktion ====================
+// Zufällige Überlagerung von Sinustermen -> glatte, aber "wilde" Funktion
+let targetFn = null;
+let complexity = 4;   // Anzahl Sinusterme, per Slider einstellbar
+
+function makeRandomFunction() {
+    const terms = [];
+    const nTerms = complexity;
+    for (let i = 0; i < nTerms; i++) {
+        terms.push({
+            amp:   0.3 + Math.random() * 0.7,
+            // Frequenzbereich wächst mit der Komplexität mit
+            freq:  0.4 + Math.random() * (0.6 + complexity * 0.35),
+            phase: Math.random() * Math.PI * 2
+        });
+    }
+    // auf [-1, 1] normieren
+    let raw = x => terms.reduce((s, t) => s + t.amp * Math.sin(t.freq * Math.PI * x + t.phase), 0);
+    let maxAbs = 0;
+    for (let x = -1; x <= 1; x += 0.01) maxAbs = Math.max(maxAbs, Math.abs(raw(x)));
+    const scale = 0.85 / maxAbs;
+    targetFn = x => raw(x) * scale;
+}
+
+// ==================== Trainingsdaten ====================
+const N_SAMPLES = 200;
+let X = [], Y = [];
+function sampleData() {
+    X = []; Y = [];
+    for (let i = 0; i < N_SAMPLES; i++) {
+        const x = -1 + 2 * i / (N_SAMPLES - 1);
+        X.push(x);
+        Y.push(targetFn(x));
+    }
+}
+
+// ==================== Netz: 1 -> H -> 1 ====================
+let H = 8;
+let W1, b1, W2, b2;           // Parameter
+let mW1, mb1, mW2, mb2;       // Adam: 1. Moment
+let vW1, vb1, vW2, vb2;       // Adam: 2. Moment
+let adamT = 0;
+let epoch = 0;
+let activationName = "tanh";
+
+function act(z) {
+    if (activationName === "relu")    return Math.max(0, z);
+    if (activationName === "sigmoid") return 1 / (1 + Math.exp(-z));
+    return Math.tanh(z);
+}
+function actPrime(z) {
+    if (activationName === "relu")    return z > 0 ? 1 : 0;
+    if (activationName === "sigmoid") { const s = 1/(1+Math.exp(-z)); return s * (1 - s); }
+    const t = Math.tanh(z); return 1 - t * t;
+}
+
+function initNet() {
+    W1 = []; b1 = []; W2 = []; b2 = 0;
+    for (let j = 0; j < H; j++) {
+        // Breite Streuung, damit die Neuronen den Eingaberaum abdecken
+        W1.push((Math.random() * 2 - 1) * 4);
+        b1.push((Math.random() * 2 - 1) * 3);
+        W2.push((Math.random() * 2 - 1) * 0.5);
+    }
+    mW1 = new Array(H).fill(0); vW1 = new Array(H).fill(0);
+    mb1 = new Array(H).fill(0); vb1 = new Array(H).fill(0);
+    mW2 = new Array(H).fill(0); vW2 = new Array(H).fill(0);
+    mb2 = 0; vb2 = 0;
+    adamT = 0;
+    epoch = 0;
+}
+
+function forward(x) {
+    const z = new Array(H), a = new Array(H);
+    let out = b2;
+    for (let j = 0; j < H; j++) {
+        z[j] = W1[j] * x + b1[j];
+        a[j] = act(z[j]);
+        out += W2[j] * a[j];
+    }
+    return { z, a, out };
+}
+
+// Ein voller Gradientenschritt (Batch = alle Stützstellen), Adam-Update
+function trainStep(lr) {
+    const gW1 = new Array(H).fill(0), gb1 = new Array(H).fill(0);
+    const gW2 = new Array(H).fill(0);
+    let gb2 = 0, loss = 0;
+
+    for (let i = 0; i < N_SAMPLES; i++) {
+        const { z, a, out } = forward(X[i]);
+        const err = out - Y[i];
+        loss += err * err;
+        const d = 2 * err / N_SAMPLES;
+        gb2 += d;
+        for (let j = 0; j < H; j++) {
+            gW2[j] += d * a[j];
+            const dHidden = d * W2[j] * actPrime(z[j]);
+            gW1[j] += dHidden * X[i];
+            gb1[j] += dHidden;
+        }
+    }
+    loss /= N_SAMPLES;
+
+    // Adam
+    adamT++;
+    const beta1 = 0.9, beta2 = 0.999, eps = 1e-8;
+    const bc1 = 1 - Math.pow(beta1, adamT);
+    const bc2 = 1 - Math.pow(beta2, adamT);
+    function adam(m, v, g) {
+        const mNew = beta1 * m + (1 - beta1) * g;
+        const vNew = beta2 * v + (1 - beta2) * g * g;
+        const step = lr * (mNew / bc1) / (Math.sqrt(vNew / bc2) + eps);
+        return [mNew, vNew, step];
+    }
+    for (let j = 0; j < H; j++) {
+        let s;
+        [mW1[j], vW1[j], s] = adam(mW1[j], vW1[j], gW1[j]); W1[j] -= s;
+        [mb1[j], vb1[j], s] = adam(mb1[j], vb1[j], gb1[j]); b1[j] -= s;
+        [mW2[j], vW2[j], s] = adam(mW2[j], vW2[j], gW2[j]); W2[j] -= s;
+    }
+    let s2; [mb2, vb2, s2] = adam(mb2, vb2, gb2); b2 -= s2;
+
+    epoch++;
+    return loss;
+}
+
+// ==================== Zeichnen ====================
+const canvas = document.getElementById('plot');
+const ctx = canvas.getContext('2d');
+const PAD = 50;
+const YMIN = -1.15, YMAX = 1.15;
+
+function xToPx(x) { return PAD + (x + 1) / 2 * (canvas.width - 2 * PAD); }
+function yToPx(y) { return canvas.height - PAD - (y - YMIN) / (YMAX - YMIN) * (canvas.height - 2 * PAD); }
+
+function drawAxes() {
+    ctx.strokeStyle = '#e9ecf4';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    // Gitter
+    for (let gx = -1; gx <= 1; gx += 0.5) {
+        ctx.beginPath(); ctx.moveTo(xToPx(gx), yToPx(YMIN)); ctx.lineTo(xToPx(gx), yToPx(YMAX)); ctx.stroke();
+    }
+    for (let gy = -1; gy <= 1; gy += 0.5) {
+        ctx.beginPath(); ctx.moveTo(xToPx(-1), yToPx(gy)); ctx.lineTo(xToPx(1), yToPx(gy)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // Achsen
+    ctx.strokeStyle = '#c6ccdb';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(xToPx(-1), yToPx(0)); ctx.lineTo(xToPx(1), yToPx(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xToPx(0), yToPx(YMIN)); ctx.lineTo(xToPx(0), yToPx(YMAX)); ctx.stroke();
+    // Beschriftung
+    ctx.fillStyle = '#9aa2b5';
+    ctx.font = '600 16px "Avenir Next", "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('−1', xToPx(-1), yToPx(0) + 24);
+    ctx.fillText('1',  xToPx(1),  yToPx(0) + 24);
+    ctx.fillText('x',  xToPx(1) + 22, yToPx(0) + 5);
+}
+
+function drawCurve(fn, color, width, alpha = 1, dash = []) {
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = width;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    const steps = 300;
+    for (let i = 0; i <= steps; i++) {
+        const x = -1 + 2 * i / steps;
+        const y = Math.max(YMIN, Math.min(YMAX, fn(x)));
+        if (i === 0) ctx.moveTo(xToPx(x), yToPx(y));
+        else ctx.lineTo(xToPx(x), yToPx(y));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawAxes();
+
+    // Einzelne Neuronenbeiträge (skalierte Aktivierungen)
+    if (document.getElementById('show-neurons').checked) {
+        for (let j = 0; j < H; j++) {
+            drawCurve(x => W2[j] * act(W1[j] * x + b1[j]), '#0891b2', 1.5, 0.35);
+        }
+    }
+
+    // Zielfunktion
+    drawCurve(x => targetFn(x), '#1e2433', 3, 1, [8, 6]);
+    // Netz-Ausgabe
+    drawCurve(x => forward(x).out, '#4f46e5', 3.5);
+}
+
+// ==================== Netz-Diagramm ====================
+const netSvg = document.getElementById('net-svg');
+const svgNS = "http://www.w3.org/2000/svg";
+
+function drawNetworkDiagram() {
+    netSvg.innerHTML = '';
+    const W = 280, Hgt = 340, TOP = 22, BOT = Hgt - 40;
+    const xIn = 40, xHid = 140, xOut = 240;
+    const yMid = (TOP + BOT) / 2;
+
+    // Knotengröße/Abstand an Neuronenzahl anpassen
+    const span = BOT - TOP;
+    const gap = span / (H + 1);
+    const rHid = Math.max(2.5, Math.min(9, gap * 0.38));
+    const hidYs = Array.from({ length: H }, (_, j) => TOP + gap * (j + 1));
+
+    function el(tag, attrs) {
+        const e = document.createElementNS(svgNS, tag);
+        for (const k in attrs) e.setAttribute(k, attrs[k]);
+        return e;
+    }
+
+    // Glow hinter der versteckten Schicht
+    netSvg.appendChild(el('rect', {
+        x: xHid - rHid - 12, y: TOP - 12,
+        width: (rHid + 12) * 2, height: span + 24,
+        rx: 14, class: 'nd-glow'
+    }));
+
+    // Kanten
+    hidYs.forEach(y => {
+        netSvg.appendChild(el('line', { x1: xIn,  y1: yMid, x2: xHid, y2: y,    class: 'nd-edge' }));
+        netSvg.appendChild(el('line', { x1: xHid, y1: y,    x2: xOut, y2: yMid, class: 'nd-edge' }));
+    });
+
+    // Knoten
+    netSvg.appendChild(el('circle', { cx: xIn,  cy: yMid, r: 10, class: 'nd-node-io' }));
+    hidYs.forEach(y => netSvg.appendChild(el('circle', { cx: xHid, cy: y, r: rHid, class: 'nd-node-hidden' })));
+    netSvg.appendChild(el('circle', { cx: xOut, cy: yMid, r: 10, class: 'nd-node-io' }));
+
+    // Beschriftungen
+    const lIn = el('text', { x: xIn, y: Hgt - 18, class: 'nd-label' });
+    lIn.textContent = 'x';
+    const lHid = el('text', { x: xHid, y: Hgt - 18, class: 'nd-label lit' });
+    lHid.textContent = H + (H === 1 ? ' Neuron' : ' Neuronen');
+    const lOut = el('text', { x: xOut, y: Hgt - 18, class: 'nd-label' });
+    lOut.textContent = 'ŷ(x)';
+    netSvg.appendChild(lIn); netSvg.appendChild(lHid); netSvg.appendChild(lOut);
+}
+
+// ==================== Trainings-Loop ====================
+let running = false;
+let currentLoss = null;
+
+function loop() {
+    if (!running) return;
+    const lr = Math.pow(10, parseFloat(document.getElementById('lr').value));
+    // Mehrere Schritte pro Frame für flottes Training
+    for (let k = 0; k < 8; k++) currentLoss = trainStep(lr);
+    updateStats();
+    render();
+    requestAnimationFrame(loop);
+}
+
+function updateStats() {
+    document.getElementById('stat-epoch').textContent = epoch;
+    const el = document.getElementById('stat-loss');
+    if (currentLoss == null) { el.textContent = '—'; el.classList.remove('good'); }
+    else {
+        el.textContent = currentLoss.toExponential(2);
+        el.classList.toggle('good', currentLoss < 1e-3);
+    }
+}
+
+// ==================== UI-Verdrahtung ====================
+const btnTrain = document.getElementById('btn-train');
+
+function setRunning(r) {
+    running = r;
+    btnTrain.textContent = r ? '⏸ Training pausieren' : '▶ Training starten';
+    if (r) requestAnimationFrame(loop);
+}
+
+btnTrain.addEventListener('click', () => setRunning(!running));
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+    initNet(); currentLoss = null; updateStats(); render();
+});
+
+document.getElementById('btn-newfn').addEventListener('click', () => {
+    makeRandomFunction(); sampleData();
+    initNet(); currentLoss = null; updateStats(); render();
+});
+
+document.getElementById('neurons').addEventListener('input', e => {
+    H = parseInt(e.target.value);
+    document.getElementById('neurons-val').textContent = H;
+    initNet(); currentLoss = null; updateStats(); render(); drawNetworkDiagram();
+});
+
+document.getElementById('complexity').addEventListener('input', e => {
+    complexity = parseInt(e.target.value);
+    document.getElementById('complexity-val').textContent = complexity;
+    makeRandomFunction(); sampleData();
+    initNet(); currentLoss = null; updateStats(); render();
+});
+
+document.getElementById('activation').addEventListener('change', e => {
+    activationName = e.target.value;
+    initNet(); currentLoss = null; updateStats(); render();
+});
+
+document.getElementById('lr').addEventListener('input', e => {
+    const lr = Math.pow(10, parseFloat(e.target.value));
+    document.getElementById('lr-val').textContent = lr.toPrecision(2);
+});
+
+document.getElementById('show-neurons').addEventListener('change', e => {
+    document.getElementById('legend-neurons').style.display = e.target.checked ? 'inline-flex' : 'none';
+    render();
+});
+
+// ==================== Start ====================
+makeRandomFunction();
+sampleData();
+initNet();
+updateStats();
+render();
+drawNetworkDiagram();
+</script>
+</body>
+</html>
