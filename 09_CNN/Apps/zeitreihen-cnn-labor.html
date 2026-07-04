@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeitreihen-CNN-Labor · 1D-Faltung</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel-border:#d0d5dd;
+  --accent:#2e75b6; --accent-dark:#1b3a5c; --accent-hover:#1b5a9e;
+  --text:#1a1a1a; --text-dim:#6b7280;
+  --highlight:#f5a623; --highlight-bg:rgba(245,166,35,0.18);
+  --cell-border:#c0c6cf;
+  --relu:#d32f2f;
+  --train:#2e75b6; --val:#f5a623; --test:#16a34a;
+  --info-bg:#eef4fb; --info-bd:#2e75b6;
+  --warn-bg:#fff7e8; --warn-bd:#f5a623;
+  --ok-bg:#eef9f1; --ok-bd:#16a34a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+h1,h2,h3{color:var(--accent-dark)}
+
+/* Header + Segment-Umschalter */
+.header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+  padding:11px 20px;background:#fff;border-bottom:2px solid var(--accent)}
+.header .title h1{font-size:20px;font-weight:700}
+.header .title h1 span{color:var(--accent)}
+.header .title p{font-size:12px;color:var(--text-dim);margin-top:2px}
+.seg{position:relative;display:inline-flex;background:#eceef2;border-radius:999px;padding:4px;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.seg .thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);
+  background:var(--accent);border-radius:999px;box-shadow:0 1px 4px rgba(27,58,92,.35);
+  transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.seg.pos1 .thumb{transform:translateX(100%)}
+.seg button{position:relative;z-index:1;border:none;background:transparent;padding:8px 24px;
+  border-radius:999px;font-weight:700;font-size:14px;color:var(--text-dim);cursor:pointer;
+  font-family:inherit;transition:color .2s;white-space:nowrap}
+.seg button.active{color:#fff}
+.seg button:focus-visible{outline:2px solid var(--accent-dark);outline-offset:2px}
+
+/* Views */
+.view{display:none;padding:14px 20px 32px;max-width:1340px;margin:0 auto}
+.view.active{display:block}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;gap:9px 13px;padding:10px 13px;background:#fff;
+  border:1px solid var(--panel-border);border-radius:10px;align-items:center;margin-bottom:12px}
+.ctrl{display:flex;align-items:center;gap:6px}
+.ctrl label{font-size:12px;color:var(--text-dim);font-weight:600;white-space:nowrap}
+select,input[type=number]{font-family:inherit;font-size:13px;border:1px solid var(--panel-border);
+  border-radius:5px;padding:5px 8px;background:#fff;color:var(--text);cursor:pointer}
+select:hover{border-color:var(--accent)}
+input[type=number]{width:72px;cursor:text}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+.toggle{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+button.btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--accent);
+  border-radius:6px;padding:8px 16px;background:var(--accent);color:#fff;cursor:pointer;transition:background .15s}
+button.btn:hover{background:var(--accent-hover)}
+button.btn.sec{background:#fff;color:var(--text);border-color:var(--panel-border);font-weight:500}
+button.btn.sec:hover{background:#f0f0f0;border-color:var(--accent)}
+button.btn:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,.upload:focus-within{outline:2px solid var(--accent-dark);outline-offset:2px}
+.upload{display:inline-flex;align-items:center;font-size:13px;border:1px solid var(--panel-border);
+  border-radius:6px;padding:6px 12px;background:#fff;cursor:pointer;font-weight:500;gap:6px}
+.upload:hover{border-color:var(--accent)}
+.range{display:flex;align-items:center;gap:8px}
+.range input[type=range]{accent-color:var(--accent)}
+
+/* Panels */
+.panel{background:#fff;border:1px solid var(--panel-border);border-radius:10px;padding:12px 14px;margin-bottom:12px;min-width:0}
+.panel h3{font-size:13.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--text-dim);background:#f0f1f5;padding:2px 8px;border-radius:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+
+/* Aktionsleiste – zentral, gut sichtbar */
+.actionbar{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;
+  background:#fff;border:1px solid var(--panel-border);border-radius:10px;padding:11px 14px;margin-bottom:12px}
+.actionbar .range label{font-size:12px;color:var(--text-dim);font-weight:600}
+
+/* Info boxes */
+.info{border-left:5px solid var(--info-bd);background:var(--info-bg);padding:10px 13px;
+  border-radius:7px;font-size:12.5px;line-height:1.5;margin:10px 0}
+.info.warn{border-left-color:var(--warn-bd);background:var(--warn-bg)}
+.info.ok{border-left-color:var(--ok-bd);background:var(--ok-bg)}
+.info b{color:var(--accent-dark)}
+.info.warn b{color:#9a6a00}
+
+/* Cell strips (Konzept) */
+.striplabel{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--text-dim);margin:8px 0 4px}
+.strip{display:flex;gap:3px;overflow-x:auto;padding:3px 2px 6px}
+.cell{flex:0 0 auto;width:38px;height:42px;border:1px solid var(--cell-border);border-radius:5px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;
+  font-variant-numeric:tabular-nums;position:relative;background:#fff;transition:transform .1s,box-shadow .1s}
+.cell .idx{position:absolute;top:1px;left:3px;font-size:8px;color:#9aa0ad}
+.cell.pad{background:#eceef2;color:#aab;border-style:dashed}
+.cell.rf{box-shadow:0 0 0 2px var(--highlight);z-index:2}
+.cell.cur{box-shadow:0 0 0 2px var(--accent-dark);z-index:3}
+.cell.editable{cursor:pointer}
+.cell.editable:hover{transform:translateY(-2px);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.cell .relu-dot{position:absolute;top:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--relu)}
+.cell input{width:32px;border:none;text-align:center;font-family:inherit;font-size:11px;background:transparent}
+.kcell{width:44px;height:42px;background:#fbfcfe}
+.calc{background:#f8fafc;border:1px solid var(--panel-border);border-radius:8px;padding:11px 13px;
+  font-size:12px;line-height:1.65;min-height:84px}
+.calc .term{font-family:'Consolas',monospace}
+.calc .ph{color:var(--text-dim);font-style:italic}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text-dim);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:12px;height:12px;border-radius:3px;border:1px solid #ccc}
+canvas{display:block;width:100%;background:#fff;border-radius:6px}
+.metrics{display:flex;flex-wrap:wrap;gap:9px;margin-top:8px}
+.metric{background:#f8fafc;border:1px solid var(--panel-border);border-radius:8px;padding:7px 13px;font-size:12px}
+.metric b{display:block;font-size:17px;color:var(--accent-dark);font-variant-numeric:tabular-nums}
+.metric.cnn{border-left:4px solid var(--accent)}
+.metric.naive{border-left:4px solid var(--text-dim)}
+.note{font-size:11px;color:var(--text-dim);font-style:italic;margin-top:5px}
+.archline{font-family:'Consolas',monospace;font-size:12px;color:var(--accent-dark);
+  background:#f4f7fb;border-radius:6px;padding:8px 12px;margin-top:6px;overflow-x:auto;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">
+    <h1><span>Zeitreihen-CNN-Labor</span> · 1D-Faltung</h1>
+    <p>Faltung von Bildern auf Zeitreihen übertragen — verstehen &amp; anwenden</p>
+  </div>
+  <div class="seg" id="seg" role="tablist" aria-label="Lab umschalten">
+    <div class="thumb"></div>
+    <button class="active" id="segK" role="tab" aria-selected="true">Konzept-Lab</button>
+    <button id="segT" role="tab" aria-selected="false">Training-Lab</button>
+  </div>
+</div>
+
+<!-- ════════════════════════ KONZEPT-LAB ════════════════════════ -->
+<section class="view active" id="viewK" role="tabpanel">
+
+  <div class="info">
+    <b>Idee:</b> Im Bild-CNN gleitet ein Filter über <i>Höhe und Breite</i>. Bei einer Zeitreihe gibt es nur <i>eine</i> Achse — die Zeit. Der Filter wird zum gleitenden Fenster und sucht nach Mustern <i>im Verlauf</i> (Anstieg, Spitze, Kante). Wähle Signal und Filter, dann klicke unten <b>Berechnen</b> — die Feature Map entsteht Schritt für Schritt.
+  </div>
+
+  <div class="controls">
+    <div class="ctrl"><label>Signal</label>
+      <select id="kSignal">
+        <option value="sin">Sinus</option>
+        <option value="sintrend">Sinus + Trend</option>
+        <option value="step">Sprung</option>
+        <option value="spike">Spitze (Impuls)</option>
+        <option value="noisy">Verrauscht</option>
+        <option value="custom">Eigenes (Zellen klicken)</option>
+      </select></div>
+    <div class="ctrl"><label>Länge</label>
+      <select id="kLen"><option>16</option><option selected>24</option><option>32</option></select></div>
+    <div class="ctrl"><label>Kernel K</label>
+      <select id="kK"><option selected>3</option><option>5</option><option>7</option></select></div>
+    <div class="ctrl"><label>Filter-Preset</label>
+      <select id="kPreset">
+        <option value="smooth">Glättung (Mittelwert)</option>
+        <option value="diff">Steigung (Differenz)</option>
+        <option value="edge">Kante (Laplace)</option>
+        <option value="custom">Eigenes</option>
+      </select></div>
+    <div class="ctrl"><label>Padding</label>
+      <select id="kPad"><option value="valid">keins (valid)</option><option value="same">same</option><option value="causal" selected>kausal</option></select></div>
+    <div class="ctrl"><label>Stride</label>
+      <select id="kStride"><option selected>1</option><option>2</option></select></div>
+    <label class="toggle"><input type="checkbox" id="kRelu"> ReLU</label>
+  </div>
+
+  <!-- Eingabe und Feature Map untereinander (vertikal – lieber nach unten scrollen) -->
+  <div>
+    <div class="panel">
+      <h3>Eingabe-Signal <span class="tag">x[t]</span></h3>
+      <canvas id="kSigCanvas" height="92" aria-label="Liniendiagramm Eingabesignal"></canvas>
+      <div class="striplabel">Diskrete Werte (Padding = gestrichelt)</div>
+      <div class="strip" id="kInputStrip"></div>
+      <div class="legend">
+        <span><span class="sw" style="background:#1b3a5c"></span>niedrig</span>
+        <span><span class="sw" style="background:#cfd6e0"></span>hoch</span>
+        <span><span class="sw" style="background:var(--highlight);opacity:.7"></span>rezeptives Feld</span>
+        <span><span class="sw" style="background:#eceef2;border-style:dashed"></span>Padding</span>
+        <span><span class="sw" style="position:relative;background:#fff"><span style="position:absolute;top:0;right:0;width:5px;height:5px;border-radius:50%;background:var(--relu)"></span></span>ReLU aktiv</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Feature Map <span class="tag">y[o]</span> <span id="kRfInfo" class="note" style="margin:0"></span></h3>
+      <canvas id="kOutCanvas" height="92" aria-label="Liniendiagramm Feature Map"></canvas>
+      <div class="striplabel">Ausgabewerte</div>
+      <div class="strip" id="kOutputStrip"></div>
+    </div>
+  </div>
+
+  <!-- Filter und Berechnung nebeneinander -->
+  <div class="grid2">
+    <div class="panel">
+      <h3>Filter <span class="tag">w</span></h3>
+      <div class="striplabel">Gewichte (Zelle klicken zum Ändern)</div>
+      <div class="strip" id="kKernelStrip"></div>
+      <div class="note">Glättung dämpft Rauschen · Differenz erkennt Anstiege · Laplace betont Kanten. Im Training-Lab werden diese Gewichte <i>gelernt</i>.</div>
+    </div>
+    <div class="panel">
+      <h3>Berechnung an Position <span class="tag" id="kPosTag">o = –</span></h3>
+      <div class="calc" id="kCalc"><span class="ph">Noch nichts berechnet. Klicke „Berechnen" oder „Animieren".</span></div>
+    </div>
+  </div>
+
+  <!-- Zentrale Aktionsleiste -->
+  <div class="actionbar">
+    <button class="btn" id="kCompute">Berechnen</button>
+    <button class="btn" id="kAnimate">▶ Animieren</button>
+    <button class="btn sec" id="kStep">Schritt →</button>
+    <button class="btn sec" id="kReset">Zurücksetzen</button>
+    <div class="range"><label>Tempo</label><input type="range" id="kSpeed" min="1" max="10" value="6"></div>
+  </div>
+
+  <div class="info ok">
+    <b>Rezeptives Feld:</b> Jeder Ausgabewert „sieht" genau K Eingabepunkte — das rezeptive Feld ist so groß wie der Kernel. Möchte man weiter zurückblicken, <b>stapelt man Schichten</b> (wie beim 2D-CNN): Die zweite Faltung sieht schon Ausschnitte der ersten, das rezeptive Feld wächst mit der Tiefe. Genau das nutzt das Training-Lab mit 2 Schichten. Mit <b>kausalem Padding</b> blickt der Filter nur in die Vergangenheit — Pflicht beim Forecasting.
+  </div>
+</section>
+
+<!-- ════════════════════════ TRAINING-LAB ════════════════════════ -->
+<section class="view" id="viewT" role="tabpanel">
+
+  <div class="info">
+    <b>Vom Konzept zur Anwendung:</b> Jetzt lernt ein echtes 1D-CNN die Filter selbst — aus Daten. Ziel: aus den letzten <i>L</i> Werten den nächsten vorhersagen. Achte besonders auf die <b>Datenaufbereitung</b> — sie unterscheidet Zeitreihen grundlegend von Bildern.
+  </div>
+
+  <div class="controls">
+    <div class="ctrl"><label>Demo-Reihe</label>
+      <select id="tDemo">
+        <option value="seasonal">Saisonal + Trend</option>
+        <option value="ar">AR-Prozess (linear)</option>
+        <option value="nonlin">Nichtlinear (Regime)</option>
+      </select></div>
+    <button class="btn sec" id="tGen">Erzeugen</button>
+    <label class="upload">📂 CSV laden<input type="file" id="tCsv" accept=".csv,text/csv" style="display:none"></label>
+    <div class="ctrl"><label>Seed</label><input type="number" id="tSeed" value="42" style="width:70px"></div>
+    <div class="ctrl"><label>Fenster L</label>
+      <select id="tL"><option>8</option><option selected>12</option><option>16</option><option>24</option></select></div>
+  </div>
+
+  <div class="panel">
+    <h3>Datenaufbereitung <span class="tag">Reihe → (X, y)</span></h3>
+    <canvas id="tDataCanvas" height="200" aria-label="Zeitreihe mit Train/Val/Test-Aufteilung"></canvas>
+    <div class="legend" style="margin-top:8px">
+      <span><span class="sw" style="background:var(--train)"></span>Train</span>
+      <span><span class="sw" style="background:var(--val)"></span>Validierung</span>
+      <span><span class="sw" style="background:var(--test)"></span>Test</span>
+      <span><span class="sw" style="background:var(--highlight);opacity:.6"></span>Fenster X → ● Ziel y</span>
+    </div>
+    <div class="info warn">
+      <b>Zwei klassische Fallen — hier vermieden:</b> (1) <b>Chronologischer Split, kein Mischen.</b> Mischt man Fenster wie Bilder, liegt Zukunft im Training → Datenleck. (2) <b>Normalisierung nur auf Train gefittet.</b> Mittelwert/Streuung kommen nur aus dem Trainingsbereich. Anders als bei SARIMA ist <b>Stationarität nicht zwingend</b> — hilft dem Netz aber.
+    </div>
+    <div id="tWinInfo" class="note"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Modell <span class="tag">1D-CNN</span></h3>
+      <div class="controls" style="border:none;padding:0;background:none;margin-bottom:6px">
+        <div class="ctrl"><label>Conv-Schichten</label>
+          <select id="tLayers"><option value="1">1</option><option value="2" selected>2</option></select></div>
+        <div class="ctrl"><label>Filter</label>
+          <select id="tFilters"><option>4</option><option selected>6</option><option>8</option></select></div>
+        <div class="ctrl"><label>Kernel K</label>
+          <select id="tK"><option selected>3</option><option>5</option></select></div>
+      </div>
+      <div class="archline" id="tArch"></div>
+      <div class="note">Kausale Faltung (blickt nur zurück) · ReLU · Flatten · Dense→1 · Verlust MSE. Gleiche Bausteine wie im 2D-CNN.</div>
+    </div>
+    <div class="panel">
+      <h3>Training</h3>
+      <div class="controls" style="border:none;padding:0;background:none;margin-bottom:6px">
+        <div class="ctrl"><label>Lernrate</label>
+          <select id="tLr"><option>0.01</option><option selected>0.03</option><option>0.1</option></select></div>
+        <div class="ctrl"><label>Epochen</label>
+          <select id="tEpochs"><option>60</option><option selected>120</option><option>200</option></select></div>
+        <div class="ctrl"><label>Batch</label>
+          <select id="tBatch"><option>8</option><option selected>16</option><option>32</option></select></div>
+      </div>
+      <div class="actionbar" style="margin:0;padding:8px 0 0;border:none">
+        <button class="btn" id="tTrain">Trainieren</button>
+        <button class="btn sec" id="tStop" disabled>Stop</button>
+        <button class="btn sec" id="tResetNet">Netz zurücksetzen</button>
+      </div>
+      <div class="note" id="tStatus">Bereit. Erst Reihe erzeugen, dann trainieren.</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h3>Verlust <span class="tag">MSE</span></h3>
+      <canvas id="tLossCanvas" height="160" aria-label="Verlustkurve Training und Validierung"></canvas>
+      <div class="legend" style="margin-top:8px">
+        <span><span class="sw" style="background:var(--accent)"></span>Train</span>
+        <span><span class="sw" style="background:var(--highlight)"></span>Validierung</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Gelernte Filter <span class="tag">Schicht 1</span></h3>
+      <canvas id="tFilterCanvas" height="160" aria-label="Gelernte Filter als Wellenformen"></canvas>
+      <div class="note">Jeder Filter ist ein kleiner Mustererkenner — z. B. Anstieg, Spitze, Kante im Verlauf.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Vorhersage &amp; ehrlicher Vergleich <span class="tag">Testbereich</span></h3>
+    <canvas id="tForecastCanvas" height="200" aria-label="Vorhersage gegen Wahrheit"></canvas>
+    <div class="legend" style="margin-top:8px">
+      <span><span class="sw" style="background:#444"></span>Wahrheit</span>
+      <span><span class="sw" style="background:var(--accent)"></span>1D-CNN</span>
+      <span><span class="sw" style="background:var(--text-dim)"></span>naive Baseline (y[t+1]=y[t])</span>
+    </div>
+    <div class="metrics" id="tMetrics"></div>
+    <div class="info" style="margin-bottom:0">
+      <b>Lies das kritisch:</b> Schlägt das CNN die naive Baseline überhaupt? Bei linearen Prozessen (Demo „AR") liegt klassisches SARIMAX oft vorn und das CNN kaum vor der Baseline. Bei der nichtlinearen Regime-Reihe spielt das CNN seine Stärke aus. <b>Die Lektion:</b> 1D-CNN ist nicht automatisch besser als SARIMAX/Prophet — es kommt auf die Datenstruktur an.
+    </div>
+  </div>
+</section>
+
+<script>
+"use strict";
+/* ═══════════════════ Umschalter ═══════════════════ */
+const seg=document.getElementById('seg');
+const segK=document.getElementById('segK'),segT=document.getElementById('segT');
+const viewK=document.getElementById('viewK'),viewT=document.getElementById('viewT');
+function switchTo(which){
+  const t=which==='T';
+  seg.classList.toggle('pos1',t);
+  segK.classList.toggle('active',!t);segT.classList.toggle('active',t);
+  segK.setAttribute('aria-selected',!t);segT.setAttribute('aria-selected',t);
+  viewK.classList.toggle('active',!t);viewT.classList.toggle('active',t);
+  if(t){TR.onShow();}else{KZ.redraw();}
+}
+segK.onclick=()=>switchTo('K');segT.onclick=()=>switchTo('T');
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function dpr(c){
+  const d=window.devicePixelRatio||1;
+  let lh=+c.dataset.h;
+  if(!lh){lh=parseInt(c.getAttribute('height'))||150;c.dataset.h=lh;}
+  const cssW=c.getBoundingClientRect().width||300;
+  c.style.width='100%';c.style.height=lh+'px';
+  c.width=Math.round(cssW*d);c.height=Math.round(lh*d);
+  const ctx=c.getContext('2d');ctx.setTransform(d,0,0,d,0,0);
+  return{ctx,w:cssW,h:lh};}
+
+/* ═══════════════════ KONZEPT-LAB ═══════════════════ */
+const KZ=(function(){
+  const $=id=>document.getElementById(id);
+  let signal=[],kernel=[],outputs=[],leftPad=0,curPos=-1,playing=false,timer=null,computed=false;
+
+  function genSignal(type,N){
+    const s=[];const rng=mulberry32(99);
+    for(let t=0;t<N;t++){let v;
+      if(type==='sin')v=50+40*Math.sin(2*Math.PI*t/8);
+      else if(type==='sintrend')v=25+2.2*t+28*Math.sin(2*Math.PI*t/8);
+      else if(type==='step')v=t<N/2?22:78;
+      else if(type==='spike')v=(t===Math.floor(N/3)||t===Math.floor(2*N/3))?92:28;
+      else if(type==='noisy')v=50+(rng()*2-1)*38;
+      else v=50+40*Math.sin(2*Math.PI*t/8);
+      s.push(Math.round(v));}
+    return s;
+  }
+  function genKernel(preset,K){
+    if(preset==='smooth')return Array(K).fill(+(1/K).toFixed(2));
+    if(preset==='diff'){const k=[];for(let j=0;j<K;j++)k.push(+((j/(K-1))*2-1).toFixed(2));return k;}
+    if(preset==='edge'){const k=Array(K).fill(0);const m=Math.floor(K/2);k[m]=-2;k[m-1]=1;k[m+1]=1;return k;}
+    return kernel.length===K?kernel.slice():Array(K).fill(+(1/K).toFixed(2));
+  }
+  function computeConv(){
+    const N=signal.length,K=kernel.length;
+    const stride=+$('kStride').value,pad=$('kPad').value,relu=$('kRelu').checked;
+    const span=K-1;
+    if(pad==='valid')leftPad=0;else if(pad==='causal')leftPad=span;else leftPad=Math.floor(span/2);
+    let outLen;
+    if(pad==='valid')outLen=Math.max(0,Math.floor((N-span-1)/stride)+1);
+    else outLen=Math.floor((N-1)/stride)+1;
+    outputs=[];
+    for(let o=0;o<outLen;o++){let s=0;const idxs=[];
+      for(let j=0;j<K;j++){const idx=o*stride+j-leftPad;const inR=idx>=0&&idx<N;const xv=inR?signal[idx]:0;
+        s+=xv*kernel[j];idxs.push({j,idx,inR,xv,w:kernel[j]});}
+      const val=relu?Math.max(0,s):s;
+      outputs.push({o,sum:s,val:+val.toFixed(2),clip:relu&&s<0,idxs});}
+  }
+  function colorFor(v,mn,mx){const t=(v-mn)/((mx-mn)||1);
+    const c=[Math.round(27+t*(207-27)),Math.round(58+t*(214-58)),Math.round(92+t*(224-92))];
+    const lum=0.299*c[0]+0.587*c[1]+0.114*c[2];
+    return{bg:`rgb(${c[0]},${c[1]},${c[2]})`,fg:lum>140?'#1a1a1a':'#fff'};}
+  function rgbObj(c){const lum=0.299*c[0]+0.587*c[1]+0.114*c[2];return{bg:`rgb(${c[0]},${c[1]},${c[2]})`,fg:lum>150?'#1a1a1a':'#fff'};}
+  function divColor(v,maxAbs){const t=Math.max(-1,Math.min(1,v/(maxAbs||1)));
+    if(t>=0)return rgbObj([Math.round(255-t*(255-46)),Math.round(255-t*(255-117)),Math.round(255-t*(255-182))]);
+    const a=-t;return rgbObj([Math.round(255-a*(255-192)),Math.round(255-a*(255-57)),Math.round(255-a*(255-43))]);}
+
+  function renderInput(){
+    const strip=$('kInputStrip');strip.innerHTML='';
+    const mn=Math.min(...signal),mx=Math.max(...signal);
+    const rf=curPos>=0&&outputs[curPos]?new Set(outputs[curPos].idxs.filter(d=>d.inR).map(d=>d.idx)):new Set();
+    const custom=$('kSignal').value==='custom';
+    for(let p=0;p<leftPad;p++){const d=document.createElement('div');d.className='cell pad';d.textContent='0';strip.appendChild(d);}
+    signal.forEach((v,i)=>{const col=colorFor(v,mn,mx);
+      const d=document.createElement('div');d.className='cell'+(custom?' editable':'')+(rf.has(i)?' rf':'');
+      d.style.background=col.bg;d.style.color=col.fg;
+      d.innerHTML=`<span class="idx" style="color:${col.fg};opacity:.6">${i}</span>${v}`;
+      if(custom)d.onclick=()=>editCell(d,i,'signal');
+      strip.appendChild(d);});
+  }
+  function renderKernel(){
+    const strip=$('kKernelStrip');strip.innerHTML='';
+    kernel.forEach((w,j)=>{const d=document.createElement('div');d.className='cell kcell editable';
+      d.innerHTML=`<span class="idx">w${j}</span>${w}`;d.onclick=()=>editCell(d,j,'kernel');strip.appendChild(d);});
+  }
+  function renderOutput(){
+    const strip=$('kOutputStrip');strip.innerHTML='';
+    if(!computed||!outputs.length){strip.innerHTML='<span class="note">noch nicht berechnet</span>';return;}
+    const maxAbs=Math.max(...outputs.map(o=>Math.abs(o.val)),1);const relu=$('kRelu').checked;
+    outputs.forEach((o,i)=>{const col=divColor(o.val,maxAbs);
+      const d=document.createElement('div');d.className='cell'+(i===curPos?' cur':'');
+      d.style.background=col.bg;d.style.color=col.fg;
+      d.innerHTML=`<span class="idx" style="color:${col.fg};opacity:.6">${i}</span>${o.val}`+(relu&&o.sum>0?'<span class="relu-dot"></span>':'');
+      d.onclick=()=>{curPos=i;showCalc();renderInput();renderOutput();drawSig();drawOut();};
+      strip.appendChild(d);});
+  }
+  function editCell(el,i,which){
+    const cur=which==='kernel'?kernel[i]:signal[i];
+    el.innerHTML=`<input type="number" step="${which==='kernel'?0.1:1}" value="${cur}">`;
+    const inp=el.querySelector('input');inp.focus();inp.select();
+    const commit=()=>{const v=parseFloat(inp.value);if(!isNaN(v)){if(which==='kernel')kernel[i]=+v.toFixed(2);else signal[i]=v;}
+      if(which==='kernel')$('kPreset').value='custom';if(which==='signal')$('kSignal').value='custom';refresh();};
+    inp.onblur=commit;inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape')refresh();};
+  }
+  function showCalc(){
+    const c=$('kCalc');$('kPosTag').textContent='o = '+(curPos>=0?curPos:'–');
+    if(!computed||curPos<0){c.innerHTML='<span class="ph">Noch nichts berechnet. Klicke „Berechnen" oder „Animieren".</span>';return;}
+    const o=outputs[curPos];const relu=$('kRelu').checked;
+    const terms=o.idxs.map(d=>`<span class="term">${d.inR?d.xv:'0<small>(pad)</small>'}·${d.w}</span>`).join(' + ');
+    let html=`<div><b>Fenster → ein Wert:</b></div><div class="term">y[${curPos}] = ${terms}</div><div class="term">= <b>${o.sum.toFixed(2)}</b></div>`;
+    if(relu)html+=`<div class="term">ReLU(${o.sum.toFixed(2)}) = <b>${o.val}</b>${o.clip?' (auf 0 gekappt)':''}</div>`;
+    c.innerHTML=html;
+  }
+  function plotLine(ctx,w,h,arr,color,zeroLine,hi){
+    const pad=22,N=arr.length;if(!N)return;
+    let mn=Math.min(...arr),mx=Math.max(...arr);if(zeroLine){mn=Math.min(mn,0);mx=Math.max(mx,0);}
+    if(mn===mx){mn-=1;mx+=1;}
+    const X=i=>pad+(N<=1?0.5:i/(N-1))*(w-2*pad),Y=v=>h-14-((v-mn)/(mx-mn))*(h-26);
+    if(zeroLine&&mn<0&&mx>0){ctx.strokeStyle='#e2e6ee';ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(w-pad,Y(0));ctx.stroke();}
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+    arr.forEach((v,i)=>{const x=X(i),y=Y(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+    ctx.fillStyle=color;arr.forEach((v,i)=>{ctx.beginPath();ctx.arc(X(i),Y(v),i===hi?4:2.2,0,7);ctx.fill();});
+    if(hi>=0&&hi<N){ctx.strokeStyle='#1b3a5c';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(X(hi),Y(arr[hi]),5.5,0,7);ctx.stroke();}
+  }
+  function drawSig(){
+    const c=$('kSigCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    plotLine(ctx,w,h,signal,'#2e75b6',false);
+    if(computed&&curPos>=0&&outputs[curPos]){const idxs=outputs[curPos].idxs.filter(d=>d.inR).map(d=>d.idx);
+      const N=signal.length,pad=22;ctx.fillStyle='rgba(245,166,35,.25)';
+      idxs.forEach(idx=>{const x=pad+(N<=1?0:idx/(N-1))*(w-2*pad);ctx.fillRect(x-6,6,12,h-20);});}
+  }
+  function drawOut(){
+    const c=$('kOutCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    if(!computed||!outputs.length){ctx.fillStyle='#9aa0ad';ctx.font='12px Segoe UI';ctx.fillText('noch nicht berechnet',12,h/2);return;}
+    plotLine(ctx,w,h,outputs.map(o=>o.val),'#16a34a',true,curPos);
+  }
+  function updateRfInfo(){
+    const K=kernel.length,pad=$('kPad').value;
+    $('kRfInfo').textContent=`rezeptives Feld = ${K} Punkte (= Kernel K) · ${pad==='causal'?'kausal':pad}`;
+  }
+  function refresh(){
+    if(computed)computeConv();
+    renderInput();renderKernel();renderOutput();showCalc();drawSig();drawOut();updateRfInfo();
+  }
+  function rebuild(){
+    const N=+$('kLen').value,K=+$('kK').value;
+    if($('kSignal').value!=='custom'||signal.length!==N)signal=genSignal($('kSignal').value,N);
+    kernel=genKernel($('kPreset').value,K);
+    computed=false;curPos=-1;refresh();
+  }
+  function redraw(){drawSig();drawOut();}
+  function doCompute(all){
+    computed=true;computeConv();curPos=all?outputs.length-1:0;
+    renderInput();renderOutput();showCalc();drawSig();drawOut();
+  }
+  function stepOnce(){if(!computed){computed=true;computeConv();curPos=-1;}curPos=(curPos+1)%outputs.length;
+    showCalc();renderInput();renderOutput();drawSig();drawOut();}
+  function animate(){
+    if(playing){stop();return;}
+    computed=true;computeConv();curPos=-1;playing=true;$('kAnimate').textContent='⏸ Pause';
+    renderOutput();
+    const tick=()=>{if(!playing)return;curPos++;
+      if(curPos>=outputs.length){stop();return;}
+      showCalc();renderInput();renderOutput();drawSig();drawOut();
+      timer=setTimeout(tick,1100-($('kSpeed').value*95));};
+    tick();
+  }
+  function stop(){playing=false;$('kAnimate').textContent='▶ Animieren';if(timer)clearTimeout(timer);}
+  function reset(){
+    stop();computed=false;outputs=[];curPos=-1;
+    renderInput();renderKernel();renderOutput();showCalc();drawSig();drawOut();updateRfInfo();
+  }
+
+  ['kSignal','kLen','kK','kPreset'].forEach(id=>$(id).onchange=rebuild);
+  ['kPad','kStride','kRelu'].forEach(id=>$(id).onchange=()=>{curPos=-1;refresh();});
+  $('kCompute').onclick=()=>doCompute(true);
+  $('kAnimate').onclick=animate;$('kStep').onclick=stepOnce;$('kReset').onclick=reset;
+  window.addEventListener('resize',()=>{if(viewK.classList.contains('active'))redraw();});
+
+  rebuild();
+  return{redraw,rebuild};
+})();
+
+/* ═══════════════════ TRAINING-LAB ═══════════════════ */
+const TR=(function(){
+  const $=id=>document.getElementById(id);
+  let RNG=Math.random;const seedRng=s=>RNG=mulberry32(s>>>0);
+  const randn=()=>{let u=0,v=0;while(u===0)u=RNG();while(v===0)v=RNG();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+  let series=[],net=null,split=null,norm=null,training=false,stopFlag=false;
+  let lossHist=[],valHist=[],preds=null,shown=false;
+
+  /* Engine v2 (Node-gradcheck PASS): Conv1d(causal)→ReLU→[Conv1d→ReLU]→Flatten→Dense→MSE */
+  function makeConv(inC,outC,K){const sc=Math.sqrt(2/(inC*K));const W=[],b=[];
+    for(let f=0;f<outC;f++){const cc=[];for(let c=0;c<inC;c++){const k=[];for(let j=0;j<K;j++)k.push(randn()*sc);cc.push(k);}W.push(cc);b.push(0);}return{inC,outC,K,W,b};}
+  function makeDense(n){const sc=Math.sqrt(1/n);return{inN:n,w:Array.from({length:n},()=>randn()*sc),b:0};}
+  function convFwd(L,x){const{inC,outC,K}=L,Lt=x[0].length,out=[];
+    for(let f=0;f<outC;f++){const r=new Array(Lt).fill(0);
+      for(let t=0;t<Lt;t++){let s=L.b[f];for(let c=0;c<inC;c++)for(let j=0;j<K;j++){const ti=t-(K-1-j);if(ti>=0)s+=L.W[f][c][j]*x[c][ti];}r[t]=s;}out.push(r);}return out;}
+  function convBwd(L,x,dout){const{inC,outC,K}=L,Lt=x[0].length;
+    const dW=L.W.map(cc=>cc.map(k=>k.map(()=>0))),db=L.b.map(()=>0),dx=x.map(c=>c.map(()=>0));
+    for(let f=0;f<outC;f++)for(let t=0;t<Lt;t++){const g=dout[f][t];db[f]+=g;
+      for(let c=0;c<inC;c++)for(let j=0;j<K;j++){const ti=t-(K-1-j);if(ti>=0){dW[f][c][j]+=g*x[c][ti];dx[c][ti]+=g*L.W[f][c][j];}}}return{dW,db,dx};}
+  const reluFwd=a=>a.map(c=>c.map(v=>v>0?v:0));
+  const reluBwd=(a,da)=>a.map((c,ci)=>c.map((v,ti)=>v>0?da[ci][ti]:0));
+  function flat(a){const o=[];for(let c=0;c<a.length;c++)for(let t=0;t<a[c].length;t++)o.push(a[c][t]);return o;}
+  function unflat(v,C,L){const o=[];let i=0;for(let c=0;c<C;c++){const r=[];for(let t=0;t<L;t++)r.push(v[i++]);o.push(r);}return o;}
+  function forward(net,x){const cache={acts:[x]};let cur=x;
+    for(const cv of net.convs){const z=convFwd(cv,cur);const a=reluFwd(z);cache.acts.push(z);cache.acts.push(a);cur=a;}
+    cache.shape={C:cur.length,L:cur[0].length};const f=flat(cur);cache.flat=f;
+    let y=net.dense.b;for(let i=0;i<f.length;i++)y+=net.dense.w[i]*f[i];return{yhat:y,cache};}
+  function backward(net,x,yt){const{yhat,cache}=forward(net,x);const loss=(yhat-yt)**2;const dy=2*(yhat-yt);
+    const f=cache.flat;const ddense={dw:f.map(fi=>dy*fi),db:dy};let dflat=net.dense.w.map(wi=>dy*wi);
+    let da=unflat(dflat,cache.shape.C,cache.shape.L);const cg=new Array(net.convs.length);
+    for(let li=net.convs.length-1;li>=0;li--){const z=cache.acts[1+li*2],inA=cache.acts[li*2];
+      const dz=reluBwd(z,da);const{dW,db,dx}=convBwd(net.convs[li],inA,dz);cg[li]={dW,db};da=dx;}
+    return{loss,cg,ddense};}
+
+  /* Daten */
+  function genDemo(type,sd){seedRng(sd);const N=180;const s=[];
+    if(type==='seasonal'){for(let t=0;t<N;t++)s.push(100+0.45*t+22*Math.sin(2*Math.PI*t/12)+8*Math.sin(2*Math.PI*t/4)+randn()*4);}
+    else if(type==='ar'){let p=0;for(let t=0;t<N;t++){p=0.75*p+randn()*6;s.push(120+0.3*t+p);}}
+    else{let p=0;for(let t=0;t<N;t++){const reg=Math.sin(2*Math.PI*t/40)>0?1:-1;p=0.6*p+randn()*5;
+      s.push(100+0.25*t+reg*(18+10*Math.sin(2*Math.PI*t/9))+p);}}
+    series=s.map(v=>+v.toFixed(2));net=null;preds=null;lossHist=[];valHist=[];$('tMetrics').innerHTML='';
+    prep();draw();drawLoss();drawFilters();drawForecast();status('Reihe erzeugt ('+series.length+' Punkte). Bereit zum Trainieren.');}
+  function parseCSV(text){const lines=text.trim().split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
+    const sep=lines[0].includes(';')?';':',';let rows=lines.map(l=>l.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+    if(rows[0].some(c=>isNaN(parseFloat(c))))rows=rows.slice(1);
+    return rows.map(r=>parseFloat(r[r.length-1])).filter(v=>!isNaN(v));}
+  function loadCSV(file){const fr=new FileReader();fr.onload=e=>{const v=parseCSV(e.target.result);
+    if(v.length<40){status('CSV zu kurz (mind. 40 Werte nötig).');return;}
+    series=v;net=null;preds=null;lossHist=[];valHist=[];$('tMetrics').innerHTML='';
+    prep();draw();drawLoss();drawFilters();drawForecast();status('CSV geladen ('+series.length+' Werte).');};fr.readAsText(file);}
+
+  function prep(){
+    const L=+$('tL').value,N=series.length;const trF=0.7,vaF=0.15;
+    const nTrain=Math.floor(N*trF),nVal=Math.floor(N*vaF);
+    let mn=Infinity,mx=-Infinity;for(let i=0;i<nTrain;i++){mn=Math.min(mn,series[i]);mx=Math.max(mx,series[i]);}
+    const rng=(mx-mn)||1;norm={mn,mx,rng,nz:v=>(v-mn)/rng,dz:v=>v*rng+mn};
+    const tr=[],va=[],te=[];
+    for(let i=0;i+L<N;i++){const tgt=i+L;const smp={x:[series.slice(i,i+L).map(norm.nz)],y:norm.nz(series[tgt]),tgt,start:i};
+      if(tgt<nTrain)tr.push(smp);else if(tgt<nTrain+nVal)va.push(smp);else te.push(smp);}
+    split={L,nTrain,nVal,tr,va,te};
+    $('tWinInfo').textContent=`${tr.length+va.length+te.length} Fenster der Länge L=${L} · Train ${tr.length} · Val ${va.length} · Test ${te.length}. Normalisierung gefittet auf Train-Bereich [${mn.toFixed(1)}, ${mx.toFixed(1)}].`;
+    buildArchLine();
+  }
+  function buildNet(){const L=split.L,F=+$('tFilters').value,K=+$('tK').value,nL=+$('tLayers').value;
+    seedRng(+$('tSeed').value+777);
+    const convs=[makeConv(1,F,K)];if(nL===2)convs.push(makeConv(F,F,K));
+    const outC=convs[convs.length-1].outC;
+    net={convs,dense:makeDense(outC*L)};lossHist=[];valHist=[];preds=null;}
+  function buildArchLine(){const L=split?split.L:+$('tL').value,F=+$('tFilters').value,K=+$('tK').value,nL=+$('tLayers').value;
+    let a=`Input [1×${L}] → Conv1d(${F}, k=${K}, causal)+ReLU`;
+    if(nL===2)a+=` → Conv1d(${F}, k=${K})+ReLU`;
+    a+=` → Flatten(${F}·${L}) → Dense(→1)`;$('tArch').textContent=a;}
+
+  function evalLoss(set){let l=0;for(const s of set)l+=(forward(net,s.x).yhat-s.y)**2;return l/Math.max(1,set.length);}
+  function metrics(){const dz=norm.dz;
+    const mae=set=>{let m=0;for(const s of set)m+=Math.abs(dz(forward(net,s.x).yhat)-dz(s.y));return m/Math.max(1,set.length);};
+    const rmse=set=>{let m=0;for(const s of set){const e=dz(forward(net,s.x).yhat)-dz(s.y);m+=e*e;}return Math.sqrt(m/Math.max(1,set.length));};
+    const maeN=set=>{let m=0;for(const s of set)m+=Math.abs(dz(s.x[0][split.L-1])-dz(s.y));return m/Math.max(1,set.length);};
+    const rmseN=set=>{let m=0;for(const s of set){const e=dz(s.x[0][split.L-1])-dz(s.y);m+=e*e;}return Math.sqrt(m/Math.max(1,set.length));};
+    return{cnnMae:mae(split.te),cnnRmse:rmse(split.te),nMae:maeN(split.te),nRmse:rmseN(split.te)};}
+  function computePreds(){const dz=norm.dz;preds={};
+    split.te.forEach(s=>{preds[s.tgt]={cnn:dz(forward(net,s.x).yhat),naive:dz(s.x[0][split.L-1]),truth:dz(s.y)};});}
+
+  async function train(){
+    if(!series.length){status('Erst eine Reihe erzeugen oder CSV laden.');return;}
+    prep();buildNet();
+    training=true;stopFlag=false;$('tTrain').disabled=true;$('tStop').disabled=false;
+    const lr=+$('tLr').value,epochs=+$('tEpochs').value,bs=+$('tBatch').value;
+    for(let e=0;e<epochs&&!stopFlag;e++){
+      const order=split.tr.map((_,i)=>i);for(let i=order.length-1;i>0;i--){const j=Math.floor(RNG()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+      for(let b=0;b<order.length;b+=bs){
+        const batch=order.slice(b,b+bs).map(i=>split.tr[i]);
+        const gC=net.convs.map(cv=>({dW:cv.W.map(cc=>cc.map(k=>k.map(()=>0))),db:cv.b.map(()=>0)}));
+        const gD={dw:net.dense.w.map(()=>0),db:0};
+        for(const s of batch){const{cg,ddense}=backward(net,s.x,s.y);
+          cg.forEach((g,li)=>{g.dW.forEach((cc,f)=>cc.forEach((k,c)=>k.forEach((v,j)=>gC[li].dW[f][c][j]+=v)));g.db.forEach((v,f)=>gC[li].db[f]+=v);});
+          ddense.dw.forEach((v,i)=>gD.dw[i]+=v);gD.db+=ddense.db;}
+        const n=batch.length;
+        net.convs.forEach((cv,li)=>{for(let f=0;f<cv.outC;f++){cv.b[f]-=lr*gC[li].db[f]/n;
+          for(let c=0;c<cv.inC;c++)for(let j=0;j<cv.K;j++)cv.W[f][c][j]-=lr*gC[li].dW[f][c][j]/n;}});
+        for(let i=0;i<net.dense.w.length;i++)net.dense.w[i]-=lr*gD.dw[i]/n;net.dense.b-=lr*gD.db/n;
+      }
+      lossHist.push(evalLoss(split.tr));valHist.push(evalLoss(split.va));
+      if(e%3===0||e===epochs-1){status(`Epoche ${e+1}/${epochs} · Train-MSE ${lossHist[e].toFixed(4)} · Val-MSE ${valHist[e].toFixed(4)}`);
+        drawLoss();drawFilters();await new Promise(r=>setTimeout(r,0));}
+    }
+    computePreds();drawForecast();drawFilters();showMetrics();
+    training=false;$('tTrain').disabled=false;$('tStop').disabled=true;
+    status(stopFlag?'Training gestoppt.':'Training fertig. Vergleiche unten CNN vs. naive Baseline.');
+  }
+
+  /* Zeichnen */
+  function axis(ctx,w,h,pad){ctx.strokeStyle='#e6e9ef';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,h-20);ctx.lineTo(w-8,h-20);ctx.stroke();}
+  function draw(){drawData();}
+  function drawData(){
+    const c=$('tDataCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    if(!series.length){ctx.fillStyle='#9aa0ad';ctx.font='13px Segoe UI';ctx.fillText('Noch keine Reihe. „Erzeugen" klicken.',14,h/2);return;}
+    const N=series.length,pad=30;const mn=Math.min(...series),mx=Math.max(...series);
+    const X=i=>pad+i/(N-1)*(w-pad-10),Y=v=>h-22-((v-mn)/((mx-mn)||1))*(h-40);
+    const nTrain=split?split.nTrain:Math.floor(N*0.7),nVal=split?split.nVal:Math.floor(N*0.15);
+    [[0,nTrain,'rgba(46,117,182,.08)'],[nTrain,nTrain+nVal,'rgba(245,166,35,.12)'],[nTrain+nVal,N,'rgba(22,163,74,.10)']]
+      .forEach(([a,b,col])=>{ctx.fillStyle=col;ctx.fillRect(X(a),8,X(Math.min(b,N-1))-X(a),h-30);});
+    axis(ctx,w,h,pad);
+    const colAt=i=>i<nTrain?'#2e75b6':i<nTrain+nVal?'#f5a623':'#16a34a';
+    for(let i=1;i<N;i++){ctx.strokeStyle=colAt(i);ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(X(i-1),Y(series[i-1]));ctx.lineTo(X(i),Y(series[i]));ctx.stroke();}
+    if(split&&split.te.length){const s=split.te[0];ctx.fillStyle='rgba(245,166,35,.30)';
+      ctx.fillRect(X(s.start),8,X(s.start+split.L-1)-X(s.start),h-30);
+      ctx.fillStyle='#1b3a5c';ctx.beginPath();ctx.arc(X(s.tgt),Y(series[s.tgt]),4,0,7);ctx.fill();}
+    ctx.fillStyle='#6b7280';ctx.font='11px Segoe UI';
+    ctx.fillText('Train',X(2),20);ctx.fillText('Val',X(nTrain+2),20);ctx.fillText('Test',X(nTrain+nVal+2),20);
+  }
+  function drawLoss(){
+    const c=$('tLossCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    if(!lossHist.length){ctx.fillStyle='#9aa0ad';ctx.font='12px Segoe UI';ctx.fillText('Verlustkurve erscheint beim Training.',12,h/2);return;}
+    const pad=34,n=lossHist.length;const all=lossHist.concat(valHist);let mx=Math.max(...all),mn=Math.min(...all);
+    mx=mx*1.05;mn=Math.max(0,mn*0.9);if(mx===mn)mx=mn+1;
+    const X=i=>pad+(n<=1?0.5:i/(n-1))*(w-pad-10),Y=v=>h-22-((v-mn)/(mx-mn))*(h-36);
+    axis(ctx,w,h,pad);
+    ctx.fillStyle='#6b7280';ctx.font='10px Segoe UI';ctx.fillText(mx.toFixed(3),2,Y(mx)+3);ctx.fillText(mn.toFixed(3),2,Y(mn)+3);
+    const line=(arr,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();arr.forEach((v,i)=>{const x=X(i),y=Y(v);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();};
+    line(lossHist,'#2e75b6');line(valHist,'#f5a623');
+  }
+  function drawFilters(){
+    const c=$('tFilterCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    if(!net){ctx.fillStyle='#9aa0ad';ctx.font='12px Segoe UI';ctx.fillText('Filter erscheinen beim Training.',12,h/2);return;}
+    const F=net.convs[0].outC,K=net.convs[0].K;const cols=Math.min(F,4),rows=Math.ceil(F/cols);
+    const cw=w/cols,ch=h/rows,pad=10;
+    for(let f=0;f<F;f++){const cx=(f%cols)*cw,cy=Math.floor(f/cols)*ch;
+      const wts=net.convs[0].W[f][0];let mx=Math.max(...wts.map(Math.abs),0.01);
+      const X=j=>cx+pad+(K<=1?0.5:j/(K-1))*(cw-2*pad),Y=v=>cy+ch/2-(v/mx)*(ch/2-12);
+      ctx.strokeStyle='#e6e9ef';ctx.beginPath();ctx.moveTo(cx+pad,cy+ch/2);ctx.lineTo(cx+cw-pad,cy+ch/2);ctx.stroke();
+      ctx.strokeStyle='#2e75b6';ctx.lineWidth=2;ctx.beginPath();wts.forEach((v,j)=>{const x=X(j),y=Y(v);j?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+      ctx.fillStyle='#2e75b6';wts.forEach((v,j)=>{ctx.beginPath();ctx.arc(X(j),Y(v),2.5,0,7);ctx.fill();});
+      ctx.fillStyle='#6b7280';ctx.font='10px Segoe UI';ctx.fillText('Filter '+(f+1),cx+pad,cy+12);}
+  }
+  function drawForecast(){
+    const c=$('tForecastCanvas');const {ctx,w,h}=dpr(c);ctx.clearRect(0,0,w,h);
+    if(!preds){ctx.fillStyle='#9aa0ad';ctx.font='12px Segoe UI';ctx.fillText('Vorhersage erscheint nach dem Training.',12,h/2);return;}
+    const tgts=Object.keys(preds).map(Number).sort((a,b)=>a-b);
+    const vals=[];tgts.forEach(t=>{vals.push(preds[t].truth,preds[t].cnn,preds[t].naive);});
+    let mn=Math.min(...vals),mx=Math.max(...vals);if(mn===mx){mn-=1;mx+=1;}
+    const pad=34,n=tgts.length;const X=i=>pad+(n<=1?0.5:i/(n-1))*(w-pad-10),Y=v=>h-22-((v-mn)/(mx-mn))*(h-40);
+    axis(ctx,w,h,pad);
+    const s3=(key,col,lw,dash)=>{ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.setLineDash(dash||[]);ctx.beginPath();
+      tgts.forEach((t,i)=>{const x=X(i),y=Y(preds[t][key]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.setLineDash([]);};
+    s3('naive','#9aa0ad',1.4,[4,3]);s3('truth','#444',2.2);s3('cnn','#2e75b6',2);
+    ctx.fillStyle='#6b7280';ctx.font='11px Segoe UI';ctx.fillText('Testbereich (Vorhersage 1 Schritt voraus)',pad,16);
+  }
+  function showMetrics(){const m=metrics();const better=m.cnnMae<m.nMae;
+    $('tMetrics').innerHTML=
+      `<div class="metric cnn">1D-CNN · Test-MAE<b>${m.cnnMae.toFixed(2)}</b>RMSE ${m.cnnRmse.toFixed(2)}</div>`+
+      `<div class="metric naive">naive Baseline · Test-MAE<b>${m.nMae.toFixed(2)}</b>RMSE ${m.nRmse.toFixed(2)}</div>`+
+      `<div class="metric" style="border-left:4px solid ${better?'#16a34a':'#c0392b'}">Verbesserung<b>${(((m.nMae-m.cnnMae)/m.nMae)*100).toFixed(1)} %</b>${better?'CNN schlägt Baseline':'Baseline besser!'}</div>`;
+  }
+  function status(t){$('tStatus').textContent=t;}
+
+  $('tGen').onclick=()=>genDemo($('tDemo').value,+$('tSeed').value);
+  $('tCsv').onchange=e=>{if(e.target.files[0])loadCSV(e.target.files[0]);};
+  $('tTrain').onclick=()=>{if(!training)train();};
+  $('tStop').onclick=()=>{stopFlag=true;};
+  $('tResetNet').onclick=()=>{net=null;lossHist=[];valHist=[];preds=null;buildArchLine();drawLoss();drawFilters();drawForecast();$('tMetrics').innerHTML='';status('Netz zurückgesetzt.');};
+  ['tL','tFilters','tK','tLayers'].forEach(id=>$(id).onchange=()=>{if(series.length){prep();drawData();}else buildArchLine();});
+  window.addEventListener('resize',()=>{if(viewT.classList.contains('active'))onShow();});
+
+  function onShow(){if(!shown){shown=true;genDemo($('tDemo').value,+$('tSeed').value);}
+    else{drawData();drawLoss();drawFilters();drawForecast();}}
+  buildArchLine();
+  return{onShow};
+})();
+</script>
+</body>
+</html>
