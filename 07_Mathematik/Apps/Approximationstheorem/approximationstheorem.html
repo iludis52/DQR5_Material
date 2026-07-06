@@ -186,6 +186,110 @@
     }
     .nd-label.lit { fill: var(--net); }
 
+    /* ---------- Reiter ---------- */
+    .tabs {
+        display: inline-flex;
+        gap: 0.35rem;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 0.35rem;
+        margin-bottom: 1.6rem;
+        box-shadow: 0 6px 18px rgba(30, 36, 51, 0.05);
+    }
+    .tab-btn {
+        border: none;
+        background: transparent;
+        font: inherit;
+        font-weight: 650;
+        font-size: 0.95rem;
+        color: var(--muted);
+        padding: 0.55rem 1.2rem;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--ink); }
+    .tab-btn:focus-visible { outline: 2px solid var(--net); outline-offset: 2px; }
+    .tab-btn[aria-selected="true"] {
+        background: var(--net);
+        color: #fff;
+    }
+    .tabpanel[hidden] { display: none; }
+
+    /* ---------- Selbst fitten: Modus-Umschalter ---------- */
+    .segmented {
+        display: flex;
+        border: 1.5px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .segmented button {
+        flex: 1;
+        border: none;
+        background: var(--card);
+        font: inherit;
+        font-weight: 650;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.6rem;
+        cursor: pointer;
+        color: var(--muted);
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .segmented button + button { border-left: 1.5px solid var(--line); }
+    .segmented button[aria-pressed="true"] { background: var(--net); color: #fff; }
+    .segmented button:focus-visible { outline: 2px solid var(--net); outline-offset: -2px; }
+
+    /* ---------- Selbst fitten: Neuron-Gruppen ---------- */
+    .neuron-box {
+        border: 1.5px solid var(--line);
+        border-left-width: 4px;
+        border-radius: 12px;
+        padding: 0.85rem 1rem 0.95rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .neuron-box.n1 { border-left-color: var(--neuron); }
+    .neuron-box.n2 { border-left-color: var(--warn); }
+    .neuron-box .neuron-title {
+        font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase;
+        font-weight: 700;
+    }
+    .neuron-box.n1 .neuron-title { color: var(--neuron); }
+    .neuron-box.n2 .neuron-title { color: var(--warn); }
+    .neuron-box.n1 input[type="range"] { accent-color: var(--neuron); }
+    .neuron-box.n2 input[type="range"] { accent-color: var(--warn); }
+    .neuron-box .control-group label .value { color: var(--ink); }
+
+    /* ---------- Selbst fitten: Status & Formel ---------- */
+    .badge {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        font-size: 0.95rem; font-weight: 700;
+        padding: 0.15rem 0;
+    }
+    .badge.far  { color: var(--muted); }
+    .badge.near { color: var(--warn); }
+    .badge.hit  { color: var(--good); }
+
+    .formula {
+        margin-top: 0.8rem;
+        font-family: Consolas, "SF Mono", Menlo, monospace;
+        font-size: 0.9rem;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.65rem 0.9rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .formula .f1 { color: var(--neuron); font-weight: 700; }
+    .formula .f2 { color: var(--warn); font-weight: 700; }
+
+    .sw-neuron2 { background: var(--warn); opacity: 0.6; }
+
     footer { margin-top: 2rem; color: #9aa2b5; font-size: 0.8rem; text-align: center; max-width: 700px; }
 
     @media (prefers-reduced-motion: reduce) {
@@ -201,7 +305,17 @@
     <p>Ein neuronales Netz mit nur <b>einer</b> versteckten Schicht kann jede stetige Funktion beliebig genau annähern — wenn es genügend Neuronen hat. Hier kannst du dabei zusehen.</p>
 </header>
 
+<div class="tabs" role="tablist" aria-label="Ansicht wählen">
+    <button class="tab-btn" id="tab-train" role="tab" aria-selected="true" aria-controls="panel-train">Training beobachten</button>
+    <button class="tab-btn" id="tab-fit" role="tab" aria-selected="false" aria-controls="panel-fit">Selbst fitten</button>
+</div>
+
 <div class="stage">
+
+    <!-- ================================================== -->
+    <!-- ============ REITER 1: TRAINING ================== -->
+    <!-- ================================================== -->
+    <section class="tabpanel" id="panel-train" role="tabpanel" aria-labelledby="tab-train">
     <div class="dashboard">
 
         <!-- ============ STEUERUNG ============ -->
@@ -279,11 +393,108 @@
             </div>
         </div>
     </div>
+    </section>
+
+    <!-- ================================================== -->
+    <!-- ============ REITER 2: SELBST FITTEN ============= -->
+    <!-- ================================================== -->
+    <section class="tabpanel" id="panel-fit" role="tabpanel" aria-labelledby="tab-fit" hidden>
+    <div class="dashboard">
+
+        <!-- ============ STEUERUNG ============ -->
+        <div class="card controls">
+            <div class="card-title">Parameter von Hand einstellen</div>
+
+            <div class="control-group">
+                <label>Anzahl Neuronen</label>
+                <div class="segmented" role="group" aria-label="Anzahl Neuronen">
+                    <button id="fit-mode-1" aria-pressed="true">1 Neuron</button>
+                    <button id="fit-mode-2" aria-pressed="false">2 Neuronen</button>
+                </div>
+            </div>
+
+            <div class="neuron-box n1">
+                <div class="neuron-title">Neuron 1</div>
+                <div class="control-group">
+                    <label for="fit-w1">Gewicht w₁ <span class="value" id="fit-w1-val">1.0</span></label>
+                    <input type="range" id="fit-w1" min="-5" max="5" step="0.1" value="1">
+                </div>
+                <div class="control-group">
+                    <label for="fit-b1">Bias b₁ <span class="value" id="fit-b1-val">0.0</span></label>
+                    <input type="range" id="fit-b1" min="-3" max="3" step="0.1" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="fit-v1">Ausgangsgewicht v₁ <span class="value" id="fit-v1-val">0.50</span></label>
+                    <input type="range" id="fit-v1" min="-1.5" max="1.5" step="0.05" value="0.5">
+                </div>
+            </div>
+
+            <div class="neuron-box n2" id="fit-neuron2-box" hidden>
+                <div class="neuron-title">Neuron 2</div>
+                <div class="control-group">
+                    <label for="fit-w2">Gewicht w₂ <span class="value" id="fit-w2-val">1.0</span></label>
+                    <input type="range" id="fit-w2" min="-5" max="5" step="0.1" value="1">
+                </div>
+                <div class="control-group">
+                    <label for="fit-b2">Bias b₂ <span class="value" id="fit-b2-val">0.0</span></label>
+                    <input type="range" id="fit-b2" min="-3" max="3" step="0.1" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="fit-v2">Ausgangsgewicht v₂ <span class="value" id="fit-v2-val">0.50</span></label>
+                    <input type="range" id="fit-v2" min="-1.5" max="1.5" step="0.05" value="0.5">
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn primary" id="fit-btn-new">Neue Aufgabe</button>
+                <button class="btn" id="fit-btn-reset">Slider zurücksetzen</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn" id="fit-btn-solve">Lösung zeigen</button>
+            </div>
+
+            <label class="toggle-row">
+                <input type="checkbox" id="fit-show-neurons" checked>
+                Beiträge der einzelnen Neuronen zeigen
+            </label>
+
+            <div class="stat-grid">
+                <div class="stat">
+                    <div class="k">Fehler (MSE)</div>
+                    <div class="v" id="fit-stat-mse">—</div>
+                </div>
+                <div class="stat">
+                    <div class="k">Status</div>
+                    <div class="v"><span class="badge far" id="fit-badge">Noch weit weg</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ PLOT ============ -->
+        <div class="card">
+            <div class="card-title">Zielfunktion von Hand nachbilden</div>
+            <div class="plot-wrap">
+                <canvas id="fit-plot" width="1200" height="640"></canvas>
+            </div>
+            <div class="legend">
+                <span><i class="swatch sw-target"></i> Zielfunktion f(x)</span>
+                <span><i class="swatch sw-net"></i> Deine Ausgabe ŷ(x)</span>
+                <span id="fit-legend-n1"><i class="swatch sw-neuron"></i> Beitrag Neuron 1</span>
+                <span id="fit-legend-n2" style="display:none"><i class="swatch sw-neuron2"></i> Beitrag Neuron 2</span>
+            </div>
+            <div class="formula" id="fit-formula" aria-live="polite"></div>
+            <div class="hint">
+                <b>Experimentieridee:</b> Verändere zuerst nur den Bias b — die Kurve verschiebt sich. Dann das Gewicht w — die Kurve wird steiler oder flacher (negatives w spiegelt sie). Das Ausgangsgewicht v streckt oder staucht sie in der Höhe. Mit diesen drei Reglern pro Neuron kannst du die graue Zielfunktion <b>exakt</b> treffen — genau so „arbeitet" auch der Gradientenabstieg, nur automatisch.
+            </div>
+        </div>
+    </div>
+    </section>
 </div>
 
 <footer>
-    Das Netz (1 versteckte Schicht) wird live im Browser per Gradientenabstieg (Adam) auf 200 Stützstellen trainiert.
-    Die Zielfunktion ist eine zufällige Überlagerung von Sinusschwingungen — bei jeder „Neue Zufallsfunktion" entsteht eine andere.
+    Reiter 1: Das Netz (1 versteckte Schicht) wird live im Browser per Gradientenabstieg (Adam) auf 200 Stützstellen trainiert;
+    die Zielfunktion ist eine zufällige Überlagerung von Sinusschwingungen.
+    Reiter 2: Die Zielfunktion wird aus versteckten Neuron-Parametern erzeugt und ist daher mit den Slidern exakt nachbildbar (Aktivierung: tanh).
 </footer>
 
 <script>
@@ -615,6 +826,338 @@ initNet();
 updateStats();
 render();
 drawNetworkDiagram();
+
+// ==========================================================
+// ==================== Reiter-Umschaltung ==================
+// ==========================================================
+(function () {
+    const tabs = [
+        { btn: document.getElementById('tab-train'), panel: document.getElementById('panel-train') },
+        { btn: document.getElementById('tab-fit'),   panel: document.getElementById('panel-fit') }
+    ];
+    tabs.forEach((t, idx) => {
+        t.btn.addEventListener('click', () => {
+            tabs.forEach((u, j) => {
+                u.btn.setAttribute('aria-selected', j === idx ? 'true' : 'false');
+                u.panel.hidden = j !== idx;
+            });
+            // Laufendes Training pausieren, wenn der Reiter verlassen wird
+            if (idx !== 0 && running) setRunning(false);
+            if (idx === 1) fitRender();
+        });
+    });
+})();
+
+// ==========================================================
+// ============ Reiter 2: Parameter von Hand fitten =========
+// ==========================================================
+let fitRender = () => {};   // wird unten gefüllt (für Tab-Umschaltung sichtbar)
+
+(function () {
+    "use strict";
+
+    // ---------- Slider-Raster (Lösung liegt exakt auf dem Raster) ----------
+    const GRID = {
+        w: { min: -5,   max: 5,   step: 0.1  },
+        b: { min: -3,   max: 3,   step: 0.1  },
+        v: { min: -1.5, max: 1.5, step: 0.05 }
+    };
+    const snap = (val, g) => {
+        const s = Math.round((val - g.min) / g.step) * g.step + g.min;
+        return Math.min(g.max, Math.max(g.min, Math.round(s * 100) / 100));
+    };
+
+    // ---------- Zustand ----------
+    let mode = 1;                 // 1 oder 2 Neuronen
+    let solution = [];            // versteckte Lösungsparameter [{w,b,v}]
+    let user = [];                // aktuelle Slider-Werte      [{w,b,v}]
+    let animId = null;            // laufende "Lösung zeigen"-Animation
+
+    const N = i => ({
+        w:  document.getElementById('fit-w' + i),
+        b:  document.getElementById('fit-b' + i),
+        v:  document.getElementById('fit-v' + i),
+        wv: document.getElementById('fit-w' + i + '-val'),
+        bv: document.getElementById('fit-b' + i + '-val'),
+        vv: document.getElementById('fit-v' + i + '-val')
+    });
+    const ui = [N(1), N(2)];
+
+    // ---------- Zielfunktion: garantiert fittbar ----------
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const sgn = () => (Math.random() < 0.5 ? -1 : 1);
+
+    function makeTask() {
+        for (let tries = 0; tries < 300; tries++) {
+            const sol = [];
+            for (let k = 0; k < mode; k++) {
+                const w = snap(sgn() * rnd(1.2, 4.0), GRID.w);
+                // Übergangsstelle t = -b/w soll im sichtbaren Bereich liegen
+                const t = rnd(-0.8, 0.8);
+                const b = snap(-t * w, GRID.b);
+                const v = snap(sgn() * rnd(0.6, 1.3), GRID.v);
+                sol.push({ w, b, v });
+            }
+            // Bei 2 Neuronen: Übergangsstellen deutlich trennen
+            if (mode === 2) {
+                const t1 = -sol[0].b / sol[0].w, t2 = -sol[1].b / sol[1].w;
+                if (Math.abs(t1 - t2) < 0.45) continue;
+            }
+            // Kurve muss in den Plotbereich passen und sichtbar "leben"
+            let maxAbs = 0;
+            for (let x = -1; x <= 1; x += 0.02) {
+                maxAbs = Math.max(maxAbs, Math.abs(evalNet(sol, x)));
+            }
+            if (maxAbs > 1.05 || maxAbs < 0.35) continue;
+            solution = sol;
+            return;
+        }
+        // Fallback (praktisch nie nötig)
+        solution = [{ w: 2.5, b: 0, v: 0.8 }];
+        if (mode === 2) solution.push({ w: -2.5, b: 1.5, v: 0.8 });
+    }
+
+    function evalNet(params, x) {
+        let y = 0;
+        for (const p of params) y += p.v * Math.tanh(p.w * x + p.b);
+        return y;
+    }
+    const targetF = x => evalNet(solution, x);
+    const userF   = x => evalNet(user.slice(0, mode), x);
+
+    // ---------- Fehler & Status ----------
+    function mse() {
+        let s = 0; const M = 201;
+        for (let i = 0; i < M; i++) {
+            const x = -1 + 2 * i / (M - 1);
+            const d = userF(x) - targetF(x);
+            s += d * d;
+        }
+        return s / M;
+    }
+
+    function updateStatus() {
+        const e = mse();
+        const elMse = document.getElementById('fit-stat-mse');
+        const badge = document.getElementById('fit-badge');
+        elMse.textContent = e.toExponential(2);
+        elMse.classList.toggle('good', e < 1.5e-3);
+        badge.classList.remove('far', 'near', 'hit');
+        if (e < 1.5e-3)      { badge.classList.add('hit');  badge.textContent = 'Getroffen! ✓'; }
+        else if (e < 2e-2)   { badge.classList.add('near'); badge.textContent = 'Nah dran!'; }
+        else                 { badge.classList.add('far');  badge.textContent = 'Noch weit weg'; }
+    }
+
+    // ---------- Formelzeile ----------
+    function fmtTerm(p, cls) {
+        const bAbs = Math.abs(p.b).toFixed(1);
+        const bStr = p.b < -1e-9 ? ` − ${bAbs}` : ` + ${bAbs}`;
+        return `<span class="${cls}">${p.v.toFixed(2)} · tanh(${p.w.toFixed(1)}·x${bStr})</span>`;
+    }
+    function updateFormula() {
+        let html = 'ŷ(x) = ' + fmtTerm(user[0], 'f1');
+        if (mode === 2) {
+            const p = user[1];
+            const vAbs = { ...p, v: Math.abs(p.v) };
+            html += (p.v < -1e-9 ? ' − ' : ' + ') + fmtTerm(vAbs, 'f2');
+        }
+        document.getElementById('fit-formula').innerHTML = html;
+    }
+
+    // ---------- Zeichnen (eigener Canvas, gleicher Stil wie Reiter 1) ----------
+    const cv = document.getElementById('fit-plot');
+    const c2 = cv.getContext('2d');
+    const FPAD = 50, FYMIN = -1.15, FYMAX = 1.15;
+    const fx = x => FPAD + (x + 1) / 2 * (cv.width - 2 * FPAD);
+    const fy = y => cv.height - FPAD - (y - FYMIN) / (FYMAX - FYMIN) * (cv.height - 2 * FPAD);
+
+    function fAxes() {
+        c2.strokeStyle = '#e9ecf4'; c2.lineWidth = 1; c2.setLineDash([4, 4]);
+        for (let gx = -1; gx <= 1; gx += 0.5) {
+            c2.beginPath(); c2.moveTo(fx(gx), fy(FYMIN)); c2.lineTo(fx(gx), fy(FYMAX)); c2.stroke();
+        }
+        for (let gy = -1; gy <= 1; gy += 0.5) {
+            c2.beginPath(); c2.moveTo(fx(-1), fy(gy)); c2.lineTo(fx(1), fy(gy)); c2.stroke();
+        }
+        c2.setLineDash([]);
+        c2.strokeStyle = '#c6ccdb'; c2.lineWidth = 1.5;
+        c2.beginPath(); c2.moveTo(fx(-1), fy(0)); c2.lineTo(fx(1), fy(0)); c2.stroke();
+        c2.beginPath(); c2.moveTo(fx(0), fy(FYMIN)); c2.lineTo(fx(0), fy(FYMAX)); c2.stroke();
+        c2.fillStyle = '#9aa2b5';
+        c2.font = '600 16px "Avenir Next", "Segoe UI", sans-serif';
+        c2.textAlign = 'center';
+        c2.fillText('−1', fx(-1), fy(0) + 24);
+        c2.fillText('1',  fx(1),  fy(0) + 24);
+        c2.fillText('x',  fx(1) + 22, fy(0) + 5);
+    }
+
+    function fCurve(fn, color, width, alpha = 1, dash = []) {
+        c2.strokeStyle = color; c2.globalAlpha = alpha;
+        c2.lineWidth = width; c2.setLineDash(dash);
+        c2.beginPath();
+        const steps = 300;
+        for (let i = 0; i <= steps; i++) {
+            const x = -1 + 2 * i / steps;
+            const y = Math.max(FYMIN, Math.min(FYMAX, fn(x)));
+            if (i === 0) c2.moveTo(fx(x), fy(y)); else c2.lineTo(fx(x), fy(y));
+        }
+        c2.stroke();
+        c2.setLineDash([]); c2.globalAlpha = 1;
+    }
+
+    function render() {
+        c2.clearRect(0, 0, cv.width, cv.height);
+        fAxes();
+        if (document.getElementById('fit-show-neurons').checked) {
+            fCurve(x => user[0].v * Math.tanh(user[0].w * x + user[0].b), '#0891b2', 1.8, 0.45);
+            if (mode === 2) {
+                fCurve(x => user[1].v * Math.tanh(user[1].w * x + user[1].b), '#d97706', 1.8, 0.45);
+            }
+        }
+        fCurve(targetF, '#1e2433', 3, 1, [8, 6]);
+        fCurve(userF, '#4f46e5', 3.5);
+        updateStatus();
+        updateFormula();
+    }
+    fitRender = render;   // für die Tab-Umschaltung exportieren
+
+    // ---------- Slider <-> Zustand ----------
+    function readSliders() {
+        for (let k = 0; k < 2; k++) {
+            user[k] = {
+                w: parseFloat(ui[k].w.value),
+                b: parseFloat(ui[k].b.value),
+                v: parseFloat(ui[k].v.value)
+            };
+        }
+    }
+    function writeSliders() {
+        for (let k = 0; k < 2; k++) {
+            ui[k].w.value = user[k].w;
+            ui[k].b.value = user[k].b;
+            ui[k].v.value = user[k].v;
+        }
+        updateLabels();
+    }
+    function updateLabels() {
+        for (let k = 0; k < 2; k++) {
+            ui[k].wv.textContent = user[k].w.toFixed(1);
+            ui[k].bv.textContent = user[k].b.toFixed(1);
+            ui[k].vv.textContent = user[k].v.toFixed(2);
+        }
+    }
+
+    function resetSliders() {
+        user = [{ w: 1, b: 0, v: 0.5 }, { w: 1, b: 0, v: 0.5 }];
+        writeSliders();
+        render();
+    }
+
+    // ---------- "Lösung zeigen": nächstliegende äquivalente Lösung ----------
+    // tanh ist ungerade: v·tanh(w·x+b) = (−v)·tanh(−w·x−b) → zwei gleichwertige
+    // Darstellungen pro Neuron; bei 2 Neuronen zusätzlich Vertauschung möglich.
+    function nearestSolution() {
+        const reps = p => [p, { w: -p.w, b: -p.b, v: -p.v }];
+        const dist = (a, b) =>
+            Math.pow((a.w - b.w) / 10, 2) +
+            Math.pow((a.b - b.b) / 6, 2) +
+            Math.pow((a.v - b.v) / 3, 2);
+
+        if (mode === 1) {
+            const cands = reps(solution[0]);
+            cands.sort((a, b) => dist(a, user[0]) - dist(b, user[0]));
+            return [cands[0], user[1]];
+        }
+        let best = null, bestD = Infinity;
+        for (const perm of [[0, 1], [1, 0]]) {
+            for (const r0 of reps(solution[perm[0]])) {
+                for (const r1 of reps(solution[perm[1]])) {
+                    const d = dist(r0, user[0]) + dist(r1, user[1]);
+                    if (d < bestD) { bestD = d; best = [r0, r1]; }
+                }
+            }
+        }
+        return best;
+    }
+
+    function showSolution() {
+        if (animId) cancelAnimationFrame(animId);
+        const from = user.map(p => ({ ...p }));
+        const to = nearestSolution();
+        const T = 1100, t0 = performance.now();
+        const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        function step(now) {
+            const t = Math.min(1, (now - t0) / T);
+            const e = ease(t);
+            for (let k = 0; k < 2; k++) {
+                user[k] = {
+                    w: from[k].w + (to[k].w - from[k].w) * e,
+                    b: from[k].b + (to[k].b - from[k].b) * e,
+                    v: from[k].v + (to[k].v - from[k].v) * e
+                };
+            }
+            writeSliders();
+            render();
+            if (t < 1) animId = requestAnimationFrame(step);
+            else {
+                // exakt auf die Lösung schnappen
+                user[0] = { ...to[0] }; user[1] = { ...to[1] };
+                writeSliders(); render();
+                animId = null;
+            }
+        }
+        animId = requestAnimationFrame(step);
+    }
+
+    // ---------- Modus ----------
+    function setMode(m) {
+        mode = m;
+        document.getElementById('fit-mode-1').setAttribute('aria-pressed', m === 1 ? 'true' : 'false');
+        document.getElementById('fit-mode-2').setAttribute('aria-pressed', m === 2 ? 'true' : 'false');
+        document.getElementById('fit-neuron2-box').hidden = m !== 2;
+        document.getElementById('fit-legend-n2').style.display =
+            (m === 2 && document.getElementById('fit-show-neurons').checked) ? 'inline-flex' : 'none';
+        newTask();
+    }
+
+    function newTask() {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        makeTask();
+        resetSliders();
+    }
+
+    // ---------- Verdrahtung ----------
+    document.getElementById('fit-mode-1').addEventListener('click', () => setMode(1));
+    document.getElementById('fit-mode-2').addEventListener('click', () => setMode(2));
+    document.getElementById('fit-btn-new').addEventListener('click', newTask);
+    document.getElementById('fit-btn-reset').addEventListener('click', resetSliders);
+    document.getElementById('fit-btn-solve').addEventListener('click', showSolution);
+
+    for (let k = 0; k < 2; k++) {
+        [ui[k].w, ui[k].b, ui[k].v].forEach(inp => {
+            inp.addEventListener('input', () => {
+                if (animId) { cancelAnimationFrame(animId); animId = null; }
+                readSliders();
+                updateLabels();
+                render();
+            });
+        });
+    }
+
+    document.getElementById('fit-show-neurons').addEventListener('change', e => {
+        document.getElementById('fit-legend-n1').style.display = e.target.checked ? 'inline-flex' : 'none';
+        document.getElementById('fit-legend-n2').style.display =
+            (e.target.checked && mode === 2) ? 'inline-flex' : 'none';
+        render();
+    });
+
+    // ---------- Start ----------
+    user = [{ w: 1, b: 0, v: 0.5 }, { w: 1, b: 0, v: 0.5 }];
+    makeTask();
+    writeSliders();
+    render();
+})();
 </script>
 </body>
 </html>
