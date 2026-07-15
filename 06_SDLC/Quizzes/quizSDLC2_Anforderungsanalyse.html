@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wissens-Check: Anforderungsanalyse</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Wissens-Check: Anforderungsanalyse</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Welche der folgenden Formulierungen ist eine korrekt aufgebaute User Story?",
+            options: [
+                "Das System muss eine REST-Schnittstelle mit JSON-Ausgabe besitzen.",
+                "Als Nutzerin möchte ich ein Bild hochladen, damit ich erfahre, welche Ziffer darauf zu sehen ist.",
+                "Der Entwickler soll bis Freitag den Upload-Button programmieren.",
+                "Das Programm wird in Python geschrieben und nutzt PyTorch."
+            ],
+            correct: 1,
+            explanation: "Eine User Story folgt dem Muster „Als … möchte ich … damit …“ — sie beschreibt ein Bedürfnis aus Sicht einer Person und ihren Nutzen. Technische Details (REST, Python) gehören nicht in die Story: Sie beschreiben Lösungen, nicht Bedürfnisse."
+        },
+        {
+            text: "Was macht ein gutes Akzeptanzkriterium aus?",
+            options: [
+                "Es klingt möglichst allgemein, damit später alles darunterfällt.",
+                "Es ist prüfbar formuliert: Man kann eindeutig entscheiden, ob es erfüllt ist oder nicht.",
+                "Es beschreibt, welche Programmiersprache verwendet werden soll.",
+                "Es wird erst nach der Implementierung festgelegt, wenn man weiß, was möglich war."
+            ],
+            correct: 1,
+            explanation: "Ein Akzeptanzkriterium ist die Messlatte einer User Story: „Nach dem Klick auf Erkennen erscheint innerhalb von 2 Sekunden eine Ziffer von 0 bis 9“ — das kann man eindeutig prüfen. Und es wird VOR der Implementierung festgelegt, nicht danach."
+        },
+        {
+            text: "Welche dieser Anforderungen ist eine FUNKTIONALE Anforderung?",
+            options: [
+                "Der Dienst ist zu 99,5 % der Geschäftszeiten verfügbar.",
+                "Die Oberfläche ist auch für Anfänger leicht verständlich.",
+                "Der Dienst nimmt ein Bild entgegen und gibt die erkannte Ziffer zurück.",
+                "Alle Vorhersagen werden verschlüsselt übertragen."
+            ],
+            correct: 2,
+            explanation: "Funktionale Anforderungen beschreiben, WAS das System tut — hier: Bild rein, Ziffer raus. Die anderen drei beschreiben, WIE GUT es etwas tut (Verfügbarkeit, Benutzerfreundlichkeit, Sicherheit) — das sind nicht-funktionale Anforderungen (NFRs)."
+        },
+        {
+            text: "Wofür steht das W in der MoSCoW-Priorisierung — und warum ist es wertvoll?",
+            options: [
+                "„Wichtig“ — es markiert die wichtigsten Anforderungen.",
+                "„Won't have“ — bewusst Ausgeschlossenes. Was wir NICHT bauen, gehört genauso in die Spezifikation wie das, was wir bauen.",
+                "„Wartung“ — Anforderungen, die erst nach dem Go-Live umgesetzt werden.",
+                "„Workaround“ — Anforderungen, für die es eine Behelfslösung gibt."
+            ],
+            correct: 1,
+            explanation: "M = Must have (ohne das kein Start), S = Should have (wichtig, aber nicht kritisch), C = Could have (schön zu haben), W = Won't have (bewusst ausgeschlossen). Das W schützt vor endlosen Diskussionen und schleichender Ausweitung des Projekts — jeder weiß, was ausdrücklich NICHT kommt."
+        },
+        {
+            text: "Welche dieser Anforderungen ist KI-SPEZIFISCH — also bei klassischer Software so gar nicht nötig?",
+            options: [
+                "Das System soll ein Login mit Passwort haben.",
+                "Das Modell soll die Ziffer 1 genauso zuverlässig erkennen wie die Ziffer 8 (Fairness).",
+                "Die Antwortzeit soll unter 2 Sekunden liegen.",
+                "Die Oberfläche soll auf Deutsch und Englisch verfügbar sein."
+            ],
+            correct: 1,
+            explanation: "Fairness, Erklärbarkeit, Robustheit und Unsicherheit sind typische KI-Anforderungen. Sie entstehen, weil das Verhalten des Modells GELERNT statt programmiert wird — niemand kann in den Code schauen und nachlesen, ob alle Ziffern gleich behandelt werden. Login, Antwortzeit und Mehrsprachigkeit gibt es bei jeder Software."
+        },
+        {
+            text: "Wozu dienen „Was wäre, wenn …“-Szenarien in der Anforderungsanalyse? (z. B. „Was wäre, wenn der Dienst 1.000 Anfragen pro Sekunde bedienen müsste?“)",
+            options: [
+                "Sie sind reine Zeitfüller, wenn im Workshop noch Zeit übrig ist.",
+                "Sie legen fest, welche Hardware gekauft werden muss.",
+                "Sie decken versteckte Anforderungen auf, an die vorher niemand gedacht hat — vor allem nicht-funktionale.",
+                "Sie ersetzen die User Stories vollständig."
+            ],
+            correct: 2,
+            explanation: "Gezielte Zuspitzungen bringen Anforderungen ans Licht, die sonst erst im Betrieb auffallen würden: Performance, Robustheit, Fairness. In SDD-Sprache sind das Interviewer-Fragen — sie machen aus einer vagen Idee eine präzise Spezifikation."
+        },
+        {
+            text: "Wer zählt zu den Stakeholdern eines Projekts?",
+            options: [
+                "Nur die Personen, die das fertige System täglich bedienen.",
+                "Nur die Personen, die das Projekt bezahlen.",
+                "Nur das Entwicklungsteam.",
+                "Alle, die das System nutzen, bezahlen, betreiben oder von seinen Entscheidungen betroffen sind — auch z. B. eine Compliance-Abteilung."
+            ],
+            correct: 3,
+            explanation: "Stakeholder sind alle Beteiligten und Betroffenen. Beim Beispiel Betrugserkennung gehören dazu: die Bank (Auftraggeber), die Karteninhaber (Betroffene), die Fraud-Analysten (Nutzer) und sogar die Regulierungsbehörde. Wer eine Gruppe vergisst, dem fehlen später deren Anforderungen."
+        },
+        {
+            text: "„Die Oberfläche soll sich gut anfühlen.“ — Wie geht man mit so einer Anforderung um?",
+            options: [
+                "Streichen — was man nicht messen kann, hat in einem Projekt nichts verloren.",
+                "Sie darf in die Spezifikation, muss aber als NICHT PRÜFBAR gekennzeichnet werden — im Gegensatz zu messbaren NFRs mit Zahl und Messverfahren.",
+                "Sie ist automatisch erfüllt, wenn das Programm keine Abstürze hat.",
+                "Man wandelt sie in eine funktionale Anforderung um, dann ist sie prüfbar."
+            ],
+            correct: 1,
+            explanation: "Solche weichen Wünsche sind ehrliche Ziele und dürfen in der Spec stehen — aber sie sind keine Prüfsteine. Die wichtigste Übung der Anforderungsanalyse: eigene Anforderungen in PRÜFBAR („95 % der Anfragen unter 2 Sekunden“ — grün) und NICHT PRÜFBAR („fühlt sich gut an“ — gelb) sortieren."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>
