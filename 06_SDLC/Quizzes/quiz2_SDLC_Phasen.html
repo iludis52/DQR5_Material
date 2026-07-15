@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDLC Wissens-Check: Die Phasen</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>SDLC Wissens-Check: Die Phasen</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "In welcher Reihenfolge durchläuft ein Software-Projekt die klassischen SDLC-Phasen?",
+            options: [
+                "Implementierung → Anforderungsanalyse → Test → Entwurf → Deployment → Wartung",
+                "Anforderungsanalyse → Entwurf/Architektur → Implementierung → Test → Deployment → Wartung",
+                "Entwurf → Deployment → Implementierung → Anforderungsanalyse → Wartung → Test",
+                "Test → Implementierung → Entwurf → Anforderungsanalyse → Wartung → Deployment"
+            ],
+            correct: 1,
+            explanation: "Erst verstehen, was gebaut werden soll (Anforderungen), dann den Bauplan machen (Entwurf), dann bauen (Implementierung), dann prüfen (Test), dann ausliefern (Deployment) — und danach beginnt der längste Abschnitt: die Wartung."
+        },
+        {
+            text: "Was ist das Ziel der Anforderungsanalyse?",
+            options: [
+                "Den Code so schnell wie möglich zu schreiben, damit man früh etwas Vorzeigbares hat.",
+                "Die Bedürfnisse der Nutzer genau zu verstehen und präzise zu beschreiben, bevor gebaut wird.",
+                "Die Datenbank auszuwählen und die Server zu bestellen.",
+                "Fehler im fertigen Programm zu finden."
+            ],
+            correct: 1,
+            explanation: "Die Denkweise lautet: Erst verstehen, dann bauen. Werkzeuge dafür sind zum Beispiel User Stories („Als … möchte ich … damit …“) mit prüfbaren Akzeptanzkriterien."
+        },
+        {
+            text: "„Der Dienst antwortet in unter 2 Sekunden.“ — Was für eine Art von Anforderung ist das?",
+            options: [
+                "Eine funktionale Anforderung, denn sie beschreibt eine Funktion des Systems.",
+                "Eine nicht-funktionale Anforderung, denn sie beschreibt, WIE GUT das System etwas tun soll.",
+                "Gar keine Anforderung, sondern ein Testfall.",
+                "Eine Architektur-Entscheidung."
+            ],
+            correct: 1,
+            explanation: "Funktionale Anforderungen sagen, WAS das System tun soll (z. B. „nimmt ein Bild entgegen und gibt eine Ziffer zurück“). Nicht-funktionale Anforderungen (NFRs) sagen, WIE GUT es das tun soll: wie schnell, wie sicher, wie zuverlässig."
+        },
+        {
+            text: "Was passiert in der Phase Entwurf/Architektur?",
+            options: [
+                "Es wird festgelegt, aus welchen Teilen das System besteht und wie diese Teile miteinander reden.",
+                "Die Nutzer werden interviewt, um ihre Wünsche zu erfahren.",
+                "Der fertige Code wird auf einen Server hochgeladen.",
+                "Es werden möglichst viele Zeilen Code geschrieben."
+            ],
+            correct: 0,
+            explanation: "Die Architektur ist der Bauplan: Komponenten, Schnittstellen, Zuständigkeiten. In unserem Projekt zum Beispiel: Gradio-Oberfläche, Vorhersagefunktion und Modelldatei — und wer davon wen kennt."
+        },
+        {
+            text: "Worin unterscheiden sich Wasserfall-Modell und agiles Vorgehen?",
+            options: [
+                "Beim Wasserfall gibt es keine Tests, bei Agil wird alles doppelt getestet.",
+                "Wasserfall ist für kleine Projekte, Agil nur für große Konzerne.",
+                "Beim Wasserfall werden die Phasen einmal nacheinander durchlaufen, bei Agil in kleinen Runden immer wieder.",
+                "Es gibt keinen Unterschied — die Begriffe bezeichnen dasselbe Vorgehen."
+            ],
+            correct: 2,
+            explanation: "Wasserfall ist wie ein Hausbau: erst der komplette Plan, dann der Bau. Agil ist wie ein Garten: pflanzen, schauen, umplanen, nachpflanzen — kleine Runden durch alle Phasen. Echte Projekte laufen heute fast immer in Runden."
+        },
+        {
+            text: "Welche Aussage über die Test-Phase ist richtig?",
+            options: [
+                "Getestet wird nur der „Happy Path“ — also der Fall, in dem alles glattgeht.",
+                "Testen ist überflüssig, wenn erfahrene Entwickler den Code geschrieben haben.",
+                "Die Denkweise ist systematisches Misstrauen: gezielt auch Ränder und Ausnahmen prüfen.",
+                "Testen bedeutet, dass der Kunde das Programm ein paar Tage ausprobiert."
+            ],
+            correct: 2,
+            explanation: "Gute Tester suchen gezielt nach Schwachstellen: leere Eingaben, riesige Bilder, Buchstaben statt Ziffern. Und sie prüfen gegen die Akzeptanzkriterien aus der Anforderungsanalyse — der Kreis schließt sich."
+        },
+        {
+            text: "Was gehört zur Phase Deployment?",
+            options: [
+                "Das System für die Nutzer verfügbar machen — z. B. eine Gradio-App per share=True über einen Link teilen.",
+                "Die User Stories aufschreiben.",
+                "Den Quellcode in eine schönere Schriftart umformatieren.",
+                "Das Pflichtenheft mit dem Kunden abstimmen."
+            ],
+            correct: 0,
+            explanation: "Deployment heißt: raus aus der Entwicklungsumgebung, rein in die Hände der Nutzer. In unserem Kurs geht das in drei Stufen: lokal starten, per share=True einen öffentlichen Link erzeugen, oder dauerhaft auf Hugging Face Spaces veröffentlichen."
+        },
+        {
+            text: "Warum ist die Wartung bei KI-Systemen besonders wichtig?",
+            options: [
+                "Weil KI-Systeme nach dem Deployment fertig sind und nie wieder angefasst werden müssen.",
+                "Weil sich die Welt ändert, während das Modell stehen bleibt — die Trefferquote kann sinken, ohne dass sich am Code etwas ändert (Model Drift).",
+                "Weil der Server jede Woche neu gestartet werden muss.",
+                "Weil die Programmiersprache Python regelmäßig ihre Syntax ändert."
+            ],
+            correct: 1,
+            explanation: "Das nennt man Model Drift: Wenn z. B. neue Nutzer ihre Ziffern anders schreiben als die Menschen im Trainingsdatensatz, wird das Modell schlechter — ganz ohne Code-Änderung. Die Antwort darauf: beobachten, neue Daten sammeln, neu trainieren. Deshalb ist die Wartung der längste Abschnitt im Leben einer Software."
+        }
+    ];
+
+    // Globale Variablen für den Zustand
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    // Initialisierung des Quiz
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            // Karte für jede Frage erstellen
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            // Buttons für Antworten generieren
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            // Feedback-Bereich (initial versteckt)
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            // Alles zusammenbauen
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    // Logik bei Klick auf eine Antwort
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        // Prüfen, ob die Frage bereits erfolgreich gelöst wurde
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            // --- RICHTIGE ANTWORT ---
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); // Markiert die Frage als gelöst
+
+            // Alle Buttons dieser Frage deaktivieren
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            // Positives Feedback anzeigen
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            // --- FALSCHE ANTWORT ---
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; // Nur diesen Button deaktivieren, damit man es nochmal versuchen kann
+
+            // Fehler-Counter erhöhen
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            // Negatives Feedback anzeigen
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    // Fortschrittsbalken und Abschlussprüfung
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        // Wenn alle Fragen richtig beantwortet wurden
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    // Quiz beim Laden der Seite starten
+    initQuiz();
+</script>
+
+</body>
+</html>
