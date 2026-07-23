@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient-Boosting-Demo: Regression mit Bäumen</title>
+<style>
+  :root {
+    --accent: #0969DA;
+    --accent-bg: #ddf4ff;
+    --resid: #A32D2D;
+    --resid-bg: #FCEBEB;
+    --tree: #0F6E56;
+    --tree-bg: #E1F5EE;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #656d76;
+    --surface: #ffffff;
+    --page: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0; padding: 20px;
+    background: var(--page);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 700; }
+  h2 { font-size: 15px; margin: 0 0 10px; font-weight: 700; color: var(--accent); }
+  .subtitle { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+
+  .controls {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 16px;
+  }
+  .controls label { font-weight: 700; }
+  .btnrow { display: flex; gap: 6px; }
+  .kbtn {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer;
+    font-family: inherit;
+  }
+  .kbtn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .kbtn:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .redraw {
+    border: 1px solid var(--accent); background: var(--surface); color: var(--accent);
+    border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 700;
+  }
+  .redraw:hover { background: var(--accent-bg); }
+  .infobtn {
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 50%; width: 28px; height: 28px; font-size: 15px; font-weight: 700;
+    cursor: pointer; font-family: inherit; line-height: 1;
+  }
+  .infobtn:hover { background: #0757b3; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 430px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+  }
+  .panel svg { width: 100%; height: auto; display: block; }
+
+  .formula {
+    font-family: Consolas, monospace; font-size: 14px;
+    margin-top: 10px; padding: 8px 10px;
+    background: var(--page); border: 1px solid var(--border); border-radius: 6px;
+    line-height: 1.9;
+  }
+  .fterm {
+    cursor: pointer; padding: 2px 5px; border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  .fterm:hover { border-color: var(--accent); }
+  .fterm.on { background: var(--accent-bg); border-color: var(--accent); font-weight: 700; }
+  .fterm.dim { color: #b6bcc2; }
+  .formula-hint { font-size: 11.5px; color: var(--muted); font-family: Arial, sans-serif; margin-top: 4px; }
+
+  .mse-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
+  .mse-chip {
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; background: #fff;
+  }
+  .mse-chip.on { border-color: var(--accent); background: var(--accent-bg); font-weight: 700; }
+  .mse-chip b { color: var(--accent); }
+
+  #steps { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 700px) { #steps { grid-template-columns: 1fr; } }
+  .step-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .step-card:hover { border-color: var(--accent); }
+  .step-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .step-card h3 { margin: 0 0 4px; font-size: 12.5px; }
+  .step-card .meta { font-size: 11px; color: var(--muted); margin: 2px 0 4px; }
+  .step-card svg { width: 100%; height: auto; display: block; }
+  .card-body { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .card-plot { flex: 0 1 180px; min-width: 150px; }
+  .card-tree { flex: 1 1 220px; min-width: 220px; }
+  .card-tree svg { width: 100%; max-width: 240px; height: auto; margin: 0 auto; }
+  .card-note {
+    flex: 1 1 200px; min-width: 180px; font-size: 12.5px; color: var(--muted);
+    font-style: italic; padding: 8px 10px; background: var(--page);
+    border: 1px dashed var(--border); border-radius: 6px;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(31, 35, 40, 0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    background: var(--surface); border-radius: 10px; max-width: 660px;
+    max-height: 85vh; overflow-y: auto; padding: 22px 26px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+  .modal h2 { margin-top: 0; }
+  .modal h4 { margin: 14px 0 4px; font-size: 13.5px; color: var(--accent); }
+  .modal p { margin: 4px 0 8px; font-size: 13.5px; }
+  .modal .close {
+    float: right; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: inherit; font-size: 13px;
+  }
+  .modal .close:hover { border-color: var(--accent); color: var(--accent); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:8px; color: var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .lin-swatch { width:18px; height:0; border-top:2.5px solid; display:inline-block; }
+  .footer { margin-top: 18px; font-size: 11.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Gradient Boosting verstehen: Bäume fitten Residuen</h1>
+<p class="subtitle">40 verrauschte Punkte &middot; Startmodell F&#8320; = Mittelwert &middot; Regressionsbäume (Tiefe 2, Split-Kriterium: Varianzreduktion / MSE) &middot; Lernrate &eta; = 0,5 &middot; kein Bootstrap &ndash; jeder Baum sieht alle Punkte, aber ein neues Ziel</p>
+
+<div class="controls">
+  <label>Zielfunktion:</label>
+  <div class="btnrow" id="funcbtns" role="group" aria-label="Zielfunktion"></div>
+  <label>Bäume insgesamt:</label>
+  <div class="btnrow" id="kbtns" role="group" aria-label="Anzahl Bäume"></div>
+  <label for="noiseslider">Rauschen:</label>
+  <input type="range" id="noiseslider" min="0" max="150" step="10" value="100" style="width:120px">
+  <span id="noiselabel" style="font-family:Consolas,monospace;font-size:12.5px;min-width:70px"></span>
+  <button class="redraw" id="redraw">&#8635; Neue Punkte</button>
+  <button class="infobtn" id="infobtn" aria-label="Erklärung anzeigen" title="Was passiert hier?" style="margin-left:auto">i</button>
+</div>
+
+<div class="modal-overlay" id="infomodal" hidden role="dialog" aria-modal="true" aria-labelledby="modaltitle">
+  <div class="modal">
+    <button class="close" id="infoclose">&#10005; Schließen</button>
+    <h2 id="modaltitle">Was zeigt diese Demo?</h2>
+
+    <h4>1 &middot; Start: die dümmste Vorhersage</h4>
+    <p>Das Startmodell F&#8320; sagt für <em>jedes</em> x einfach den Mittelwert aller y-Werte vorher &ndash; eine waagerechte Linie. Der Abstand jedes Punktes zu dieser Linie ist sein <strong>Residuum</strong>: r = y &minus; F(x), also &bdquo;das, was noch fehlt&ldquo;.</p>
+
+    <h4>2 &middot; Bäume fitten Residuen, nicht y</h4>
+    <p>Jeder neue Baum wird <strong>auf die Residuen</strong> trainiert &ndash; nicht auf die Originaldaten! Ein Regressionsbaum sucht Schwellenwerte für x, die die Streuung (Varianz) der Residuen möglichst stark senken, und sagt pro Blatt den Mittelwert vorher. Das Ergebnis ist eine <strong>Treppenfunktion</strong> mit maximal 4 Stufen (Tiefe 2).</p>
+
+    <h4>3 &middot; Update mit Lernrate</h4>
+    <p>Die Baumvorhersage wird nicht voll übernommen, sondern gedämpft addiert: F<sub>neu</sub> = F<sub>alt</sub> + <strong>&eta;</strong> &middot; Baum(x) mit &eta; = 0,5. Kleine Schritte statt großer Sprünge &ndash; das verhindert, dass ein einzelner Baum das Modell dominiert. Danach werden die Residuen neu berechnet (sie schrumpfen!) und der nächste Baum trainiert.</p>
+
+    <h4>4 &middot; Die Summe macht das Modell</h4>
+    <p>Kein Baum allein sagt y vorher &ndash; erst die <strong>Summe</strong> aller Beiträge: F(x) = &#563; + &eta;&middot;h&#8321;(x) + &eta;&middot;h&#8322;(x) + &hellip; In der Formelzeile kannst du einzelne Zwischenstände anklicken und im großen Plot sehen, wie sich das Modell Schicht für Schicht an die Daten anschmiegt.</p>
+
+    <h4>Unterschied zu Bagging / Random Forest</h4>
+    <p>Bagging: viele Bäume <em>parallel</em> auf verschiedenen Bootstrap-Samples, alle sagen y vorher, am Ende wird gemittelt (&rarr; Varianz sinkt). Boosting: Bäume <em>nacheinander</em> auf denselben Daten, jeder korrigiert die Restfehler der Vorgänger (&rarr; Bias sinkt). Hinweis: Diese Demo zeigt <em>Gradient</em> Boosting. AdaBoost arbeitet anders (Umgewichtung von Punkten statt Residuen-Fitting).</p>
+
+    <h4>Ausprobieren</h4>
+    <p>Wähle die <strong>Sinus-Funktion</strong>: Ein einzelner Baum mit 4 Stufen kann eine ganze Schwingung gar nicht abbilden &ndash; aber die Summe von 4 Bäumen kommt erstaunlich nah heran. Vergleiche den MSE nach jedem Schritt.</p>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>1 &middot; Daten &amp; Gesamtmodell F(x)</h2>
+    <div id="mainplot"></div>
+    <div class="legend">
+      <span><span style="width:9px;height:9px;border-radius:50%;background:#57606a;display:inline-block"></span>Datenpunkte</span>
+      <span><span class="lin-swatch" style="border-color:#b6bcc2;border-top-style:dashed"></span>wahre Funktion</span>
+      <span><span class="lin-swatch" style="border-color:var(--accent)"></span>Modell F(x)</span>
+      <span><span class="lin-swatch" style="border-color:var(--resid);border-top-width:1.5px"></span>Residuen</span>
+    </div>
+    <div class="formula" id="formula"></div>
+    <div class="formula-hint">Zwischenstand anklicken &rarr; der große Plot zeigt das Modell bis zu diesem Term.</div>
+    <div class="mse-row" id="mserow"></div>
+  </div>
+
+  <div class="panel">
+    <h2>2 &middot; Boosting-Schritte: jeder Baum fittet die aktuellen Residuen</h2>
+    <div id="steps"></div>
+  </div>
+</div>
+
+<p class="footer">Didaktische Demo &middot; Regressionsbaum: Split minimiert die gewichtete Varianz der Kindknoten (&equiv; maximale MSE-Reduktion), Blattvorhersage = Mittelwert. Gradient Boosting mit quadratischem Verlust: Pseudo-Residuen = gewöhnliche Residuen. &middot; iludis.de</p>
+
+<script>
+"use strict";
+
+/* ---------- Konfiguration ---------- */
+const N = 40;
+const ETA = 0.5;
+const DEPTH = 2;
+const MAX_TREES = 5;
+
+const FUNCS = {
+  lin:  { label: "Linear",    f: x => 0.8 * x + 1,   dom: [0, 10],            noise: 0.9 },
+  quad: { label: "Parabel",   f: x => 0.12 * x * x,  dom: [0, 10],            noise: 0.9 },
+  sin:  { label: "Sinus",     f: x => 3 * Math.sin(x), dom: [0, 2 * Math.PI], noise: 0.55 }
+};
+
+/* ---------- Seedbarer Zufall ---------- */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) {
+  const u = Math.max(rng(), 1e-12), v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* ---------- Regressionsbaum (Varianzreduktion, Tiefe 2) ---------- */
+function fitRegTree(xs, ts, depth) {
+  const idx = xs.map((_, i) => i);
+  function sse(ind) {
+    if (ind.length === 0) return 0;
+    const m = ind.reduce((a, i) => a + ts[i], 0) / ind.length;
+    return ind.reduce((a, i) => a + (ts[i] - m) * (ts[i] - m), 0);
+  }
+  function mean(ind) { return ind.reduce((a, i) => a + ts[i], 0) / ind.length; }
+  function build(ind, d) {
+    const node = { n: ind.length, value: mean(ind), sse: sse(ind) };
+    if (d >= depth || ind.length < 4 || node.sse < 1e-10) { node.leaf = true; return node; }
+    const vals = [...new Set(ind.map(i => xs[i]))].sort((a, b) => a - b);
+    let best = null;
+    for (let v = 0; v < vals.length - 1; v++) {
+      const thr = (vals[v] + vals[v + 1]) / 2;
+      const L = ind.filter(i => xs[i] <= thr);
+      const R = ind.filter(i => xs[i] > thr);
+      if (L.length < 2 || R.length < 2) continue;
+      const red = node.sse - sse(L) - sse(R);
+      if (!best || red > best.red + 1e-12) best = { thr: thr, L: L, R: R, red: red };
+    }
+    if (!best || best.red < 1e-10) { node.leaf = true; return node; }
+    node.leaf = false;
+    node.thr = best.thr;
+    node.left = build(best.L, d + 1);
+    node.right = build(best.R, d + 1);
+    return node;
+  }
+  return build(idx, 0);
+}
+function treePredict(node, x) {
+  while (!node.leaf) node = (x <= node.thr) ? node.left : node.right;
+  return node.value;
+}
+
+/* ---------- Zustand ---------- */
+let funcKey = "sin";
+let k = 3;
+let seed = 7;
+let noisePct = 100;
+let data = { x: [], y: [] };
+let model = null;       // { f0, trees[], Fsteps[][], resSteps[][], mses[] }
+let activeStep = k;     // 0 = nur F0, m = F0 + m Bäume
+let residRange = 1;
+
+function genData() {
+  const cfg = FUNCS[funcKey];
+  const sigma = cfg.noise * noisePct / 100;
+  const rng = mulberry32(seed + funcKey.length * 1000);
+  const xs = [], ys = [];
+  for (let i = 0; i < N; i++) {
+    const x = cfg.dom[0] + (i + 0.5) / N * (cfg.dom[1] - cfg.dom[0])
+            + (rng() - 0.5) * (cfg.dom[1] - cfg.dom[0]) / N * 0.8;
+    xs.push(x);
+    ys.push(cfg.f(x) + gauss(rng) * sigma);
+  }
+  data = { x: xs, y: ys };
+  document.getElementById("noiselabel").textContent = "\u03c3 = " + sigma.toFixed(2);
+}
+
+function fitBoosting() {
+  const f0 = data.y.reduce((a, b) => a + b, 0) / N;
+  let F = data.y.map(() => f0);
+  const trees = [], Fsteps = [F.slice()], resSteps = [], mses = [];
+  mses.push(data.y.reduce((a, y, i) => a + (y - F[i]) ** 2, 0) / N);
+  for (let m = 0; m < MAX_TREES; m++) {
+    const r = data.y.map((y, i) => y - F[i]);
+    resSteps.push(r);
+    const tree = fitRegTree(data.x, r, DEPTH);
+    trees.push(tree);
+    F = F.map((f, i) => f + ETA * treePredict(tree, data.x[i]));
+    Fsteps.push(F.slice());
+    mses.push(data.y.reduce((a, y, i) => a + (y - F[i]) ** 2, 0) / N);
+  }
+  model = { f0: f0, trees: trees, Fsteps: Fsteps, resSteps: resSteps, mses: mses };
+  residRange = Math.max(...resSteps[0].map(Math.abs)) * 1.15;
+}
+
+/* Gesamtmodell an Stelle x bis Schritt m auswerten (für glatte Kurve) */
+function evalF(x, m) {
+  let v = model.f0;
+  for (let j = 0; j < m; j++) v += ETA * treePredict(model.trees[j], x);
+  return v;
+}
+
+/* ---------- SVG-Plot-Helfer ---------- */
+function makePlot(w, h, dom, yr) {
+  const pad = { l: 36, r: 10, t: 10, b: 24 };
+  const sx = x => pad.l + (x - dom[0]) / (dom[1] - dom[0]) * (w - pad.l - pad.r);
+  const sy = y => h - pad.b - (y - yr[0]) / (yr[1] - yr[0]) * (h - pad.t - pad.b);
+  let g = "";
+  /* Achsen */
+  g += `<line x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}" stroke="#8c959f" stroke-width="1"/>`;
+  g += `<line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h - pad.b}" stroke="#8c959f" stroke-width="1"/>`;
+  /* Ticks y */
+  const yt = niceTicks(yr[0], yr[1], 4);
+  for (const t of yt) {
+    g += `<line x1="${pad.l - 3}" y1="${sy(t)}" x2="${pad.l}" y2="${sy(t)}" stroke="#8c959f"/>`;
+    g += `<text x="${pad.l - 6}" y="${sy(t) + 3.5}" font-size="10" fill="#656d76" text-anchor="end">${fmt(t)}</text>`;
+    if (Math.abs(t) < 1e-9 && yr[0] < 0)
+      g += `<line x1="${pad.l}" y1="${sy(0)}" x2="${w - pad.r}" y2="${sy(0)}" stroke="#eaeef2" stroke-width="1"/>`;
+  }
+  /* Ticks x */
+  const xt = niceTicks(dom[0], dom[1], 5);
+  for (const t of xt) {
+    g += `<line x1="${sx(t)}" y1="${h - pad.b}" x2="${sx(t)}" y2="${h - pad.b + 3}" stroke="#8c959f"/>`;
+    g += `<text x="${sx(t)}" y="${h - pad.b + 14}" font-size="10" fill="#656d76" text-anchor="middle">${fmt(t)}</text>`;
+  }
+  return { sx: sx, sy: sy, axes: g };
+}
+function niceTicks(a, b, n) {
+  const span = b - a, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => span / s <= n + 1) || mag * 10;
+  const t = [];
+  for (let v = Math.ceil(a / step) * step; v <= b + 1e-9; v += step) t.push(v);
+  return t;
+}
+function fmt(v) { return Math.abs(v) < 1e-9 ? "0" : (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1)); }
+
+function curvePath(fn, dom, sx, sy, steps) {
+  let d = "";
+  for (let i = 0; i <= steps; i++) {
+    const x = dom[0] + i / steps * (dom[1] - dom[0]);
+    d += (i === 0 ? "M" : "L") + sx(x).toFixed(1) + " " + sy(fn(x)).toFixed(1);
+  }
+  return d;
+}
+
+/* ---------- Rendering ---------- */
+function renderMainPlot() {
+  const cfg = FUNCS[funcKey];
+  const w = 380, h = 380;
+  const allY = data.y.concat(model.Fsteps[activeStep]);
+  const ymin = Math.min(...allY), ymax = Math.max(...allY);
+  const m = (ymax - ymin) * 0.12;
+  const plot = makePlot(w, h, cfg.dom, [ymin - m, ymax + m]);
+  let g = plot.axes;
+
+  /* wahre Funktion */
+  g += `<path d="${curvePath(cfg.f, cfg.dom, plot.sx, plot.sy, 160)}" fill="none" stroke="#b6bcc2" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  /* Residuen als vertikale Linien */
+  for (let i = 0; i < N; i++) {
+    const fx = model.Fsteps[activeStep][i];
+    g += `<line x1="${plot.sx(data.x[i])}" y1="${plot.sy(data.y[i])}" x2="${plot.sx(data.x[i])}" y2="${plot.sy(fx)}" stroke="#A32D2D" stroke-width="1.2" opacity="0.55"/>`;
+  }
+  /* Modell F als Treppenkurve */
+  g += `<path d="${curvePath(x => evalF(x, activeStep), cfg.dom, plot.sx, plot.sy, 400)}" fill="none" stroke="#0969DA" stroke-width="2.5"/>`;
+  /* Punkte */
+  for (let i = 0; i < N; i++) {
+    g += `<circle cx="${plot.sx(data.x[i])}" cy="${plot.sy(data.y[i])}" r="3.5" fill="#57606a"/>`;
+  }
+  const title = activeStep === 0
+    ? "F\u2080 (nur Mittelwert)"
+    : `F\u2080 + ${activeStep} ${activeStep > 1 ? "B\u00e4ume" : "Baum"} (\u03b7 = 0,5)`;
+  document.getElementById("mainplot").innerHTML =
+    `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Datenpunkte und Modell">
+      <text x="${w / 2}" y="12" font-size="12" font-weight="bold" fill="#1f2328" text-anchor="middle">${title}</text>${g}</svg>`;
+}
+
+function renderFormula() {
+  const el = document.getElementById("formula");
+  let html = `<span class="fterm${activeStep === 0 ? " on" : ""}" data-s="0" title="Nur Startmodell anzeigen">&#563;</span>`;
+  for (let m = 1; m <= k; m++) {
+    const cls = m <= activeStep ? (m === activeStep ? " on" : "") : " dim";
+    html += ` + <span class="fterm${cls}" data-s="${m}" title="Modell bis Baum ${m} anzeigen">&eta;&middot;h${subChar(m)}(x)</span>`;
+  }
+  html = `F(x) = ` + html;
+  el.innerHTML = html;
+  el.querySelectorAll(".fterm").forEach(t => {
+    t.addEventListener("click", () => { activeStep = +t.dataset.s; renderAll(); });
+  });
+}
+/* Unicode-Subskripte 1-4 */
+function subChar(n) { return ["", "\u2081", "\u2082", "\u2083", "\u2084", "\u2085"][n]; }
+
+function renderMSE() {
+  const el = document.getElementById("mserow");
+  let html = "";
+  for (let m = 0; m <= k; m++) {
+    html += `<span class="mse-chip${m === activeStep ? " on" : ""}">${m === 0 ? "F\u2080" : "+" + m + " B\u00e4ume"}: <b>MSE ${model.mses[m].toFixed(2)}</b></span>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderTreeSVG(tree) {
+  /* kleines Baumdiagramm: Wurzel, ggf. 2 innere, bis 4 Blätter */
+  const W = 220, H = tree.leaf ? 50 : (tree.left.leaf && tree.right.leaf ? 100 : 150);
+  const pos = new Map();
+  (function layout(n, d, x0, x1) {
+    pos.set(n, { x: (x0 + x1) / 2, y: 22 + d * 48 });
+    if (!n.leaf) { layout(n.left, d + 1, x0, (x0 + x1) / 2); layout(n.right, d + 1, (x0 + x1) / 2, x1); }
+  })(tree, 0, 5, W - 5);
+  let e = "", nd = "";
+  (function walk(n) {
+    const p = pos.get(n);
+    if (!n.leaf) {
+      const pl = pos.get(n.left), pr = pos.get(n.right);
+      e += `<line x1="${p.x}" y1="${p.y + 10}" x2="${pl.x}" y2="${pl.y - 10}" stroke="#d0d7de"/>`;
+      e += `<line x1="${p.x}" y1="${p.y + 10}" x2="${pr.x}" y2="${pr.y - 10}" stroke="#d0d7de"/>`;
+      walk(n.left); walk(n.right);
+      nd += `<rect x="${p.x - 34}" y="${p.y - 10}" width="68" height="20" rx="4" fill="#fff" stroke="#8c959f" stroke-width="0.8"/>
+             <text x="${p.x}" y="${p.y + 3.5}" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#1f2328">x &#8804; ${n.thr.toFixed(2)}</text>`;
+    } else {
+      nd += `<rect x="${p.x - 26}" y="${p.y - 10}" width="52" height="20" rx="4" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+             <text x="${p.x}" y="${p.y + 3.5}" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0F6E56">${n.value >= 0 ? "+" : ""}${n.value.toFixed(2)}</text>`;
+    }
+  })(tree);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Regressionsbaum" style="max-width:${W}px;margin:0 auto">${e}${nd}</svg>`;
+}
+
+function renderSteps() {
+  const cfg = FUNCS[funcKey];
+  const el = document.getElementById("steps");
+  let html = "";
+  const w = 180, h = 180;
+
+  /* Karte 0: Startmodell */
+  {
+    const allY = data.y;
+    const ymin = Math.min(...allY), ymax = Math.max(...allY), mm = Math.max((ymax - ymin) * 0.12, 0.5);
+    const plot = makePlot(w, h, cfg.dom, [ymin - mm, ymax + mm]);
+    let g = plot.axes;
+    for (let i = 0; i < N; i++) g += `<circle cx="${plot.sx(data.x[i])}" cy="${plot.sy(data.y[i])}" r="2.4" fill="#57606a"/>`;
+    g += `<line x1="${plot.sx(cfg.dom[0])}" y1="${plot.sy(model.f0)}" x2="${plot.sx(cfg.dom[1])}" y2="${plot.sy(model.f0)}" stroke="#0969DA" stroke-width="2.2"/>`;
+    html += `<div class="step-card${activeStep === 0 ? " active" : ""}" data-s="0" tabindex="0" role="button">
+      <h3>Schritt 0: F&#8320; = Mittelwert = ${model.f0.toFixed(2)}</h3>
+      <div class="meta">MSE ${model.mses[0].toFixed(2)}</div>
+      <div class="card-body">
+        <div class="card-plot"><svg viewBox="0 0 ${w} ${h}">${g}</svg></div>
+        <div class="card-note">Hier noch kein Baum, sondern nur der Mittelwert.</div>
+      </div>
+    </div>`;
+  }
+
+  /* Karten 1..k: Residuen + Baum-Treppenfunktion + Baumdiagramm */
+  for (let m = 1; m <= k; m++) {
+    const r = model.resSteps[m - 1];
+    const tree = model.trees[m - 1];
+    const plot = makePlot(w, h, cfg.dom, [-residRange, residRange]);
+    let g = plot.axes;
+    /* Nulllinie */
+    g += `<line x1="${plot.sx(cfg.dom[0])}" y1="${plot.sy(0)}" x2="${plot.sx(cfg.dom[1])}" y2="${plot.sy(0)}" stroke="#d0d7de" stroke-width="1"/>`;
+    /* Residuenpunkte */
+    for (let i = 0; i < N; i++) g += `<circle cx="${plot.sx(data.x[i])}" cy="${plot.sy(r[i])}" r="2.4" fill="#A32D2D" opacity="0.8"/>`;
+    /* Baumvorhersage (ungedämpft) als Treppe */
+    g += `<path d="${curvePath(x => treePredict(tree, x), cfg.dom, plot.sx, plot.sy, 400)}" fill="none" stroke="#0F6E56" stroke-width="2.2"/>`;
+    html += `<div class="step-card${activeStep === m ? " active" : ""}" data-s="${m}" tabindex="0" role="button">
+      <h3>Baum ${m}: h${subChar(m)} fittet die Residuen von F${subChar(m - 1) || "\u2080"}</h3>
+      <div class="meta">Rote Punkte: r = y &minus; F${subChar(m - 1) || "\u2080"}(x) &middot; gr&uuml;ne Treppe: Baum &middot; danach MSE ${model.mses[m].toFixed(2)} <span style="color:#0F6E56">(&minus;${(100 * (1 - model.mses[m] / model.mses[m - 1])).toFixed(0)} %)</span></div>
+      <div class="card-body">
+        <div class="card-plot"><svg viewBox="0 0 ${w} ${h}">${g}</svg></div>
+        <div class="card-tree">${renderTreeSVG(tree)}</div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll(".step-card").forEach(c => {
+    const go = () => { activeStep = +c.dataset.s; renderAll(); };
+    c.addEventListener("click", go);
+    c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
+}
+
+function renderButtons() {
+  const fb = document.getElementById("funcbtns");
+  fb.innerHTML = Object.keys(FUNCS).map(key =>
+    `<button class="kbtn${key === funcKey ? " active" : ""}" data-f="${key}">${FUNCS[key].label}</button>`
+  ).join("");
+  fb.querySelectorAll(".kbtn").forEach(b => {
+    b.addEventListener("click", () => { funcKey = b.dataset.f; refit(true); });
+  });
+  const kb = document.getElementById("kbtns");
+  kb.innerHTML = [2, 3, 4, 5].map(n =>
+    `<button class="kbtn${n === k ? " active" : ""}" data-k="${n}">${n}</button>`
+  ).join("");
+  kb.querySelectorAll(".kbtn").forEach(b => {
+    b.addEventListener("click", () => { k = +b.dataset.k; if (activeStep > k) activeStep = k; renderAll(); });
+  });
+}
+
+function renderAll() {
+  renderButtons();
+  renderMainPlot();
+  renderFormula();
+  renderMSE();
+  renderSteps();
+}
+
+function refit(resetStep) {
+  genData();
+  fitBoosting();
+  if (resetStep) activeStep = k;
+  renderAll();
+}
+
+document.getElementById("noiseslider").addEventListener("input", e => {
+  noisePct = +e.target.value;
+  refit(false);
+});
+
+document.getElementById("redraw").addEventListener("click", () => {
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+  refit(true);
+});
+
+const modal = document.getElementById("infomodal");
+document.getElementById("infobtn").addEventListener("click", () => { modal.hidden = false; document.getElementById("infoclose").focus(); });
+document.getElementById("infoclose").addEventListener("click", () => { modal.hidden = true; });
+modal.addEventListener("click", e => { if (e.target === modal) modal.hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") modal.hidden = true; });
+
+refit(true);
+</script>
+</body>
+</html>

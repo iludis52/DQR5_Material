@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bagging-Demo: Bootstrap &amp; Entscheidungsbäume (Iris)</title>
+<style>
+  :root {
+    --accent: #0969DA;
+    --accent-bg: #ddf4ff;
+    --setosa: #0F6E56;
+    --setosa-bg: #E1F5EE;
+    --versicolor: #854F0B;
+    --versicolor-bg: #FAEEDA;
+    --virginica: #534AB7;
+    --virginica-bg: #EEEDFE;
+    --oob: #A32D2D;
+    --oob-bg: #FCEBEB;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #656d76;
+    --surface: #ffffff;
+    --page: #f6f8fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0; padding: 20px;
+    background: var(--page);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 700; }
+  h2 { font-size: 15px; margin: 0 0 10px; font-weight: 700; color: var(--accent); }
+  .subtitle { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+
+  .controls {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 16px;
+  }
+  .controls label { font-weight: 700; }
+  .controls .kbtns { display: flex; gap: 6px; }
+  .kbtn {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer;
+    font-family: inherit;
+  }
+  .kbtn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .kbtn:focus-visible, button:focus-visible, .testcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .redraw {
+    border: 1px solid var(--accent); background: var(--surface); color: var(--accent);
+    border-radius: 6px; padding: 5px 14px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 700;
+  }
+  .redraw:hover { background: var(--accent-bg); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 270px minmax(240px, 320px) 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+  }
+
+  table { border-collapse: collapse; width: 100%; font-size: 11px; }
+  th, td { padding: 2px 4px; text-align: right; border-bottom: 1px solid #eaeef2; }
+  th { color: var(--muted); font-weight: 700; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  td.cls { text-align: left; font-weight: 700; }
+  tr.row-set   td.cls { color: var(--setosa); }
+  tr.row-ver   td.cls { color: var(--versicolor); }
+  tr.row-vir   td.cls { color: var(--virginica); }
+  tr.hl-in  { background: var(--accent-bg); }
+  tr.hl-oob { background: var(--oob-bg); }
+  .dupbadge {
+    display: inline-block; min-width: 20px; text-align: center;
+    background: var(--accent); color: #fff; border-radius: 10px;
+    font-size: 11px; font-weight: 700; padding: 1px 5px; margin-left: 4px;
+  }
+
+  .sample-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 12px; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .sample-card:hover { border-color: var(--accent); }
+  .sample-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .sample-card h3 { margin: 0 0 6px; font-size: 13.5px; }
+  .idchips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .chip {
+    border: 1px solid var(--border); border-radius: 5px;
+    padding: 1px 6px; font-size: 12px; font-family: Consolas, monospace;
+    background: #fff;
+  }
+  .chip.dup { background: var(--accent-bg); border-color: var(--accent); font-weight: 700; }
+  .chip.c-set { border-left: 3px solid var(--setosa); }
+  .chip.c-ver { border-left: 3px solid var(--versicolor); }
+  .chip.c-vir { border-left: 3px solid var(--virginica); }
+  .oobline { font-size: 12px; color: var(--oob); }
+  .oobline .chip { border-color: var(--oob); color: var(--oob); background: var(--oob-bg); }
+  .samplemeta { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+  #trees {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  @media (max-width: 700px) { #trees { grid-template-columns: 1fr; } }
+  .tree-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 0;
+  }
+  .tree-card h3 { margin: 0 0 6px; font-size: 12.5px; }
+  .tree-card svg { width: 100%; height: auto; display: block; }
+  .pred-chip {
+    display: inline-block; border-radius: 6px; padding: 2px 10px;
+    font-weight: 700; font-size: 12.5px; margin-left: 8px;
+  }
+  .pred-set { background: var(--setosa-bg); color: var(--setosa); }
+  .pred-ver { background: var(--versicolor-bg); color: var(--versicolor); }
+  .pred-vir { background: var(--virginica-bg); color: var(--virginica); }
+
+  #testpoints { display: flex; gap: 8px; flex-wrap: wrap; }
+  .testcard {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 0; cursor: pointer;
+    background: #fff; flex: 1 1 190px; text-align: left; font-family: inherit; font-size: 13px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .testcard:hover { border-color: var(--accent); }
+  .testcard.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+  .tuple { font-family: Consolas, monospace; font-size: 12.5px; display: block; margin-top: 2px; }
+  .truecls { font-weight: 700; }
+
+  .vote-panel {
+    border: 2px solid var(--accent); border-radius: 8px;
+    padding: 10px 12px; margin-top: 12px; background: var(--accent-bg);
+    font-size: 13.5px;
+  }
+  .vote-panel .big { font-size: 15px; font-weight: 700; }
+  .footer { margin-top: 18px; font-size: 11.5px; color: var(--muted); }
+
+  .infobtn {
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 50%; width: 28px; height: 28px; font-size: 15px; font-weight: 700;
+    cursor: pointer; font-family: inherit; line-height: 1;
+  }
+  .infobtn:hover { background: #0757b3; }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(31, 35, 40, 0.5);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+    padding: 20px;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    background: var(--surface); border-radius: 10px; max-width: 640px;
+    max-height: 85vh; overflow-y: auto; padding: 22px 26px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+  .modal h2 { margin-top: 0; }
+  .modal h4 { margin: 14px 0 4px; font-size: 13.5px; color: var(--accent); }
+  .modal p { margin: 4px 0 8px; font-size: 13.5px; }
+  .modal .close {
+    float: right; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: inherit; font-size: 13px;
+  }
+  .modal .close:hover { border-color: var(--accent); color: var(--accent); }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; margin-top:8px; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+</style>
+</head>
+<body>
+
+<h1>Bagging verstehen: Bootstrap-Samples &amp; Entscheidungsbäume</h1>
+<p class="subtitle">20 Trainingspunkte aus dem Iris-Datensatz &middot; Ziehen mit Zurücklegen &middot; Bäume: binäre Splits, Kriterium: Informationsgewinn (Entropie), max. Tiefe 3</p>
+
+<div class="controls">
+  <label for="kbtns">Anzahl Bootstrap-Samples:</label>
+  <div class="kbtns" id="kbtns" role="group" aria-label="Anzahl Bootstrap-Samples"></div>
+  <button class="redraw" id="redraw">&#8635; Neu ziehen</button>
+  <span style="color:var(--muted);font-size:12.5px">Jedes Sample: 20&times; ziehen mit Zurücklegen aus den 20 Trainingspunkten</span>
+  <button class="infobtn" id="infobtn" aria-label="Erklärung anzeigen" title="Was passiert hier?" style="margin-left:auto">i</button>
+</div>
+
+<div class="modal-overlay" id="infomodal" hidden role="dialog" aria-modal="true" aria-labelledby="modaltitle">
+  <div class="modal">
+    <button class="close" id="infoclose">&#10005; Schließen</button>
+    <h2 id="modaltitle">Was zeigt diese Demo?</h2>
+
+    <h4>1 &middot; Bootstrap: Ziehen mit Zurücklegen</h4>
+    <p>Aus den 20 Trainingspunkten wird 20-mal <strong>mit Zurücklegen</strong> gezogen. Jedes Bootstrap-Sample hat also wieder Größe 20 &ndash; aber: Manche Punkte kommen mehrfach vor (Chip mit <strong>&times;2</strong>, <strong>&times;3</strong>&hellip;), andere gar nicht. Die nie gezogenen Punkte heißen <strong>Out-of-Bag (OOB)</strong>. Im Mittel landen nur rund <strong>63 %</strong> der verschiedenen Punkte in einem Sample.</p>
+
+    <h4>2 &middot; Ein Baum pro Sample</h4>
+    <p>Für jedes Sample wird ein eigener Entscheidungsbaum trainiert. Der Algorithmus sucht an jedem Knoten den <strong>Split mit dem größten Informationsgewinn</strong>: Wie stark sinkt die Unordnung (Entropie H) der Klassen, wenn man die Daten an einem Schwellenwert teilt? Duplikate zählen dabei mehrfach. Weil jedes Sample etwas andere Daten enthält, sehen die Bäume unterschiedlich aus &ndash; genau das ist gewollt.</p>
+
+    <h4>3 &middot; Bagging: Mehrheitsentscheid</h4>
+    <p>Für einen neuen Punkt gibt <em>jeder</em> Baum eine Vorhersage ab (der Entscheidungspfad wird blau markiert). Die Endvorhersage ist der <strong>Mehrheitsentscheid</strong>. Einzelne Bäume dürfen sich irren &ndash; solange sich die Fehler nicht wiederholen, korrigiert die Abstimmung sie. Fachlich: Bagging senkt die <strong>Varianz</strong> des Modells, ohne den Bias zu erhöhen.</p>
+
+    <h4>Ausprobieren</h4>
+    <p>Anzahl der Samples ändern, &bdquo;Neu ziehen&ldquo; klicken und beobachten, wie sich Samples und Bäume ändern. Besonders spannend: <strong>Testpunkt D</strong> &ndash; ein Grenzfall, bei dem sich die Bäume oft uneinig sind.</p>
+  </div>
+</div>
+
+<div class="grid">
+  <div>
+    <div class="panel">
+      <h2>1 &middot; Trainingsdaten (n = 20)</h2>
+      <table id="datatable" aria-label="Trainingsdaten">
+        <thead>
+          <tr><th>ID</th><th>SL</th><th>SB</th><th>PL</th><th>PB</th><th style="text-align:left">Klasse</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--accent)"></span>im gewählten Sample (Ziffer = Häufigkeit)</span>
+        <span><span class="dot" style="background:var(--oob)"></span>Out-of-Bag</span>
+      </div>
+      <div class="samplemeta" style="margin-top:6px">SL/SB = Sepal Länge/Breite, PL/PB = Petal Länge/Breite (cm). Sample anklicken, um die Zuordnung zu sehen.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>2 &middot; Bootstrap-Samples</h2>
+    <div id="samples"></div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>3 &middot; Zugehörige Bäume</h2>
+      <div id="trees"></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>4 &middot; Vorhersage testen (Punkte aus den übrigen 130)</h2>
+      <div id="testpoints"></div>
+      <div class="vote-panel" id="votepanel" hidden></div>
+    </div>
+  </div>
+</div>
+
+<p class="footer">Didaktische Demo &middot; Entropie H = &minus;&Sigma; p<sub>k</sub> log&#8322; p<sub>k</sub>, Split maximiert den Informationsgewinn. Duplikate im Sample zählen mehrfach in die Entropie ein. Mehrheitsentscheid = Bagging-Vorhersage. &middot; iludis.de</p>
+
+<script>
+"use strict";
+
+/* ---------- Daten: echte Iris-Messwerte ---------- */
+const FEATURES = ["SL", "SB", "PL", "PB"];
+const FEATURE_NAMES = ["Sepal-Länge", "Sepal-Breite", "Petal-Länge", "Petal-Breite"];
+const CLASSES = ["setosa", "versicolor", "virginica"];
+const CLS_SHORT = { setosa: "set", versicolor: "ver", virginica: "vir" };
+const CLS_COLOR = { setosa: "#0F6E56", versicolor: "#854F0B", virginica: "#534AB7" };
+const CLS_BG = { setosa: "#E1F5EE", versicolor: "#FAEEDA", virginica: "#EEEDFE" };
+
+const TRAIN = [
+  { x: [5.1, 3.5, 1.4, 0.2], y: "setosa" },
+  { x: [4.9, 3.0, 1.4, 0.2], y: "setosa" },
+  { x: [4.7, 3.2, 1.3, 0.2], y: "setosa" },
+  { x: [5.0, 3.6, 1.4, 0.2], y: "setosa" },
+  { x: [5.4, 3.9, 1.7, 0.4], y: "setosa" },
+  { x: [4.6, 3.4, 1.4, 0.3], y: "setosa" },
+  { x: [5.8, 4.0, 1.2, 0.2], y: "setosa" },
+  { x: [7.0, 3.2, 4.7, 1.4], y: "versicolor" },
+  { x: [6.4, 3.2, 4.5, 1.5], y: "versicolor" },
+  { x: [6.9, 3.1, 4.9, 1.5], y: "versicolor" },
+  { x: [5.5, 2.3, 4.0, 1.3], y: "versicolor" },
+  { x: [6.5, 2.8, 4.6, 1.5], y: "versicolor" },
+  { x: [5.7, 2.8, 4.5, 1.3], y: "versicolor" },
+  { x: [6.3, 3.3, 4.7, 1.6], y: "versicolor" },
+  { x: [6.3, 3.3, 6.0, 2.5], y: "virginica" },
+  { x: [5.8, 2.7, 5.1, 1.9], y: "virginica" },
+  { x: [7.1, 3.0, 5.9, 2.1], y: "virginica" },
+  { x: [6.3, 2.9, 5.6, 1.8], y: "virginica" },
+  { x: [6.5, 3.0, 5.8, 2.2], y: "virginica" },
+  { x: [7.6, 3.0, 6.6, 2.1], y: "virginica" }
+];
+
+const TEST = [
+  { x: [4.4, 2.9, 1.4, 0.2], y: "setosa" },
+  { x: [4.9, 2.4, 3.3, 1.0], y: "versicolor" },
+  { x: [6.6, 2.9, 4.6, 1.3], y: "versicolor" },
+  { x: [4.9, 2.5, 4.5, 1.7], y: "virginica" },
+  { x: [6.7, 3.1, 5.6, 2.4], y: "virginica" }
+];
+
+/* ---------- Seedbarer Zufall (Mulberry32) ---------- */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- Entropie-Entscheidungsbaum (CART-artig, binäre Splits) ---------- */
+function entropy(indices) {
+  if (indices.length === 0) return 0;
+  const counts = {};
+  for (const i of indices) counts[TRAIN[i].y] = (counts[TRAIN[i].y] || 0) + 1;
+  let h = 0;
+  for (const c in counts) {
+    const p = counts[c] / indices.length;
+    h -= p * Math.log2(p);
+  }
+  return h;
+}
+
+function majority(indices) {
+  const counts = {};
+  for (const i of indices) counts[TRAIN[i].y] = (counts[TRAIN[i].y] || 0) + 1;
+  let best = null, bestN = -1;
+  for (const c of CLASSES) {
+    if ((counts[c] || 0) > bestN) { bestN = counts[c] || 0; best = c; }
+  }
+  return { cls: best, counts: counts, n: indices.length };
+}
+
+function bestSplit(indices) {
+  const hParent = entropy(indices);
+  let best = null;
+  for (let f = 0; f < 4; f++) {
+    const vals = [...new Set(indices.map(i => TRAIN[i].x[f]))].sort((a, b) => a - b);
+    for (let v = 0; v < vals.length - 1; v++) {
+      const thr = (vals[v] + vals[v + 1]) / 2;
+      const left = indices.filter(i => TRAIN[i].x[f] <= thr);
+      const right = indices.filter(i => TRAIN[i].x[f] > thr);
+      if (left.length === 0 || right.length === 0) continue;
+      const gain = hParent
+        - (left.length / indices.length) * entropy(left)
+        - (right.length / indices.length) * entropy(right);
+      if (!best || gain > best.gain + 1e-12) {
+        best = { feature: f, thr: thr, gain: gain, left: left, right: right };
+      }
+    }
+  }
+  return best;
+}
+
+function buildTree(indices, depth, maxDepth) {
+  const h = entropy(indices);
+  const maj = majority(indices);
+  if (depth >= maxDepth || h < 1e-9 || indices.length < 2) {
+    return { leaf: true, pred: maj.cls, counts: maj.counts, n: indices.length, entropy: h };
+  }
+  const split = bestSplit(indices);
+  if (!split || split.gain < 1e-9) {
+    return { leaf: true, pred: maj.cls, counts: maj.counts, n: indices.length, entropy: h };
+  }
+  return {
+    leaf: false,
+    feature: split.feature,
+    thr: split.thr,
+    gain: split.gain,
+    n: indices.length,
+    entropy: h,
+    left: buildTree(split.left, depth + 1, maxDepth),
+    right: buildTree(split.right, depth + 1, maxDepth)
+  };
+}
+
+function predict(tree, x, path) {
+  let node = tree;
+  while (!node.leaf) {
+    path.push(node);
+    node = (x[node.feature] <= node.thr) ? node.left : node.right;
+  }
+  path.push(node);
+  return node.pred;
+}
+
+/* ---------- Baum als SVG rendern ---------- */
+function layoutTree(node, depth, xMin, xMax, positions) {
+  const x = (xMin + xMax) / 2;
+  const y = 34 + depth * 62;
+  positions.set(node, { x: x, y: y });
+  if (!node.leaf) {
+    layoutTree(node.left, depth + 1, xMin, x, positions);
+    layoutTree(node.right, depth + 1, x, xMax, positions);
+  }
+}
+
+function treeDepth(node) {
+  return node.leaf ? 0 : 1 + Math.max(treeDepth(node.left), treeDepth(node.right));
+}
+
+function renderTreeSVG(tree, highlightPath) {
+  const positions = new Map();
+  const W = 460;
+  layoutTree(tree, 0, 10, W - 10, positions);
+  const d = treeDepth(tree);
+  const H = 34 + d * 62 + 40;
+  const hp = new Set(highlightPath || []);
+  let edges = "", nodes = "";
+
+  function walk(node) {
+    const p = positions.get(node);
+    if (!node.leaf) {
+      const pl = positions.get(node.left), pr = positions.get(node.right);
+      const lHot = hp.has(node) && hp.has(node.left);
+      const rHot = hp.has(node) && hp.has(node.right);
+      edges += `<line x1="${p.x}" y1="${p.y + 16}" x2="${pl.x}" y2="${pl.y - 16}" stroke="${lHot ? "#0969DA" : "#d0d7de"}" stroke-width="${lHot ? 3 : 1.2}"/>`;
+      edges += `<line x1="${p.x}" y1="${p.y + 16}" x2="${pr.x}" y2="${pr.y - 16}" stroke="${rHot ? "#0969DA" : "#d0d7de"}" stroke-width="${rHot ? 3 : 1.2}"/>`;
+      edges += `<text x="${(p.x + pl.x) / 2 - 6}" y="${(p.y + pl.y) / 2 + 4}" font-size="10" fill="#656d76" text-anchor="end">ja</text>`;
+      edges += `<text x="${(p.x + pr.x) / 2 + 6}" y="${(p.y + pr.y) / 2 + 4}" font-size="10" fill="#656d76">nein</text>`;
+      walk(node.left); walk(node.right);
+    }
+    const hot = hp.has(node);
+    if (node.leaf) {
+      const col = CLS_COLOR[node.pred], bg = CLS_BG[node.pred];
+      const cnt = CLASSES.map(c => node.counts[c] || 0).join("/");
+      nodes += `<g>
+        <rect x="${p.x - 44}" y="${p.y - 16}" width="88" height="34" rx="6"
+          fill="${bg}" stroke="${hot ? "#0969DA" : col}" stroke-width="${hot ? 3 : 1}"/>
+        <text x="${p.x}" y="${p.y - 2}" text-anchor="middle" font-size="11" font-weight="bold" fill="${col}">${node.pred}</text>
+        <text x="${p.x}" y="${p.y + 12}" text-anchor="middle" font-size="9.5" fill="#656d76">${cnt} (n=${node.n})</text>
+      </g>`;
+    } else {
+      nodes += `<g>
+        <rect x="${p.x - 52}" y="${p.y - 16}" width="104" height="32" rx="6"
+          fill="#fff" stroke="${hot ? "#0969DA" : "#8c959f"}" stroke-width="${hot ? 3 : 1}"/>
+        <text x="${p.x}" y="${p.y - 2}" text-anchor="middle" font-size="11" font-weight="bold" fill="#1f2328">${FEATURES[node.feature]} &#8804; ${node.thr.toFixed(2)}</text>
+        <text x="${p.x}" y="${p.y + 11}" text-anchor="middle" font-size="9.5" fill="#656d76">H=${node.entropy.toFixed(2)}, Gain=${node.gain.toFixed(2)}</text>
+      </g>`;
+    }
+  }
+  walk(tree);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Entscheidungsbaum">${edges}${nodes}</svg>`;
+}
+
+/* ---------- App-Zustand ---------- */
+let k = 3;
+let seed = 42;
+let samples = [];   // pro Sample: { draws:[idx...], counts:{idx:n}, oob:[idx...] }
+let trees = [];
+let activeSample = 0;
+let activeTest = -1;
+
+function drawSamples() {
+  const rng = mulberry32(seed);
+  samples = [];
+  trees = [];
+  for (let s = 0; s < k; s++) {
+    const draws = [];
+    for (let j = 0; j < TRAIN.length; j++) draws.push(Math.floor(rng() * TRAIN.length));
+    const counts = {};
+    for (const d of draws) counts[d] = (counts[d] || 0) + 1;
+    const oob = [];
+    for (let i = 0; i < TRAIN.length; i++) if (!(i in counts)) oob.push(i);
+    samples.push({ draws: draws, counts: counts, oob: oob });
+    trees.push(buildTree(draws, 0, 3));   // draws enthält Duplikate -> zählen mehrfach
+  }
+  if (activeSample >= k) activeSample = 0;
+}
+
+/* ---------- Rendering ---------- */
+function renderDataTable() {
+  const tb = document.querySelector("#datatable tbody");
+  const cur = samples[activeSample];
+  tb.innerHTML = TRAIN.map((p, i) => {
+    const inS = cur && (i in cur.counts);
+    const isOob = cur && cur.oob.includes(i);
+    const cls = "row-" + CLS_SHORT[p.y] + (inS ? " hl-in" : "") + (isOob ? " hl-oob" : "");
+    const badge = inS ? `<span class="dupbadge">${cur.counts[i]}&times;</span>` : "";
+    return `<tr class="${cls}">
+      <td>#${i + 1}${badge}</td>
+      <td>${p.x[0].toFixed(1)}</td><td>${p.x[1].toFixed(1)}</td>
+      <td>${p.x[2].toFixed(1)}</td><td>${p.x[3].toFixed(1)}</td>
+      <td class="cls">${p.y}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderSamples() {
+  const el = document.getElementById("samples");
+  el.innerHTML = samples.map((s, si) => {
+    const uniq = Object.keys(s.counts).length;
+    const chips = Object.keys(s.counts).map(Number).sort((a, b) => a - b).map(i => {
+      const n = s.counts[i];
+      return `<span class="chip c-${CLS_SHORT[TRAIN[i].y]}${n > 1 ? " dup" : ""}">#${i + 1}${n > 1 ? " &times;" + n : ""}</span>`;
+    }).join("");
+    const oobChips = s.oob.map(i => `<span class="chip">#${i + 1}</span>`).join("") || "<em>keine</em>";
+    return `<div class="sample-card${si === activeSample ? " active" : ""}" data-si="${si}" tabindex="0" role="button" aria-pressed="${si === activeSample}">
+      <h3>Sample ${si + 1} &nbsp;<span style="font-weight:400;color:var(--muted)">(20 Züge, ${uniq} verschiedene = ${(uniq / 20 * 100).toFixed(0)} %)</span></h3>
+      <div class="idchips">${chips}</div>
+      <div class="oobline"><strong>Out-of-Bag (${s.oob.length}):</strong> ${oobChips}</div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".sample-card").forEach(c => {
+    const go = () => { activeSample = +c.dataset.si; renderAll(); };
+    c.addEventListener("click", go);
+    c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
+}
+
+function renderTrees() {
+  const el = document.getElementById("trees");
+  const tp = activeTest >= 0 ? TEST[activeTest] : null;
+  el.innerHTML = trees.map((t, ti) => {
+    let path = [], pred = null, chip = "";
+    if (tp) {
+      pred = predict(t, tp.x, path);
+      chip = `<span class="pred-chip pred-${CLS_SHORT[pred]}">&rarr; ${pred}</span>`;
+    }
+    return `<div class="tree-card">
+      <h3>Baum ${ti + 1} <span style="font-weight:400;color:var(--muted)">(aus Sample ${ti + 1})</span>${chip}</h3>
+      ${renderTreeSVG(t, tp ? path : null)}
+    </div>`;
+  }).join("");
+}
+
+function renderTestPoints() {
+  const el = document.getElementById("testpoints");
+  el.innerHTML = TEST.map((p, i) => {
+    return `<button class="testcard${i === activeTest ? " active" : ""}" data-ti="${i}">
+      <strong>Testpunkt ${String.fromCharCode(65 + i)}</strong>
+      <span class="tuple">(SL ${p.x[0].toFixed(1)}, SB ${p.x[1].toFixed(1)}, PL ${p.x[2].toFixed(1)}, PB ${p.x[3].toFixed(1)},
+        <span class="truecls" style="color:${CLS_COLOR[p.y]}">${p.y}</span>)</span>
+    </button>`;
+  }).join("");
+  el.querySelectorAll(".testcard").forEach(b => {
+    b.addEventListener("click", () => {
+      activeTest = (+b.dataset.ti === activeTest) ? -1 : +b.dataset.ti;
+      renderAll();
+    });
+  });
+}
+
+function renderVote() {
+  const panel = document.getElementById("votepanel");
+  if (activeTest < 0) { panel.hidden = true; return; }
+  const tp = TEST[activeTest];
+  const votes = {};
+  const per = trees.map((t, ti) => {
+    const pred = predict(t, tp.x, []);
+    votes[pred] = (votes[pred] || 0) + 1;
+    return `Baum ${ti + 1}: <span class="pred-chip pred-${CLS_SHORT[pred]}" style="margin-left:2px">${pred}</span>`;
+  });
+  let winner = null, wn = -1;
+  for (const c of CLASSES) if ((votes[c] || 0) > wn) { wn = votes[c] || 0; winner = c; }
+  const correct = winner === tp.y;
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div>${per.join(" &nbsp; ")}</div>
+    <div style="margin-top:8px" class="big">Mehrheitsentscheid: <span style="color:${CLS_COLOR[winner]}">${winner}</span>
+      (${wn}/${trees.length} Stimmen) &nbsp;&mdash;&nbsp; wahre Klasse: <span style="color:${CLS_COLOR[tp.y]}">${tp.y}</span>
+      ${correct ? "&#10003; korrekt" : "&#10007; falsch"}</div>`;
+}
+
+function renderKButtons() {
+  const el = document.getElementById("kbtns");
+  el.innerHTML = [2, 3, 4].map(n =>
+    `<button class="kbtn${n === k ? " active" : ""}" data-k="${n}">${n}</button>`
+  ).join("");
+  el.querySelectorAll(".kbtn").forEach(b => {
+    b.addEventListener("click", () => { k = +b.dataset.k; drawSamples(); renderAll(); });
+  });
+}
+
+function renderAll() {
+  renderKButtons();
+  renderDataTable();
+  renderSamples();
+  renderTrees();
+  renderTestPoints();
+  renderVote();
+}
+
+const modal = document.getElementById("infomodal");
+document.getElementById("infobtn").addEventListener("click", () => { modal.hidden = false; document.getElementById("infoclose").focus(); });
+document.getElementById("infoclose").addEventListener("click", () => { modal.hidden = true; });
+modal.addEventListener("click", e => { if (e.target === modal) modal.hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") modal.hidden = true; });
+
+document.getElementById("redraw").addEventListener("click", () => {
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+  drawSamples();
+  renderAll();
+});
+
+drawSamples();
+renderAll();
+</script>
+</body>
+</html>
