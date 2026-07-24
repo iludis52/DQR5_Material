@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pruning-Demo: Cost-Complexity-Pruning (α-Pfad)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f6f8fa; color: #1f2328; padding: 8px 0; }
+  .wrap { width: 1260px; margin: 0 auto; }
+  h1 { font-size: 16px; margin-bottom: 1px; }
+  .subtitle { color: #656d76; font-size: 11.5px; margin-bottom: 6px; }
+
+  /* Steuerleiste */
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 5px 10px; margin-bottom: 8px; }
+  .kbtn { font-family: Arial; font-size: 12.5px; padding: 5px 12px; border: 1px solid #d0d7de;
+    border-radius: 6px; background: #fff; cursor: pointer; color: #1f2328; }
+  .kbtn:hover { background: #ddf4ff; border-color: #0969DA; }
+  .kbtn.active { background: #0969DA; color: #fff; border-color: #0969DA; }
+  .ctl-label { font-size: 12px; color: #656d76; }
+  .seed-chip { font-family: Consolas, monospace; font-size: 11.5px; color: #656d76; }
+  input[type=range] { width: 230px; accent-color: #0969DA; }
+  input[type=checkbox] { accent-color: #0969DA; }
+  .alpha-readout { font-family: Consolas, monospace; font-size: 13px; color: #0969DA; font-weight: bold; min-width: 110px; }
+  .spacer { flex: 1; }
+  .info-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #0969DA; color: #0969DA;
+    background: #fff; font-size: 15px; cursor: pointer; }
+  .info-btn:hover { background: #ddf4ff; }
+
+  /* Grid */
+  .grid { display: grid; grid-template-columns: 360px 884px; gap: 8px; }
+  .panel { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 7px 10px; }
+  .panel h3 { font-size: 12.5px; margin-bottom: 4px; color: #1f2328; }
+  .panel h3 .sub { font-weight: normal; color: #656d76; font-size: 11.5px; }
+  .full { grid-column: 1 / -1; }
+
+  svg { display: block; }   /* fixe Pixelgrößen, kein Skalieren */
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chip { font-size: 10.5px; padding: 2px 8px; border-radius: 12px; border: 1px solid #d0d7de; background: #f6f8fa; }
+  .chip b { font-family: Consolas, monospace; }
+  .chip.blue  { background: #ddf4ff; border-color: #0969DA; color: #0969DA; }
+  .chip.red   { background: #FCEBEB; border-color: #A32D2D; color: #A32D2D; }
+  .chip.green { background: #E1F5EE; border-color: #0F6E56; color: #0F6E56; }
+  .chip.amber { background: #FAEEDA; border-color: #854F0B; color: #854F0B; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: #EEEDFE;
+    border: 1px solid #534AB7; color: #534AB7; margin-left: 6px; font-weight: normal; }
+
+  .formula-box { margin-top: 5px; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px;
+    padding: 5px 9px; font-family: Consolas, monospace; font-size: 11.5px; }
+  .formula-box .lbl { font-family: Arial; font-size: 11px; color: #656d76; display: block; margin-bottom: 3px; }
+  .fneu { color: #0969DA; font-weight: bold; }
+
+  .hint { font-size: 10.5px; color: #656d76; margin-top: 4px; line-height: 1.4; }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(31,35,40,.45); display: flex;
+    align-items: center; justify-content: center; z-index: 50; }
+  .modal-overlay[hidden] { display: none; }
+  .modal { background: #fff; border-radius: 8px; max-width: 720px; width: 92%; max-height: 86vh;
+    overflow-y: auto; padding: 20px 24px; position: relative; }
+  .modal h2 { font-size: 17px; margin-bottom: 10px; }
+  .modal h4 { color: #0969DA; font-size: 13.5px; margin: 14px 0 4px; }
+  .modal p, .modal li { font-size: 13px; line-height: 1.55; }
+  .modal ul { padding-left: 20px; }
+  .modal code { font-family: Consolas, monospace; background: #f6f8fa; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .modal-close { position: absolute; top: 10px; right: 12px; border: none; background: none;
+    font-size: 18px; cursor: pointer; color: #656d76; }
+  .modal-close:hover { color: #1f2328; }
+
+  footer { margin-top: 8px; font-size: 11.5px; color: #656d76; display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 6px; border-top: 1px solid #d0d7de; padding-top: 8px; }
+  footer code { font-family: Consolas, monospace; }
+
+  
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Pruning: Warum ist der größte Baum nicht der beste?</h1>
+<div class="subtitle">Cost-Complexity-Pruning (Post-Pruning) – der α-Slider läuft den Pruning-Pfad ab, wie <span style="font-family:Consolas">ccp_alpha</span> in sklearn.</div>
+
+<div class="controls">
+  <button class="kbtn" id="btnNew">Neue Punkte</button>
+  <span class="seed-chip" id="seedChip"></span>
+  <span class="ctl-label">Pre-Pruning &nbsp;max_depth:</span>
+  <input type="range" id="depthSlider" min="1" max="5" step="1" value="5" style="width:90px">
+  <span class="alpha-readout" id="depthReadout" style="min-width:22px">5</span>
+  <span class="ctl-label">Post-Pruning &nbsp;α-Pfad:</span>
+  <input type="range" id="alphaSlider" min="0" max="1" step="1" value="0">
+  <span class="alpha-readout" id="alphaReadout">α = 0</span>
+  <div class="spacer"></div>
+  <button class="info-btn" id="btnInfo" title="Erklärung">ⓘ</button>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h3 style="display:flex;align-items:center;justify-content:space-between">
+      <span>Datenraum <span class="sub">— 120 Train / 52 Test (≈ 30 %)</span></span>
+      <label class="ctl-label" style="display:flex;align-items:center;gap:4px;font-weight:normal">
+        <input type="checkbox" id="chkTest"> Testpunkte
+      </label></h3>
+    <div id="svgData"></div>
+    <button class="kbtn" id="btnRegions" style="margin-top:4px">Regionen ausblenden</button>
+    <div class="hint">Jedes Rechteck ist ein Blatt des Baums. Beim Prunen verschmelzen Regionen – Splitter um
+      Rauschpunkte verschwinden zuerst. <b>Klick auf einen Punkt</b> zeigt seinen Entscheidungspfad
+      im Baum (✓/✗ am Endknoten).</div>
+  </div>
+
+  <div class="panel">
+    <h3>Der Baum <span class="sub">— geprunte Teile ausgegraut</span>
+      <span class="badge" id="badgePre">Pre-Pruning: max_depth 5</span><span class="badge">Post-Pruning: α-Slider</span></h3>
+    <div id="svgTree"></div>
+    <div class="chips" id="treeChips"></div>
+    <div class="formula-box">
+      <span class="lbl">Kostenfunktion des aktuellen Baums (auf Trainingsdaten):</span>
+      <span id="costFormula"></span>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <h3>Train- vs. Test-Fehler über α <span class="sub">— Testfehler auf 52 Holdout-Punkten (≈ 30 % der Daten)</span></h3>
+    <div id="svgCurve"></div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+<footer style="width:1260px;margin:8px auto 0">
+  <span>Weakest Link: <code>g(t) = (R(t) − R(T_t)) / (|T̃_t| − 1)</code> &nbsp;·&nbsp;
+        Kosten: <code>R_α(T) = R(T) + α·|T̃|</code> &nbsp;·&nbsp; Split-Kriterium: Entropie</span>
+  <span>iludis.de</span>
+</footer>
+
+<!-- Info-Modal -->
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h2>Pruning verstehen</h2>
+
+    <h4>Das Problem: Overfitting</h4>
+    <p>Ein voll gewachsener Entscheidungsbaum passt sich auch dem <b>Rauschen</b> in den Trainingsdaten an:
+    Er baut winzige Regionen um einzelne Ausreißer. Auf den Trainingsdaten sieht das perfekt aus –
+    auf neuen Daten (Testdaten) rächt es sich. Genau das zeigt die Fehlerkurve links bei α = 0.</p>
+
+    <h4>Pre-Pruning vs. Post-Pruning</h4>
+    <ul>
+      <li><b>Pre-Pruning:</b> Das Wachstum wird früh gestoppt (z.&nbsp;B. <code>max_depth</code>,
+        <code>min_samples_leaf</code>, Mindest-Informationsgewinn). Schnell, aber kurzsichtig:
+        Ein Split, der allein nichts bringt, kann spätere wertvolle Splits ermöglichen (Horizon-Effekt, Klassiker: XOR).</li>
+      <li><b>Post-Pruning:</b> Erst voll wachsen lassen, dann gezielt zurückschneiden.
+        Der Baum darf „über den Horizont schauen" – zurückgeschnitten wird nur, was sich nicht bewährt.</li>
+      <li><b>In dieser App:</b> Der <b>max_depth-Slider</b> ist Pre-Pruning (begrenzt das Wachstum),
+        der <b>α-Slider</b> ist Post-Pruning auf dem so gewachsenen Baum. Beide sind kombinierbar –
+        genau wie <code>max_depth</code> und <code>ccp_alpha</code> in sklearn.
+        Beobachtung: Bei kleinem max_depth wird der α-Pfad kurz – es gibt kaum noch etwas zu prunen.</li>
+    </ul>
+
+    <h4>Cost-Complexity-Pruning (CCP)</h4>
+    <p>Wir bestrafen Komplexität mit einem „Strafpreis pro Blatt":
+    <code>Kosten = Trainingsfehler + α · Blattanzahl</code>.
+    Für jeden inneren Knoten t lässt sich ausrechnen, ab welchem α es sich lohnt, seinen ganzen Teilbaum
+    zu einem Blatt zu kollabieren:</p>
+    <p style="text-align:center; margin:6px 0"><code>g(t) = (R(t) − R(T_t)) / (|T̃_t| − 1)</code></p>
+    <p>R(t) = Fehler, wenn t ein Blatt wäre; R(T_t) = Fehler des Teilbaums; |T̃_t| = seine Blattanzahl.
+    Der Knoten mit dem <b>kleinsten g</b> ist das „schwächste Glied" (weakest link) und fällt zuerst.
+    So entsteht eine Folge kritischer α-Werte – die <b>Rastpunkte des Sliders</b>.
+    Zwischen zwei Rastpunkten passiert nichts, deshalb rastet der Slider ein.</p>
+
+    <h4>Wie lese ich die App?</h4>
+    <ul>
+      <li><b>α = 0:</b> voller Baum, Trainingsfehler minimal, Testfehler hoch → <b>Overfitting</b>.</li>
+      <li><b>α steigt:</b> Teilbäume kollabieren (im Baumdiagramm ausgegraut, Ersatzblatt mit gestricheltem Ring),
+        Regionen im Datenraum verschmelzen.</li>
+      <li><b>Sweet Spot</b> (grüner Marker): minimaler Testfehler – das beste Modell für neue Daten.</li>
+      <li><b>α groß:</b> nur noch die Wurzel – der Baum sagt immer dieselbe Klasse → <b>Underfitting</b>.</li>
+    </ul>
+
+    <h4>Ehrlichkeitshinweis</h4>
+    <p>Wir bewerten mit einem <b>Holdout-Testset</b> von 52 Punkten (≈ 30 % der Daten – realistischer Split).
+    Achtung: Bei so kleinen Testsets zackt die Kurve; ein einzelner Punkt entspricht fast 2 Prozentpunkten.
+    In der Praxis wählt man das optimale α deshalb per <b>Kreuzvalidierung</b>
+    (sklearn: <code>cost_complexity_pruning_path</code> + CV über <code>ccp_alpha</code>) –
+    das Prinzip der Kurve ist identisch.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- Zufall (Mulberry32, seedbar) ---------- */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let seed = 20260733;
+let rng = mulberry32(seed);
+function gauss() { // Box-Muller
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/* ---------- Daten: zwei Gauß-Blobs ---------- */
+const DOM = { x0: 0, x1: 10, y0: 0, y1: 10 };
+const CLS = [
+  { name: "A", mx: 3.6, my: 4.1, sd: 1.6, col: "#0969DA", fill: "#ddf4ff" },
+  { name: "B", mx: 6.4, my: 5.9, sd: 1.6, col: "#A32D2D", fill: "#FCEBEB" }
+];
+let TRAIN = [], TEST = [];
+let hideRegions = false;
+let selPoint = null;   // {set:'train'|'test', i}
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function genData() {
+  TRAIN = []; TEST = [];
+  for (let c = 0; c < 2; c++) {
+    for (let i = 0; i < 86; i++) {
+      const p = {
+        x: clamp(CLS[c].mx + gauss() * CLS[c].sd, 0.15, 9.85),
+        y: clamp(CLS[c].my + gauss() * CLS[c].sd, 0.15, 9.85),
+        c: c
+      };
+      (i < 60 ? TRAIN : TEST).push(p);
+    }
+  }
+}
+
+/* ---------- Baum: Entropie, binäre Schwellen-Splits, max_depth 5 ---------- */
+let MAXDEPTH = 5;
+let nodes = [];   // flache Liste aller Knoten
+
+function entropy(idx) {
+  const n = idx.length;
+  if (n === 0) return 0;
+  let n1 = 0;
+  for (const i of idx) n1 += TRAIN[i].c;
+  const p1 = n1 / n, p0 = 1 - p1;
+  let h = 0;
+  if (p0 > 0) h -= p0 * Math.log2(p0);
+  if (p1 > 0) h -= p1 * Math.log2(p1);
+  return h;
+}
+function majority(idx) {
+  let n1 = 0;
+  for (const i of idx) n1 += TRAIN[i].c;
+  return (n1 * 2 > idx.length) ? 1 : 0;
+}
+function misCount(idx) {
+  const m = majority(idx);
+  let e = 0;
+  for (const i of idx) if (TRAIN[i].c !== m) e++;
+  return e;
+}
+
+function buildTree() {
+  nodes = [];
+  const N = TRAIN.length;
+  function grow(idx, depth) {
+    const node = {
+      id: nodes.length, depth, idx, n: idx.length,
+      pred: majority(idx),
+      R: misCount(idx) / N,          // Fehleranteil, wenn dieser Knoten Blatt wäre
+      isLeaf: true, feat: -1, thr: 0, left: null, right: null
+    };
+    nodes.push(node);
+    const H = entropy(idx);
+    if (depth >= MAXDEPTH || H < 1e-9 || idx.length < 2) return node;
+
+    // beste binäre Schwelle über beide Merkmale
+    let best = { gain: 1e-9, feat: -1, thr: 0, li: null, ri: null };
+    for (let f = 0; f < 2; f++) {
+      const vals = idx.map(i => f === 0 ? TRAIN[i].x : TRAIN[i].y).sort((a, b) => a - b);
+      for (let k = 0; k < vals.length - 1; k++) {
+        if (vals[k + 1] - vals[k] < 1e-9) continue;
+        const thr = (vals[k] + vals[k + 1]) / 2;
+        const li = [], ri = [];
+        for (const i of idx) ((f === 0 ? TRAIN[i].x : TRAIN[i].y) <= thr ? li : ri).push(i);
+        if (li.length === 0 || ri.length === 0) continue;
+        const gain = H - (li.length / idx.length) * entropy(li) - (ri.length / idx.length) * entropy(ri);
+        if (gain > best.gain) best = { gain, feat: f, thr, li, ri };
+      }
+    }
+    if (best.feat === -1) return node;
+    node.isLeaf = false; node.feat = best.feat; node.thr = best.thr;
+    node.left = grow(best.li, depth + 1);
+    node.right = grow(best.ri, depth + 1);
+    return node;
+  }
+  return grow(TRAIN.map((_, i) => i), 0);
+}
+
+/* ---------- Cost-Complexity-Pfad (Weakest Link) ---------- */
+let root = null;
+let steps = [];   // [{alpha, collapsed:Set, leaves, trainErr, testErr}]
+
+function leafStats(node, collapsed) {
+  // liefert {leaves, Rsub} unter Beachtung der Kollaps-Menge
+  if (node.isLeaf || collapsed.has(node.id)) return { leaves: 1, Rsub: node.R };
+  const L = leafStats(node.left, collapsed), R = leafStats(node.right, collapsed);
+  return { leaves: L.leaves + R.leaves, Rsub: L.Rsub + R.Rsub };
+}
+function predict(p, collapsed) {
+  let n = root;
+  while (!n.isLeaf && !collapsed.has(n.id)) {
+    n = ((n.feat === 0 ? p.x : p.y) <= n.thr) ? n.left : n.right;
+  }
+  return n.pred;
+}
+function errOn(pts, collapsed) {
+  let e = 0;
+  for (const p of pts) if (predict(p, collapsed) !== p.c) e++;
+  return e / pts.length;
+}
+
+function computePath() {
+  steps = [];
+  let collapsed = new Set();
+  function record(alpha) {
+    const st = leafStats(root, collapsed);
+    steps.push({
+      alpha, collapsed: new Set(collapsed), leaves: st.leaves, Rsub: st.Rsub,
+      trainErr: errOn(TRAIN, collapsed), testErr: errOn(TEST, collapsed)
+    });
+  }
+  record(0);
+  while (true) {
+    // effektive innere Knoten sammeln (nicht kollabiert, nicht unter kollabiertem Vorfahren)
+    const inner = [];
+    (function walk(n) {
+      if (n.isLeaf || collapsed.has(n.id)) return;
+      inner.push(n);
+      walk(n.left); walk(n.right);
+    })(root);
+    if (inner.length === 0) break;
+    let gMin = Infinity;
+    const gOf = new Map();
+    for (const n of inner) {
+      const st = leafStats(n, collapsed);
+      const g = (n.R - st.Rsub) / (st.leaves - 1);
+      gOf.set(n.id, g);
+      if (g < gMin - 1e-12) gMin = g;
+    }
+    // alle schwächsten Glieder gleichzeitig kollabieren (Standard bei Gleichstand)
+    for (const n of inner) {
+      if (Math.abs(gOf.get(n.id) - gMin) < 1e-12) collapsed.add(n.id);
+    }
+    // Knoten unter neuen Kollaps-Punkten sind irrelevant; leafStats beachtet das automatisch
+    record(Math.max(gMin, 0));
+  }
+}
+
+/* ---------- Rendering ---------- */
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 3) => v.toFixed(d).replace(".", ",");
+
+function sx(x) { return 26 + (x - DOM.x0) / (DOM.x1 - DOM.x0) * 300; }
+function sy(y) { return 310 - (y - DOM.y0) / (DOM.y1 - DOM.y0) * 300; }
+
+function renderData(step) {
+  let rects = "";
+  (function walk(n, x0, x1, y0, y1) {
+    if (n.isLeaf || step.collapsed.has(n.id)) {
+      rects += `<rect x="${sx(x0)}" y="${sy(y1)}" width="${sx(x1) - sx(x0)}" height="${sy(y0) - sy(y1)}"
+        fill="${CLS[n.pred].fill}" stroke="#d0d7de" stroke-width="1"/>`;
+      return;
+    }
+    if (n.feat === 0) { walk(n.left, x0, n.thr, y0, y1); walk(n.right, n.thr, x1, y0, y1); }
+    else { walk(n.left, x0, x1, y0, n.thr); walk(n.right, x0, x1, n.thr, y1); }
+  })(root, DOM.x0, DOM.x1, DOM.y0, DOM.y1);
+
+  let pts = "";
+  TRAIN.forEach((p, i) => {
+    pts += `<circle data-k="t${i}" style="cursor:pointer" cx="${sx(p.x)}" cy="${sy(p.y)}" r="3.4" fill="${CLS[p.c].col}" stroke="#fff" stroke-width="1"/>`;
+  });
+  if ($("chkTest").checked) {
+    TEST.forEach((p, i) => {
+      pts += `<circle data-k="s${i}" style="cursor:pointer" cx="${sx(p.x)}" cy="${sy(p.y)}" r="3" fill="none" stroke="${CLS[p.c].col}" stroke-width="1.4"/>`;
+    });
+  }
+  if (selPoint) {
+    const p = selPoint.set === "train" ? TRAIN[selPoint.i] : TEST[selPoint.i];
+    pts += `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="7" fill="none" stroke="#0969DA" stroke-width="2.2"/>`;
+  }
+  const ax = `
+    <line x1="26" y1="312" x2="328" y2="312" stroke="#656d76"/>
+    <line x1="26" y1="8" x2="26" y2="312" stroke="#656d76"/>
+    <text x="322" y="325" font-size="10" fill="#656d76" font-family="Consolas">x₁</text>
+    <text x="12" y="14" font-size="10" fill="#656d76" font-family="Consolas">x₂</text>`;
+  $("svgData").innerHTML =
+    `<svg width="336" height="328" viewBox="0 0 336 328" xmlns="http://www.w3.org/2000/svg">${hideRegions ? "" : rects}${pts}${ax}</svg>`;
+}
+
+/* Baum-Layout: Blattpositionen des VOLLEN Baums, feste Geometrie über alle α */
+function renderTree(step) {
+  const leavesFull = [];
+  (function order(n) {
+    if (n.isLeaf) { leavesFull.push(n.id); return; }
+    order(n.left); order(n.right);
+  })(root);
+  const LX = new Map();
+  leavesFull.forEach((id, i) => LX.set(id, i));
+  const pos = new Map();
+  (function place(n) {
+    if (n.isLeaf) { pos.set(n.id, { x: LX.get(n.id), y: n.depth }); return LX.get(n.id); }
+    const a = place(n.left), b = place(n.right);
+    const x = (a + b) / 2;
+    pos.set(n.id, { x, y: n.depth });
+    return x;
+  })(root);
+
+  const W = Math.max(leavesFull.length * 35 + 32, 500), H = MAXDEPTH * 60 + 46;
+  const px = v => 18 + v * ((W - 36) / Math.max(leavesFull.length - 1, 1));
+  const py = d => 21 + d * 60;
+
+  // Status je Knoten: 'active' | 'collapse' (Ersatzblatt) | 'dead' (unter Kollaps)
+  const state = new Map();
+  (function mark(n, under) {
+    if (under) state.set(n.id, "dead");
+    else if (step.collapsed.has(n.id)) state.set(n.id, "collapse");
+    else state.set(n.id, "active");
+    if (!n.isLeaf) {
+      const u = under || step.collapsed.has(n.id);
+      mark(n.left, u); mark(n.right, u);
+    }
+  })(root, false);
+
+  // Pfad des ausgewählten Punkts (unter aktueller Kollaps-Menge)
+  const pathIds = new Set();
+  let termNode = null, selP = null;
+  if (selPoint) {
+    selP = selPoint.set === "train" ? TRAIN[selPoint.i] : TEST[selPoint.i];
+    let n = root;
+    pathIds.add(n.id);
+    while (!n.isLeaf && !step.collapsed.has(n.id)) {
+      n = ((n.feat === 0 ? selP.x : selP.y) <= n.thr) ? n.left : n.right;
+      pathIds.add(n.id);
+    }
+    termNode = n;
+  }
+  let edges = "", circles = "", overlay = "";
+  for (const n of nodes) {
+    const s = state.get(n.id);
+    const p = pos.get(n.id);
+    const op = s === "dead" ? 0.18 : 1;
+    if (!n.isLeaf) {
+      const pl = pos.get(n.left.id), pr = pos.get(n.right.id);
+      const eop = (s === "dead" || s === "collapse") ? 0.18 : 1;
+      const hlL = pathIds.has(n.id) && pathIds.has(n.left.id), hlR = pathIds.has(n.id) && pathIds.has(n.right.id);
+      edges += `<line x1="${px(p.x)}" y1="${py(p.y)}" x2="${px(pl.x)}" y2="${py(pl.y)}" stroke="${hlL ? "#0969DA" : "#d0d7de"}" stroke-width="${hlL ? 2.6 : 1.1}" opacity="${eop}"/>
+                <line x1="${px(p.x)}" y1="${py(p.y)}" x2="${px(pr.x)}" y2="${py(pr.y)}" stroke="${hlR ? "#0969DA" : "#d0d7de"}" stroke-width="${hlR ? 2.6 : 1.1}" opacity="${eop}"/>`;
+    }
+    if (s === "collapse") {
+      // Ersatzblatt: gefüllter Kreis in Klassenfarbe + gestrichelter Ring
+      circles += `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="8.5" fill="${CLS[n.pred].col}"/>
+        <circle cx="${px(p.x)}" cy="${py(p.y)}" r="12.5" fill="none" stroke="${CLS[n.pred].col}" stroke-width="1.6" stroke-dasharray="3 2"/>`;
+    } else if (n.isLeaf) {
+      circles += `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="6.5" fill="${CLS[n.pred].col}" opacity="${op}"/>`;
+    } else {
+      const label = (n.feat === 0 ? "x₁" : "x₂") + " ≤ " + fmt(n.thr, 1);
+      circles += `<g opacity="${op}">
+        <rect x="${px(p.x) - 27}" y="${py(p.y) - 10}" width="54" height="20" rx="3" fill="#fff" stroke="#0969DA" stroke-width="1.3"/>
+        <text x="${px(p.x)}" y="${py(p.y) + 4}" font-size="10.5" text-anchor="middle" font-family="Consolas" fill="#1f2328">${label}</text></g>`;
+    }
+  }
+  if (termNode) {
+    const tp = pos.get(termNode.id);
+    const ok = termNode.pred === selP.c;
+    const okCol = ok ? "#0F6E56" : "#A32D2D";
+    overlay = `<circle class="path-hl" cx="${px(tp.x)}" cy="${py(tp.y)}" r="17" fill="none" stroke="${okCol}" stroke-width="2.6"/>
+      <text x="${px(tp.x)}" y="${py(tp.y) - 23}" font-size="12" text-anchor="middle" fill="${okCol}" font-weight="bold">${ok ? "✓" : "✗"}</text>`;
+  }
+  const sc = Math.min(1, 860 / W);
+  $("svgTree").innerHTML =
+    `<svg width="${Math.round(W * sc)}" height="${Math.round(H * sc)}" viewBox="0 0 ${W} ${H}"
+      xmlns="http://www.w3.org/2000/svg" style="margin:0 auto">${edges}${circles}${overlay}</svg>`;
+
+  // Chips + Formel
+  $("treeChips").innerHTML =
+    `<span class="chip blue">Blätter: <b>${step.leaves}</b></span>
+     <span class="chip">Train-Fehler: <b>${fmt(step.trainErr * 100, 1)} %</b></span>
+     <span class="chip red">Test-Fehler: <b>${fmt(step.testErr * 100, 1)} %</b></span>`;
+  const cost = step.Rsub + step.alpha * step.leaves;
+  $("costFormula").innerHTML =
+    `Kosten = ${fmt(step.Rsub)} + <span class="fneu">${fmt(step.alpha, 4)}</span> · ${step.leaves}` +
+    ` = <b>${fmt(cost)}</b>` +
+    `<span style="color:#656d76;font-family:Arial;font-size:11px"> &nbsp;(Train-Fehler + α · Blätter)</span>`;
+}
+
+function renderCurve(cur) {
+  const K = steps.length;
+  const W = 1230, H = 168, mL = 46, mR = 16, mT = 12, mB = 40;
+  const xAt = i => mL + i * ((W - mL - mR) / Math.max(K - 1, 1));
+  const maxE = Math.max(...steps.map(s => Math.max(s.trainErr, s.testErr)), 0.05) * 1.12;
+  const yAt = e => H - mB - e / maxE * (H - mT - mB);
+
+  const line = (key, col) => `<polyline fill="none" stroke="${col}" stroke-width="2"
+      points="${steps.map((s, i) => xAt(i) + "," + yAt(s[key])).join(" ")}"/>` +
+    steps.map((s, i) => `<circle cx="${xAt(i)}" cy="${yAt(s[key])}" r="3" fill="${col}"/>`).join("");
+
+  // Sweet Spot = minimaler Testfehler (erster bei Gleichstand)
+  let best = 0;
+  for (let i = 1; i < K; i++) if (steps[i].testErr < steps[best].testErr - 1e-12) best = i;
+
+  let ticks = "";
+  const every = K > 14 ? Math.ceil(K / 14) : 1;
+  for (let i = 0; i < K; i++) {
+    if (i % every !== 0 && i !== K - 1) continue;
+    ticks += `<text x="${xAt(i)}" y="${H - mB + 16}" font-size="9.5" text-anchor="middle"
+      font-family="Consolas" fill="#656d76">${fmt(steps[i].alpha, 3)}</text>
+      <text x="${xAt(i)}" y="${H - mB + 28}" font-size="9" text-anchor="middle" fill="#656d76">${steps[i].leaves} Bl.</text>`;
+  }
+  let yticks = "";
+  for (let e = 0; e <= maxE; e += 0.1) {
+    yticks += `<line x1="${mL}" y1="${yAt(e)}" x2="${W - mR}" y2="${yAt(e)}" stroke="#f0f2f5"/>
+      <text x="${mL - 6}" y="${yAt(e) + 3}" font-size="9.5" text-anchor="end" fill="#656d76" font-family="Consolas">${fmt(e * 100, 0)}%</text>`;
+  }
+
+  const zones = `
+    <text x="${xAt(0)}" y="${mT + 2}" font-size="10" fill="#A32D2D" opacity=".75">← Overfitting</text>
+    <text x="${xAt(K - 1)}" y="${mT + 2}" font-size="10" fill="#854F0B" text-anchor="end" opacity=".85">Underfitting →</text>`;
+
+  const svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    ${yticks}
+    <line x1="${xAt(cur)}" y1="${mT}" x2="${xAt(cur)}" y2="${H - mB}" stroke="#0969DA" stroke-width="1.5" stroke-dasharray="4 3"/>
+    ${line("trainErr", "#0969DA")}
+    ${line("testErr", "#A32D2D")}
+    <circle cx="${xAt(best)}" cy="${yAt(steps[best].testErr)}" r="7" fill="none" stroke="#0F6E56" stroke-width="2.5"/>
+    <text x="${xAt(best)}" y="${yAt(steps[best].testErr) - 12}" font-size="10.5" text-anchor="middle" fill="#0F6E56" font-weight="bold">Sweet Spot</text>
+    ${zones}
+    <line x1="${mL}" y1="${H - mB}" x2="${W - mR}" y2="${H - mB}" stroke="#656d76"/>
+    ${ticks}
+    <text x="${(mL + W - mR) / 2}" y="${H - 4}" font-size="10.5" text-anchor="middle" fill="#656d76">α (Rastpunkte des Pruning-Pfads) · darunter: Blattanzahl</text>
+    <g font-size="10.5">
+      <rect x="${W - 190}" y="${mT}" width="10" height="3" fill="#0969DA"/><text x="${W - 176}" y="${mT + 5}" fill="#1f2328">Train</text>
+      <rect x="${W - 130}" y="${mT}" width="10" height="3" fill="#A32D2D"/><text x="${W - 116}" y="${mT + 5}" fill="#1f2328">Test</text>
+    </g>
+  </svg>`;
+  $("svgCurve").innerHTML = svg;
+}
+
+function renderAll() {
+  const cur = +$("alphaSlider").value;
+  const step = steps[cur];
+  $("alphaReadout").textContent = "α = " + fmt(step.alpha, 4);
+  renderData(step);
+  renderTree(step);
+  renderCurve(cur);
+}
+
+/* ---------- Setup ---------- */
+function rebuild() {
+  selPoint = null;
+  MAXDEPTH = +$("depthSlider").value;
+  rng = mulberry32(seed);
+  $("seedChip").textContent = "Seed " + seed;
+  genData();
+  root = buildTree();
+  computePath();
+  const sl = $("alphaSlider");
+  sl.max = steps.length - 1;
+  sl.value = 0;
+  renderAll();
+}
+
+$("btnNew").addEventListener("click", () => { seed = (seed + 1) | 0; rebuild(); });
+
+/* Regionen ein-/ausblenden per Button */
+const dataEl = $("svgData");
+$("btnRegions").addEventListener("click", () => {
+  hideRegions = !hideRegions;
+  $("btnRegions").textContent = hideRegions ? "Regionen einblenden" : "Regionen ausblenden";
+  $("btnRegions").classList.toggle("active", hideRegions);
+  renderAll();
+});
+dataEl.addEventListener("click", e => {
+  const k = e.target.dataset && e.target.dataset.k;
+  if (k) {
+    const np = { set: k[0] === "t" ? "train" : "test", i: +k.slice(1) };
+    selPoint = (selPoint && selPoint.set === np.set && selPoint.i === np.i) ? null : np;
+  } else {
+    selPoint = null;
+  }
+  renderAll();
+});
+
+$("alphaSlider").addEventListener("input", renderAll);
+$("depthSlider").addEventListener("input", () => {
+  MAXDEPTH = +$("depthSlider").value;
+  $("depthReadout").textContent = MAXDEPTH;
+  $("badgePre").textContent = "Pre-Pruning: max_depth " + MAXDEPTH;
+  root = buildTree();          // gleiche Daten, neues Wachstumslimit
+  computePath();               // α-Pfad auf dem vor-geprunten Baum
+  const sl = $("alphaSlider");
+  sl.max = steps.length - 1; sl.value = 0;
+  renderAll();
+});
+$("chkTest").addEventListener("change", renderAll);
+
+/* Modal */
+$("btnInfo").addEventListener("click", () => { $("modalOverlay").hidden = false; });
+$("modalClose").addEventListener("click", () => { $("modalOverlay").hidden = true; });
+$("modalOverlay").addEventListener("click", e => { if (e.target === $("modalOverlay")) $("modalOverlay").hidden = true; });
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("modalOverlay").hidden = true; });
+
+rebuild();
+</script>
+</body>
+</html>
