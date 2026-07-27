@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bias-Varianz-Simulator – Random Forest (Regression)</title>
+<style>
+  :root{
+    --indigo:#4F46E5; --indigo-light:#EEF2FF;
+    --cyan:#06B6D4;   --cyan-light:#ECFEFF;
+    --green:#10B981;  --green-light:#ECFDF5;
+    --amber:#F59E0B;  --amber-light:#FFFBEB; --amber-dark:#B45309;
+    --slate:#64748B;  --slate-dark:#1E293B;
+    --bg:#F8FAFC; --card:#FFFFFF; --border:#E2E8F0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:Arial, "Segoe UI", sans-serif; background:var(--bg); color:var(--slate-dark); padding:20px; line-height:1.45;}
+  .wrap{max-width:1180px; margin:0 auto;}
+
+  header{margin-bottom:18px;}
+  header h1{font-size:1.45rem; color:var(--indigo);}
+  header p{color:var(--slate); font-size:0.95rem; margin-top:4px; max-width:78ch;}
+
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; box-shadow:0 1px 3px rgba(15,23,42,.06); margin-bottom:16px;}
+  .card h2{font-size:1.05rem; margin-bottom:8px; color:var(--slate-dark);}
+
+  /* ---------- Steuerung ---------- */
+  .ctrlhead{font-size:0.72rem; font-weight:bold; letter-spacing:.08em; text-transform:uppercase; color:var(--slate); margin-bottom:10px;}
+  .ctrlhead .tag{background:var(--indigo-light); color:var(--indigo); border-radius:999px; padding:2px 8px; margin-left:6px; letter-spacing:.02em;}
+  .controls{display:flex; flex-wrap:wrap; gap:16px 26px; align-items:flex-end;}
+  .ctrl{min-width:158px; flex:1;}
+  .ctrl label{display:block; font-size:0.78rem; font-weight:bold; color:var(--slate); text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px;}
+  .ctrl .val{color:var(--indigo); font-weight:bold; text-transform:none; font-size:0.9rem;}
+  .ctrl input[type=range]{width:100%; accent-color:var(--indigo);}
+  .ctrl.lead{outline:2px solid var(--indigo-light); outline-offset:6px; border-radius:4px;}
+  .ctrl.off{opacity:.42;}
+  .switch{display:flex; align-items:center; gap:7px; font-size:0.9rem; cursor:pointer; padding-bottom:3px; white-space:nowrap;}
+  .switch input{accent-color:var(--indigo); width:17px; height:17px;}
+  button.dice{background:var(--indigo); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:0.95rem; font-weight:bold; cursor:pointer; white-space:nowrap;}
+  button.dice:hover{background:#4338CA;}
+  button.dice:focus-visible, .switch input:focus-visible, .tabs button:focus-visible{outline:3px solid var(--cyan);}
+  .clone-warn{display:none; margin-top:12px;}
+  .clone-warn.on{display:block;}
+  #busy{display:none; font-size:0.8rem; color:var(--amber-dark); font-weight:bold; margin-top:8px;}
+  #busy.on{display:block;}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .tabs button{border:1px solid var(--border); background:var(--card); border-radius:999px; padding:9px 16px; font-size:0.9rem; cursor:pointer; color:var(--slate-dark);}
+  .tabs button.active{background:var(--indigo); border-color:var(--indigo); color:#fff; font-weight:bold;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Panels ---------- */
+  .grid16{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  .grid12{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  @media (max-width:860px){ .grid16,.grid12{grid-template-columns:repeat(2,1fr);} }
+  .panel{background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden;}
+  .panel .ptitle{font-size:0.75rem; font-weight:bold; color:var(--slate); padding:6px 8px 0 8px;}
+  .panel svg{display:block; width:100%; height:auto;}
+  .panel .pstats{font-size:0.72rem; padding:4px 8px 8px 8px; color:var(--slate-dark); display:flex; gap:8px; flex-wrap:wrap;}
+  .pstats b{font-weight:bold;}
+  .pstats .b2{color:var(--indigo);} .pstats .va{color:var(--amber-dark);} .pstats .to{color:var(--slate-dark);}
+  .panel.optimum{border:2px solid var(--green);}
+  .panel.optimum .ptitle::after{content:" ★ Optimum"; color:var(--green);}
+
+  /* ---------- Callouts ---------- */
+  .callout{border-left:5px solid; border-radius:8px; padding:10px 14px; margin:14px 0; font-size:0.92rem;}
+  .callout b{display:block; margin-bottom:2px;}
+  .co-info{border-color:var(--indigo); background:var(--indigo-light);}
+  .co-warn{border-color:var(--amber); background:var(--amber-light);}
+  .co-merk{border-color:var(--green); background:var(--green-light);}
+  .co-prax{border-color:var(--cyan); background:var(--cyan-light);}
+
+  /* ---------- Zwei-Spalten-Layout ---------- */
+  .split{display:flex; gap:16px; flex-wrap:wrap;}
+  .split-main{flex:2.2; min-width:340px;}
+  .split-side{flex:1; min-width:262px;}
+  .statrow{display:flex; justify-content:space-between; align-items:baseline; padding:6px 4px; border-bottom:1px dashed var(--border); font-size:0.9rem; gap:10px;}
+  .statrow:last-child{border-bottom:none;}
+  .statrow .num{font-family:Consolas, monospace; font-weight:bold; white-space:nowrap;}
+  .statrow.sub{padding-left:18px; font-size:0.84rem; border-bottom:none;}
+  .statrow.sub span:first-child::before{content:"└ "; color:var(--border);}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:0.8rem; color:var(--slate); margin-top:8px;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .swatch{width:18px; height:4px; border-radius:2px; display:inline-block;}
+  .swatch.dash{background:repeating-linear-gradient(90deg, currentColor 0 5px, transparent 5px 9px);}
+  .chart-toggle{font-size:0.85rem; color:var(--slate); user-select:none;}
+  .chart-toggle input{accent-color:var(--indigo); margin-right:4px;}
+  .chips{display:flex; flex-wrap:wrap; gap:5px; margin-top:2px;}
+  .chips button{border:1px solid var(--border); background:var(--card); border-radius:6px; min-width:36px;
+                padding:5px 7px; font-size:0.78rem; cursor:pointer; color:var(--slate-dark); font-family:Consolas, monospace;}
+  .chips button:hover{border-color:var(--indigo);}
+  .chips button.sel{background:var(--indigo); border-color:var(--indigo); color:#fff; font-weight:bold;}
+  .chips button:focus-visible{outline:3px solid var(--cyan);}
+  .pager{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+  .pager button{border:1px solid var(--border); background:var(--card); border-radius:8px; padding:6px 13px;
+                font-size:0.95rem; cursor:pointer; color:var(--slate-dark);}
+  .pager button:hover:not(:disabled){border-color:var(--indigo); color:var(--indigo);}
+  .pager button:disabled{opacity:.35; cursor:default;}
+  .pager .pinfo{font-size:0.88rem; color:var(--slate);}
+  .pager .pinfo b{color:var(--indigo);}
+
+  .lupeflex{display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;}
+  .dspane{flex:0 0 300px; width:300px;}
+  .treepane{flex:1 1 380px; min-width:0;}
+  .dstable{max-height:560px; overflow:auto; border:1px solid var(--border); border-radius:8px; background:#fff;}
+  .dstable table{border-collapse:collapse; width:100%; font-family:Consolas, monospace; font-size:0.68rem;}
+  .dstable th{position:sticky; top:0; background:#F1F5F9; color:var(--slate); font-size:0.63rem; font-weight:bold;
+              letter-spacing:.03em; padding:5px 4px; border-bottom:1px solid var(--border); z-index:1; text-align:right;}
+  .dstable td{padding:2px 4px; text-align:right; border-bottom:1px solid #F5F7FA; color:var(--slate-dark);}
+  .dstable td:last-child, .dstable th:last-child{border-left:1px solid var(--border); font-weight:bold;}
+  .dstable tr.oob{background:#FEE2E2;}
+  .dstable tr.oob td{color:#B91C1C;}
+  .dslegend{font-size:0.76rem; color:var(--slate); margin-top:8px; display:flex; flex-direction:column; gap:5px;}
+  .dslegend .row{display:flex; align-items:center; gap:7px;}
+  .dsbar{width:74px; height:11px; border-radius:3px; border:1px solid var(--border);
+         background:linear-gradient(90deg, rgba(79,70,229,0.16), rgba(79,70,229,0.62));}
+  .dsoob{width:16px; height:11px; border-radius:3px; background:#FEE2E2; border:1px solid #FCA5A5;}
+  .treewrap{overflow-x:auto; padding-bottom:6px; border:1px solid var(--border); border-radius:8px; background:#FDFDFE;}
+  .treewrap svg{display:block;}
+  .minictrl{display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px;}
+  .minictrl .ctrl{min-width:150px;}
+  footer{color:var(--slate); font-size:0.8rem; text-align:center; margin-top:24px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Bias-Varianz-Simulator: Random Forest (Regression)</h1>
+  <p>Wahre Funktion: <b>f(x₁) = sin(2πx₁)</b> &nbsp;·&nbsp; Beobachtung: <b>y = f(x₁) + ε</b> mit ε ~ N(0, σ²).
+     Wir spielen „Gott“: Wir kennen f und ziehen beliebig viele frische Trainingsdatensätze aus derselben Verteilung.
+     Neu gegenüber der Polynom-Version: Der Schätzer ist jetzt selbst zufällig – Bootstrap und Feature-Auswahl bringen
+     eine <b>zweite Zufallsebene</b> ins Spiel.</p>
+</header>
+
+<!-- ================= STEUERUNG ================= -->
+<div class="card">
+  <div class="ctrlhead">Datenerzeugung <span class="tag">Gott-Regler</span></div>
+  <div class="controls">
+    <div class="ctrl">
+      <label>Rauschen σ: <span class="val" id="v-sig">0.30</span></label>
+      <input type="range" id="s-sig" min="0.05" max="0.60" step="0.05" value="0.30">
+    </div>
+    <div class="ctrl">
+      <label>Punkte pro Datensatz n: <span class="val" id="v-n">40</span></label>
+      <input type="range" id="s-n" min="10" max="80" step="2" value="40">
+    </div>
+    <div class="ctrl">
+      <label>Anzahl Welten M: <span class="val" id="v-m">30</span></label>
+      <input type="range" id="s-m" min="16" max="48" step="2" value="30">
+    </div>
+    <div class="ctrl">
+      <label>Irrelevante Features k: <span class="val" id="v-k">0</span></label>
+      <input type="range" id="s-k" min="0" max="3" step="1" value="0">
+    </div>
+    <button class="dice" id="btn-dice">🎲 Neue Welten ziehen</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="ctrlhead">Modell <span class="tag">Random-Forest-Regler</span></div>
+  <div class="controls">
+    <div class="ctrl lead">
+      <label>Blätter pro Baum: <span class="val" id="v-lev">8</span></label>
+      <input type="range" id="s-lev" min="0" max="11" step="1" value="4">
+    </div>
+    <div class="ctrl lead">
+      <label>Bäume B: <span class="val" id="v-b">16</span></label>
+      <input type="range" id="s-b" min="1" max="32" step="1" value="16">
+    </div>
+    <div class="ctrl" id="wrap-mtry">
+      <label>max_features (mtry): <span class="val" id="v-mtry">1 von 1</span></label>
+      <input type="range" id="s-mtry" min="1" max="1" step="1" value="1">
+    </div>
+    <label class="switch"><input type="checkbox" id="c-boot" checked> Bootstrap (Bagging)</label>
+  </div>
+  <div class="callout co-warn clone-warn" id="clone-warn" style="margin-bottom:0;">
+    <b>Achtung: Der Wald ist gar kein Wald.</b>
+    Ohne Bootstrap und mit mtry = allen Features ist der Baumbau vollständig deterministisch –
+    alle B Bäume sind <i>identisch</i>. Der Mittelwert von B gleichen Bäumen ist dieser eine Baum. Schalten Sie eine
+    Zufallsquelle ein und beobachten Sie, was mit der Varianz passiert.
+  </div>
+  <div id="busy">rechnet …</div>
+</div>
+
+<!-- ================= TABS ================= -->
+<div class="tabs">
+  <button data-view="v1" class="active">1 · Einzelfits</button>
+  <button data-view="vl">2 · Einzelbaum-Lupe</button>
+  <button data-view="v2">3 · Der Wald von innen</button>
+  <button data-view="v3">4 · Überlagerung &amp; Zerlegung</button>
+  <button data-view="v4">5 · Komplexitäts-Matrix</button>
+</div>
+
+<!-- ================= ANSICHT 1 ================= -->
+<div class="view active" id="v1">
+  <div class="callout co-info">
+    <b>Beobachtungsauftrag</b>
+    Jedes Fenster zeigt eine eigene Welt: einen frisch gezogenen Trainingsdatensatz und den darauf trainierten
+    Random Forest. Die graue gestrichelte Linie ist die wahre Funktion. Gezeigt werden acht Welten pro Seite –
+    mit den Pfeilen blättern Sie durch alle M Welten, aus denen weiter hinten Bias und Varianz berechnet werden.
+    Fragen: Wie ähnlich sind sich die Wälder bei 2 Blättern? Bei 8? Bei ∞? Und: Was passiert an den Rändern von [0,1]?
+  </div>
+  <div class="pager">
+    <button type="button" id="pg-prev">◀</button>
+    <span class="pinfo" id="pg-info">–</span>
+    <button type="button" id="pg-next">▶</button>
+  </div>
+  <div class="grid16" id="grid16"></div>
+  <div class="callout co-warn">
+    <b>Treppen statt Kurven</b>
+    Ein Baum sagt stückweise konstant vorher – die Vorhersage ist eine Treppe, deren Stufenzahl der Blätterregler steuert.
+    Am linken und rechten Rand läuft sie <i>flach</i> aus: Bäume extrapolieren nicht. Das ist ein systematischer Fehler,
+    also Bias – aber ein völlig anderer als beim Polynom, das dort explodierte.
+  </div>
+  <div class="callout co-merk">
+    <b>Bewusst ohne Kennzahlen</b>
+    In einem einzelnen Fenster gibt es keinen Bias und keine Varianz – ein Einzelmodell hat nur <i>einen</i> Fehler.
+    Bias und Varianz sind Eigenschaften der <i>ganzen Modellschar</i>.
+  </div>
+</div>
+
+<!-- ================= EINZELBAUM-LUPE ================= -->
+<div class="view" id="vl">
+  <div class="callout co-info">
+    <b>Ein Baum, aufgeklappt</b>
+    Hier sehen Sie einen einzelnen Baum des Waldes so, wie er wirklich gebaut ist: als Folge von Ja/Nein-Fragen.
+    Der Blätterregler oben schneidet den Baum ab – bei 6 Blättern sehen Sie die 5 wichtigsten Splits, bei „∞“ den
+    voll ausgewachsenen Baum. Jeder Split im Diagramm entspricht genau einer Stufenkante in der Vorhersage rechts.
+  </div>
+
+  <div class="card">
+    <div class="minictrl" style="margin-bottom:6px;">
+      <div class="ctrl" style="max-width:230px;">
+        <label>Welt Nr.: <span class="val" id="v-lworld">1</span></label>
+        <input type="range" id="s-lworld" min="1" max="30" step="1" value="1">
+      </div>
+      <div style="flex:1; min-width:260px;">
+        <label style="display:block; font-size:0.78rem; font-weight:bold; color:var(--slate); text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px;">Baum auswählen</label>
+        <div class="chips" id="tree-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Baumdiagramm <span id="lupe-sub" style="font-weight:normal; color:var(--slate); font-size:0.9rem;"></span></h2>
+    <div class="lupeflex">
+      <div class="dspane">
+        <div style="font-size:0.78rem; font-weight:bold; color:var(--slate); text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px;">Trainingsdatensatz dieser Welt</div>
+        <div class="dstable" id="ds-table"></div>
+        <div class="dslegend">
+          <div class="row"><span class="dsbar"></span><span>im Bagging-Datensatz &nbsp;·&nbsp; selten → oft gezogen</span></div>
+          <div class="row"><span class="dsoob"></span><span>Out-of-Bag: dieser Baum hat den Punkt nie gesehen</span></div>
+        </div>
+      </div>
+      <div class="treepane">
+        <div class="treewrap" id="tree-svg"></div>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:10px;">
+      <span><span class="swatch" style="background:var(--green); height:11px; width:11px; border-radius:2px;"></span> x₁ – das echte Signal</span>
+      <span><span class="swatch" style="background:var(--slate); height:11px; width:11px; border-radius:2px;"></span> Rausch-Feature</span>
+      <span><span class="swatch" style="background:#F1F5F9; border:1px solid var(--border); height:11px; width:11px; border-radius:2px;"></span> beim Split nicht angeboten</span>
+      <span><span class="swatch" style="background:transparent; border:2px solid var(--amber); height:11px; width:11px; border-radius:2px;"></span> wäre die beste Wahl gewesen, fehlte aber im Angebot</span>
+    </div>
+    <div class="callout co-merk" style="margin-bottom:0;">
+      <b>So liest man max_features (mtry)</b>
+      Die Tabelle links ist nach x₁ sortiert – Sie können jede Split-Schwelle darin direkt wiederfinden.
+      Die kleine Kästchenreihe über jeder Frage ist der Feature-Vorrat. <b>Gefüllte Kästchen = das Angebot an diesem
+      Knoten</b>, ihre Anzahl ist genau mtry. Das dick umrandete Kästchen ist die getroffene Wahl. Der Baum darf immer
+      nur aus dem Angebot wählen – und das Angebot wird an <i>jedem</i> Knoten neu ausgewürfelt.
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="card split-main">
+      <h2>Was dieser eine Baum vorhersagt</h2>
+      <div id="tree-pred-svg"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--green);"></span> wahre Funktion f(x₁)</span>
+        <span><span class="swatch" style="background:var(--cyan);"></span> Vorhersage dieses Baums</span>
+        <span style="color:var(--green)"><span class="swatch dash"></span> Split auf x₁ (wird zur Stufenkante)</span>
+        <span>Punkte wie in der Tabelle: blau = gezogen, rot = Out-of-Bag</span>
+      </div>
+    </div>
+    <div class="card split-side">
+      <h2>Bilanz dieses Baums</h2>
+      <div class="statrow"><span>Splits im gezeigten Baum</span><span class="num" id="lt-splits">–</span></div>
+      <div class="statrow"><span>Blätter</span><span class="num" id="lt-leaves">–</span></div>
+      <div class="statrow"><span style="color:var(--green);font-weight:bold;">Splits auf x₁ (Signal)</span><span class="num" id="lt-sig" style="color:var(--green)">–</span></div>
+      <div class="statrow"><span style="color:var(--slate);font-weight:bold;">Splits auf Rausch-Features</span><span class="num" id="lt-noise" style="color:var(--slate)">–</span></div>
+      <div class="statrow"><span style="color:var(--amber-dark);font-weight:bold;">beste Variable fehlte im Angebot</span><span class="num" id="lt-missed" style="color:var(--amber-dark)">–</span></div>
+      <div class="callout co-prax" style="margin-bottom:0;">
+        <b>Experiment</b>
+        Stellen Sie oben k = 3 irrelevante Features ein und mtry auf 1. Dann wird an jedem Knoten nur <i>eine</i>
+        Variable angeboten – in 3 von 4 Fällen eine nutzlose. Der Baum wird sichtbar schlechter. Genau dafür gibt es
+        den Wald: Was ein einzelner Baum an Qualität verliert, gewinnt die Schar an Unabhängigkeit zurück.
+        Mit mtry = 4 sieht jeder Knoten alles – die Bäume werden besser und sich gegenseitig ähnlicher.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ANSICHT 2 ================= -->
+<div class="view" id="v2">
+  <div class="callout co-info">
+    <b>Eine Welt, viele Bäume</b>
+    Ansicht 1 zeigte viele Welten mit je einem Wald. Hier steigen wir in <i>eine</i> Welt hinab und sehen die
+    B Einzelbäume, aus denen der Wald gemittelt wird. Der Bootstrap zieht dafür n Punkte <i>mit Zurücklegen</i> aus
+    demselben einen Datensatz – er ist der Viele-Welten-Ansatz für Sterbliche.
+  </div>
+  <div class="minictrl">
+    <div class="ctrl">
+      <label>Welt Nr.: <span class="val" id="v-world">1</span></label>
+      <input type="range" id="s-world" min="1" max="30" step="1" value="1">
+    </div>
+    <div class="ctrl">
+      <label>Baum Nr. (rechte Ansicht): <span class="val" id="v-tree">1</span></label>
+      <input type="range" id="s-tree" min="1" max="25" step="1" value="1">
+    </div>
+  </div>
+  <div class="split">
+    <div class="card split-main">
+      <h2>Die B Bäume dieser einen Welt</h2>
+      <div id="inside-svg"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--green);"></span> wahre Funktion f(x₁)</span>
+        <span><span class="swatch" style="background:var(--cyan);opacity:.55;"></span> einzelne Bäume (B Stück)</span>
+        <span><span class="swatch" style="background:var(--indigo);"></span> Mittelwert = der Wald</span>
+      </div>
+    </div>
+    <div class="card split-side">
+      <h2>Die Bootstrap-Ziehung für Baum <span id="tree-no">1</span></h2>
+      <div id="boot-svg"></div>
+      <div class="legend" style="margin-bottom:6px;">
+        <span><span class="swatch" style="background:var(--indigo); height:9px; width:9px; border-radius:50%;"></span> gezogen (Fläche ∝ Häufigkeit)</span>
+        <span><span class="swatch" style="background:transparent; border:1.5px solid #B91C1C; height:9px; width:9px; border-radius:50%;"></span> Out-of-Bag</span>
+      </div>
+      <div class="statrow"><span>eindeutige Punkte im Bootstrap</span><span class="num" id="st-uniq">–</span></div>
+      <div class="statrow"><span>theoretischer Grenzwert 1−1/e</span><span class="num" style="color:var(--slate)">63.2&nbsp;%</span></div>
+      <div class="statrow"><span style="color:var(--cyan);font-weight:bold;">OOB-Fehler (nur aus Daten)</span><span class="num" id="st-oob" style="color:var(--cyan)">–</span></div>
+      <div class="statrow"><span style="color:var(--green);font-weight:bold;">wahrer Testfehler (Gott)</span><span class="num" id="st-truetest" style="color:var(--green)">–</span></div>
+      <div class="callout co-prax" style="margin-bottom:0;">
+        <b>Brücke zur Praxis</b>
+        Der OOB-Fehler nutzt für jeden Punkt nur die Bäume, die ihn nie gesehen haben. Er kostet nichts extra und
+        ersetzt im Wald die Cross-Validation. Vergleichen Sie die beiden Zahlen: So nah kommt man dem Blick Gottes,
+        ohne Gott zu sein.
+      </div>
+    </div>
+  </div>
+  <div class="callout co-warn">
+    <b>Bootstrap-Welten sind keine echten Welten</b>
+    Gott zieht aus der wahren Verteilung P. Der Bootstrap zieht aus der <i>einen</i> vorliegenden Stichprobe.
+    Alle Bootstrap-Bäume hängen an denselben n Punkten und sind deshalb untereinander korreliert – deshalb kann
+    Bagging die Varianz senken, aber nie auf null.
+  </div>
+</div>
+
+<!-- ================= ANSICHT 3 ================= -->
+<div class="view" id="v3">
+  <div class="callout co-info">
+    <b>Alle Wälder übereinandergelegt</b>
+    Jetzt werden alle M Wälder halbtransparent überlagert. Zwei geometrische Größen werden sichtbar:
+    der <span style="color:var(--indigo);font-weight:bold;">Abstand der Mittelwertkurve zur wahren Funktion</span> (→ Bias)
+    und die <span style="color:var(--amber-dark);font-weight:bold;">Breite des Kurvenschlauchs</span> (→ Varianz).
+  </div>
+  <div class="split">
+    <div class="card split-main">
+      <div id="overlay-svg"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--green);"></span> wahre Funktion f(x₁)</span>
+        <span><span class="swatch" style="background:var(--cyan);opacity:.5;"></span> einzelne Wälder (M Stück)</span>
+        <span><span class="swatch" style="background:var(--indigo);"></span> Mittelwert der Wälder</span>
+        <span><span class="swatch" style="background:var(--amber);opacity:.4;height:10px;"></span> ±1 Standardabweichung</span>
+      </div>
+    </div>
+    <div class="card split-side">
+      <h2>Zerlegung des Fehlers</h2>
+      <div class="statrow"><span style="color:var(--indigo);font-weight:bold;">Bias²</span><span class="num" id="st-b2" style="color:var(--indigo);">–</span></div>
+      <div class="statrow" style="border-bottom:none;"><span style="color:var(--amber-dark);font-weight:bold;">Varianz gesamt</span><span class="num" id="st-va" style="color:var(--amber-dark);">–</span></div>
+      <div class="statrow sub"><span>zwischen den Welten (Daten)</span><span class="num" id="st-vb" style="color:var(--amber-dark);">–</span></div>
+      <div class="statrow sub" style="border-bottom:1px dashed var(--border);"><span>innerhalb einer Welt (Algorithmus)</span><span class="num" id="st-vw" style="color:var(--cyan);">–</span></div>
+      <div class="statrow"><span style="color:var(--slate);font-weight:bold;">σ² (irreduzibel)</span><span class="num" id="st-s2" style="color:var(--slate);">–</span></div>
+      <div class="statrow" style="border-top:2px solid var(--border);"><span style="font-weight:bold;">Summe</span><span class="num" id="st-sum">–</span></div>
+      <div class="statrow"><span style="color:var(--green);font-weight:bold;">MSE, frische Testdaten</span><span class="num" id="st-mse" style="color:var(--green);">–</span></div>
+      <div class="callout co-merk" style="margin-bottom:0;">
+        <b>Merksatz</b>
+        Bias² + Varianz + σ² ≈ gemessener Testfehler. Neu: Die Varianz zerfällt weiter. Der Anteil
+        „innerhalb einer Welt“ ist der Preis des Zufalls im Algorithmus – und er schrumpft mit 1/B.
+        Ziehen Sie den B-Regler und beobachten Sie genau diese Zeile.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ANSICHT 4 ================= -->
+<div class="view" id="v4">
+  <div class="callout co-info">
+    <b>Ein Fenster pro Komplexitätsstufe</b>
+    Jedes Fenster zeigt die komplette Waldschar bei einer festen Blätterzahl – deshalb darf hier (und erst hier)
+    in jedem Fenster die volle Analytik stehen. Die Leiter der Blätterzahlen passt sich n an: Mehr Blätter als
+    unterscheidbare Punkte kann ein Baum nicht bilden, deshalb endet sie bei „∞“ = voll ausgewachsen.
+  </div>
+  <div class="grid12" id="grid12"></div>
+
+  <div class="card" style="margin-top:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <h2>Fehlerzerlegung über die Modellkomplexität</h2>
+      <label class="chart-toggle"><input type="checkbox" id="chk-log"> logarithmische Skala</label>
+    </div>
+    <div id="ucurve-svg"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--indigo);"></span> Bias² (Wald)</span>
+      <span><span class="swatch" style="background:var(--amber);"></span> Varianz (Wald)</span>
+      <span><span class="swatch" style="background:var(--slate-dark);height:5px;"></span> Summe (Wald)</span>
+      <span style="color:var(--slate)"><span class="swatch dash"></span> Summe bei B = 1 (Einzelbaum)</span>
+      <span><span class="swatch" style="background:var(--slate);"></span> σ² (irreduzibler Sockel)</span>
+    </div>
+  </div>
+
+  <div class="callout co-merk">
+    <b>Die Pointe</b>
+    Der Einzelbaum (gestrichelt) zeigt die klassische U-Form: rechts läuft ihm die Varianz davon. Der Wald
+    (durchgezogen) hat einen fast <i>flachen</i> rechten Ast. Bagging bügelt den Overfitting-Arm der U-Kurve platt –
+    deshalb ist „zu viele Blätter“ beim Random Forest ein weit geringeres Problem als „zu hoher Grad“ beim Polynom.
+    Der Bias-Ast links bleibt dagegen unangetastet: Zu wenig Blätter kann kein Wald reparieren.
+  </div>
+</div>
+
+<footer>Bias-Varianz-Simulator · Random-Forest-Regression · Vanilla HTML/JS, keine Abhängigkeiten · f(x₁) = sin(2πx₁), x₁ ∈ [0,1]</footer>
+</div>
+
+<script>
+"use strict";
+
+/* ======================================================================
+   Konfiguration
+   ====================================================================== */
+const NLEV       = 12;
+let LEAVES = [], LEAF_LABEL = [], SPLITS = [];
+/* Die Komplexitaetsleiter passt sich n an: ein Baum kann nie mehr Blaetter
+   bekommen als er unterscheidbare Punkte hat (im Bootstrap etwa 63 % von n).
+   Feste Stufen waeren bei kleinem n oben nur Wiederholungen. */
+function rebuildLevels(){
+  const Lmax = Math.max(12, Math.round(0.63 * state.n));
+  const arr = []; let prev = 1;
+  for (let i = 0; i < NLEV - 1; i++){
+    let L = Math.round(2 * Math.pow(Lmax / 2, i / (NLEV - 2)));
+    if (L <= prev) L = prev + 1;
+    arr.push(L); prev = L;
+  }
+  arr.push(Infinity);
+  LEAVES = arr;
+  LEAF_LABEL = arr.map(L => L === Infinity ? "∞" : String(L));
+  SPLITS = arr.map(L => L === Infinity ? 1e9 : L - 1);
+}
+const PAGE       = 8;                         // Welten pro Seite in Ansicht 1
+const GRID_N     = 120;                       // Auflösung in x1
+const Y_MIN = -2.0, Y_MAX = 2.0;
+const fTrue = x => Math.sin(2 * Math.PI * x);
+
+/* ======================================================================
+   Zustand
+   ====================================================================== */
+const state = {
+  sigma: 0.30, n: 40, M: 30, k: 0,            // Datenerzeugung
+  lev: 4, B: 16, mtry: 1, boot: true,           // Modell
+  world: 0, tree: 0, page: 0,                  // Auswahl in Lupe / Einzelfits
+  seed: 42
+};
+
+/* ======================================================================
+   Zufall (seedbar, reproduzierbar)
+   ====================================================================== */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng){                            // Box-Muller
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+// deterministischer Baum-Seed: gleiche Einstellungen -> gleicher Baum,
+// dadurch kann B inkrementell wachsen, ohne alles neu zu bauen
+function treeSeed(m, b){
+  let h = (state.seed ^ 0x85EBCA6B) >>> 0;
+  h = Math.imul(h ^ (m + 0x9E3779B9), 0xC2B2AE35) >>> 0;
+  h = Math.imul(h ^ (b + 0x165667B1), 0x27D4EB2F) >>> 0;
+  return h >>> 0;
+}
+
+/* ======================================================================
+   Regressionsbaum, Best-First-Wachstum (leaf-wise)
+   ----------------------------------------------------------------------
+   Wächst immer voll aus. Jeder innere Knoten merkt sich seine Split-Nummer
+   (ord). Weil ein Kind erst nach seinem Elternteil gesplittet werden kann,
+   wachsen die ord-Werte entlang jedes Pfades streng monoton -> ein einmal
+   voll gewachsener Baum enthaelt alle kleineren Baeume als Praefix und
+   liefert saemtliche Komplexitaetsstufen in einem einzigen Durchlauf.
+   ====================================================================== */
+function sse(cnt, s, sq){ return cnt > 0 ? sq - s * s / cnt : 0; }
+
+function buildTree(X, y, idx, rng, p, mtry, rec){
+  const nodes = [];
+  const featBuf = new Int32Array(p);
+
+  function makeNode(ix){
+    let s = 0, sq = 0;
+    for (let i = 0; i < ix.length; i++){ const v = y[ix[i]]; s += v; sq += v * v; }
+    nodes.push({ ix, n: ix.length, val: s / ix.length, sum: s, sumSq: sq, sse: sse(ix.length, s, sq),
+                 feat: -1, thr: 0, left: -1, right: -1, ord: 1e9, cand: null, allFeat: -1 });
+    return nodes.length - 1;
+  }
+
+  // mtry Features ohne Zuruecklegen ziehen (partielles Fisher-Yates)
+  function pickFeatures(){
+    for (let f = 0; f < p; f++) featBuf[f] = f;
+    const take = Math.min(mtry, p);
+    for (let i = 0; i < take; i++){
+      const j = i + Math.floor(rng() * (p - i));
+      const t = featBuf[i]; featBuf[i] = featBuf[j]; featBuf[j] = t;
+    }
+    return take;
+  }
+
+  // Bestmoeglichen Schnitt eines Features finden (sortieren, Praefixsummen scannen)
+  function scanFeature(nd, f){
+    const ix = nd.ix, m = ix.length, col = X[f];
+    const ord = Array.prototype.slice.call(ix).sort((a, b) => col[a] - col[b]);
+    let sl = 0, sql = 0, best = null;
+    for (let i = 0; i < m - 1; i++){
+      const v = y[ord[i]]; sl += v; sql += v * v;
+      const a = col[ord[i]], b = col[ord[i + 1]];
+      if (b - a < 1e-12) continue;                 // kein Schnitt zwischen gleichen Werten
+      const nl = i + 1;
+      const gain = nd.sse - sse(nl, sl, sql) - sse(m - nl, nd.sum - sl, nd.sumSq - sql);
+      if (gain > 1e-12 && (!best || gain > best.gain)) best = { feat: f, thr: 0.5 * (a + b), gain };
+    }
+    return best;
+  }
+
+  function bestSplit(id){
+    const nd = nodes[id];
+    if (nd.n < 2) return null;
+    const take = pickFeatures();                   // verbraucht Zufall -> Reihenfolge ist bindend
+    let best = null;
+    for (let fi = 0; fi < take; fi++){
+      const r = scanFeature(nd, featBuf[fi]);
+      if (r && (!best || r.gain > best.gain)) best = r;
+    }
+    if (!best) return null;
+    if (rec){                                      // Zusatzinfo nur fuer die Lupe, ohne Zufallsverbrauch
+      best.cand = Array.from(featBuf.slice(0, take));
+      let all = null;
+      for (let f = 0; f < p; f++){
+        const r = scanFeature(nd, f);
+        if (r && (!all || r.gain > all.gain)) all = r;
+      }
+      best.allFeat = all ? all.feat : -1;
+    }
+    return best;
+  }
+
+  const root = makeNode(idx);
+  const frontier = [];                              // { id, split }
+  let sp = bestSplit(root);
+  if (sp) frontier.push({ id: root, split: sp });
+
+  const maxSplits = idx.length - 1;
+  for (let s = 0; s < maxSplits; s++){
+    if (!frontier.length) break;
+    let bi = 0;
+    for (let i = 1; i < frontier.length; i++)
+      if (frontier[i].split.gain > frontier[bi].split.gain) bi = i;
+    const { id, split } = frontier.splice(bi, 1)[0];
+
+    const nd = nodes[id], col = X[split.feat];
+    const L = [], R = [];
+    for (let i = 0; i < nd.ix.length; i++){
+      const j = nd.ix[i];
+      (col[j] <= split.thr ? L : R).push(j);
+    }
+    if (!L.length || !R.length) { s--; continue; }   // Schutz gegen Entartung
+
+    nd.feat = split.feat; nd.thr = split.thr; nd.ord = s;
+    if (rec){ nd.cand = split.cand; nd.allFeat = split.allFeat; }
+    nd.left = makeNode(L); nd.right = makeNode(R);
+    nd.ix = null;                                   // Speicher freigeben
+
+    for (const child of [nd.left, nd.right]){
+      const cs = bestSplit(child);
+      if (cs) frontier.push({ id: child, split: cs });
+    }
+  }
+  for (const nd of nodes) nd.ix = null;
+  return nodes;
+}
+
+/* Vorhersage fuer ALLE Komplexitaetsstufen in einem einzigen Abstieg.
+   SPLITS ist aufsteigend sortiert; sobald wir fuer eine Stufe abgestiegen
+   sind, steigen alle groesseren Stufen erst recht ab. */
+function predictAllLevels(nodes, row, out){
+  let id = 0, li = 0;
+  while (li < NLEV){
+    const nd = nodes[id];
+    if (nd.left < 0){ while (li < NLEV) out[li++] = nd.val; return; }
+    if (nd.ord >= SPLITS[li]){ out[li++] = nd.val; continue; }
+    id = (row[nd.feat] <= nd.thr) ? nd.left : nd.right;
+  }
+}
+function predictAtLevel(nodes, row, lev){
+  const S = SPLITS[lev];
+  let id = 0;
+  for (;;){
+    const nd = nodes[id];
+    if (nd.left < 0 || nd.ord >= S) return nd.val;
+    id = (row[nd.feat] <= nd.thr) ? nd.left : nd.right;
+  }
+}
+
+/* ======================================================================
+   Daten, Auswertungsgitter, Waelder
+   ====================================================================== */
+let P = 1;                 // Anzahl Features = 1 + k
+let R_PD = 1;              // Zahl der Auswertungs-Schnitte durch den Feature-Raum
+let NEVAL = GRID_N;        // = R_PD * GRID_N
+let x1Grid = [];           // Gitter in x1
+let evalRows = [];         // NEVAL Zeilen a P Werte
+let evalX1 = null;         // x1-Wert je Auswertungspunkt
+let worlds = [];           // [{ X:[Float64Array], y:Float64Array, rows:[Float64Array] }]
+let forests = [];          // forests[m] = [ tree, tree, ... ]
+let inBag = [];            // inBag[m][b] = Int32Array(n) Ziehungshaeufigkeiten
+let freshNoise = [];       // freshNoise[m] = Float64Array(NEVAL)
+
+let meanAll = [];          // meanAll[m] = Float64Array(NLEV*NEVAL) Waldmittel
+let varTree = [];          // varTree[m] = Float64Array(NLEV*NEVAL) Streuung der Baeume
+let mean1   = [];          // mean1[m]   = Float64Array(NLEV*NEVAL) nur Baum 1
+let stats = [];            // stats[lev] = { bias2, vari, varW, varB, total, sigT2, rho }
+let stats1 = [];           // dasselbe fuer B = 1
+let oobErr = NaN, trueTestErr = NaN;
+
+function rebuildGeometry(){
+  P     = 1 + state.k;
+  R_PD  = state.k > 0 ? 3 : 1;
+  NEVAL = R_PD * GRID_N;
+  x1Grid = Array.from({ length: GRID_N }, (_, i) => i / (GRID_N - 1));
+
+  const rng = mulberry32(state.seed ^ 0x5F356495);
+  evalRows = new Array(NEVAL);
+  evalX1   = new Float64Array(NEVAL);
+  for (let r = 0; r < R_PD; r++){
+    const slice = new Float64Array(P);           // ein fester Schnitt durch die Rausch-Features
+    for (let f = 1; f < P; f++) slice[f] = rng();
+    for (let g = 0; g < GRID_N; g++){
+      const row = Float64Array.from(slice);
+      row[0] = x1Grid[g];
+      const e = r * GRID_N + g;
+      evalRows[e] = row; evalX1[e] = x1Grid[g];
+    }
+  }
+}
+
+function drawWorlds(){
+  const rng = mulberry32(state.seed);
+  worlds = [];
+  for (let m = 0; m < state.M; m++){
+    const X = [], y = new Float64Array(state.n);
+    for (let f = 0; f < P; f++) X.push(new Float64Array(state.n));
+    for (let i = 0; i < state.n; i++){
+      for (let f = 0; f < P; f++) X[f][i] = rng();
+      y[i] = fTrue(X[0][i]) + state.sigma * gauss(rng);
+    }
+    const rows = new Array(state.n);
+    for (let i = 0; i < state.n; i++){
+      const row = new Float64Array(P);
+      for (let f = 0; f < P; f++) row[f] = X[f][i];
+      rows[i] = row;
+    }
+    worlds.push({ X, y, rows });
+  }
+  const rng2 = mulberry32(state.seed ^ 0x9E3779B9);
+  freshNoise = [];
+  for (let m = 0; m < state.M; m++){
+    const nz = new Float64Array(NEVAL);
+    for (let e = 0; e < NEVAL; e++) nz[e] = state.sigma * gauss(rng2);
+    freshNoise.push(nz);
+  }
+}
+
+function growForests(){
+  const mtry = Math.min(state.mtry, P);
+  for (let m = 0; m < state.M; m++){
+    if (!forests[m]) { forests[m] = []; inBag[m] = []; }
+    const w = worlds[m];
+    for (let b = forests[m].length; b < state.B; b++){
+      const rng = mulberry32(treeSeed(m, b));
+      const cnt = new Int32Array(state.n);
+      let idx;
+      if (state.boot){
+        idx = new Array(state.n);
+        for (let i = 0; i < state.n; i++){
+          const j = Math.floor(rng() * state.n);
+          idx[i] = j; cnt[j]++;
+        }
+      } else {
+        idx = Array.from({ length: state.n }, (_, i) => i);
+        for (let i = 0; i < state.n; i++) cnt[i] = 1;
+      }
+      forests[m][b] = buildTree(w.X, w.y, idx, rng, P, mtry, false);
+      inBag[m][b]   = cnt;
+    }
+  }
+  forests.length = state.M; inBag.length = state.M;
+}
+function invalidateForests(){ forests = []; inBag = []; }
+
+/* ---------------------------------------------------------------------
+   Hauptdurchlauf: Waldmittel je Welt und Stufe, Baumstreuung, B-Snapshots
+   --------------------------------------------------------------------- */
+function computeCurves(){
+  const B = state.B, M = state.M, LN = NLEV * NEVAL;
+  meanAll = []; varTree = []; mean1 = [];
+  const tmp = new Float64Array(NLEV);
+
+  for (let m = 0; m < M; m++){
+    const sum = new Float64Array(LN), sumSq = new Float64Array(LN);
+    const m1  = new Float64Array(LN);
+    for (let b = 0; b < B; b++){
+      const tree = forests[m][b];
+      for (let e = 0; e < NEVAL; e++){
+        predictAllLevels(tree, evalRows[e], tmp);
+        for (let li = 0; li < NLEV; li++){
+          const v = tmp[li], o = li * NEVAL + e;
+          sum[o] += v; sumSq[o] += v * v;
+          if (b === 0) m1[o] = v;
+        }
+      }
+    }
+    const mean = new Float64Array(LN), vt = new Float64Array(LN);
+    for (let o = 0; o < LN; o++){
+      const mu = sum[o] / B;
+      mean[o] = mu;
+      vt[o]   = Math.max(0, sumSq[o] / B - mu * mu);   // Streuung der Baeume in dieser Welt
+    }
+    meanAll.push(mean); varTree.push(vt); mean1.push(m1);
+  }
+}
+
+function decompose(getCurve, B){
+  const M = state.M;
+  const out = [];
+  for (let li = 0; li < NLEV; li++){
+    let bias2 = 0, vari = 0, within = 0, treeVarSum = 0;
+    for (let e = 0; e < NEVAL; e++){
+      const o = li * NEVAL + e;
+      let mu = 0;
+      for (let m = 0; m < M; m++) mu += getCurve(m)[o];
+      mu /= M;
+      let v = 0;
+      for (let m = 0; m < M; m++){ const d = getCurve(m)[o] - mu; v += d * d; }
+      v /= M;
+      let tv = 0;
+      for (let m = 0; m < M; m++) tv += varTree[m][o];
+      tv /= M;
+      const bi = mu - fTrue(evalX1[e]);
+      bias2 += bi * bi; vari += v; within += tv / B; treeVarSum += tv;
+    }
+    bias2 /= NEVAL; vari /= NEVAL; within /= NEVAL; treeVarSum /= NEVAL;
+    const sigT2 = treeVarSum + vari;                 // Gesamtvarianz eines Einzelbaums
+    const rho = (B > 1 && sigT2 > 1e-12)
+      ? Math.min(1, Math.max(0, (B * vari / sigT2 - 1) / (B - 1))) : 1;
+    out.push({
+      bias2, vari,
+      varW: Math.min(vari, within), varB: Math.max(0, vari - within),
+      total: bias2 + vari + state.sigma * state.sigma,
+      sigT2, rho
+    });
+  }
+  return out;
+}
+
+function computeStats(){
+  stats  = decompose(m => meanAll[m], state.B);
+  stats1 = decompose(m => mean1[m], 1);
+
+  // Wahrer Testfehler (Gott) auf frischen, verrauschten Daten
+  const off = state.lev * NEVAL;
+  let mse = 0;
+  for (let m = 0; m < state.M; m++)
+    for (let e = 0; e < NEVAL; e++){
+      const err = fTrue(evalX1[e]) + freshNoise[m][e] - meanAll[m][off + e];
+      mse += err * err;
+    }
+  trueTestErr = mse / (state.M * NEVAL);
+
+  // OOB-Fehler: je Punkt nur die Baeume, die ihn nie gesehen haben
+  if (!state.boot){ oobErr = NaN; return; }
+  let acc = 0, cntW = 0;
+  for (let m = 0; m < state.M; m++){
+    let s = 0, c = 0;
+    for (let i = 0; i < state.n; i++){
+      let p = 0, k = 0;
+      for (let b = 0; b < state.B; b++){
+        if (inBag[m][b][i] === 0){ p += predictAtLevel(forests[m][b], worlds[m].rows[i], state.lev); k++; }
+      }
+      if (k){ const d = worlds[m].y[i] - p / k; s += d * d; c++; }
+    }
+    if (c){ acc += s / c; cntW++; }
+  }
+  oobErr = cntW ? acc / cntW : NaN;
+}
+
+/* Partial-Dependence-Kurve: Mittel ueber die R_PD Schnitte */
+function pdCurve(arr, li){
+  const off = li * NEVAL, out = new Float64Array(GRID_N);
+  for (let g = 0; g < GRID_N; g++){
+    let s = 0;
+    for (let r = 0; r < R_PD; r++) s += arr[off + r * GRID_N + g];
+    out[g] = s / R_PD;
+  }
+  return out;
+}
+
+/* ======================================================================
+   SVG-Helfer
+   ====================================================================== */
+let clipCounter = 0;
+function panelSVG({ w = 260, h = 170, curves = [], points = null, band = null, vlines = null }){
+  const px = x => x * w;
+  const py = y => h - ((y - Y_MIN) / (Y_MAX - Y_MIN)) * h;
+  const path = ys => { let d = ""; for (let i = 0; i < GRID_N; i++) d += (i ? "L" : "M") + px(x1Grid[i]).toFixed(1) + "," + py(ys[i]).toFixed(1); return d; };
+  const id = "clip" + (clipCounter++);
+  let s = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img">`;
+  s += `<defs><clipPath id="${id}"><rect x="0" y="0" width="${w}" height="${h}"/></clipPath></defs>`;
+  s += `<rect x="0" y="0" width="${w}" height="${h}" fill="#FDFDFE"/>`;
+  s += `<line x1="0" y1="${py(0)}" x2="${w}" y2="${py(0)}" stroke="#EDF0F4"/>`;
+  s += `<g clip-path="url(#${id})">`;
+  if (vlines)
+    for (const v of vlines)
+      s += `<line x1="${px(v).toFixed(1)}" y1="0" x2="${px(v).toFixed(1)}" y2="${h}" stroke="var(--green)" stroke-width="1" stroke-dasharray="3 3" opacity="0.75"/>`;
+  if (band){
+    let up = "", lo = "";
+    for (let g = 0; g < GRID_N; g++)
+      up += (g ? "L" : "M") + px(x1Grid[g]).toFixed(1) + "," + py(band.mean[g] + band.std[g]).toFixed(1);
+    for (let g = GRID_N - 1; g >= 0; g--)
+      lo += "L" + px(x1Grid[g]).toFixed(1) + "," + py(band.mean[g] - band.std[g]).toFixed(1);
+    s += `<path d="${up + lo}Z" fill="var(--amber)" opacity="0.22"/>`;
+  }
+  for (const c of curves)
+    s += `<path d="${path(c.ys)}" fill="none" stroke="${c.color}" stroke-width="${c.width || 1.4}"` +
+         (c.dash ? ` stroke-dasharray="${c.dash}"` : "") +
+         (c.opacity !== undefined ? ` opacity="${c.opacity}"` : "") + `/>`;
+  if (points)
+    for (let i = 0; i < points.xs.length; i++){
+      const f = points.fill ? points.fill[i] : "var(--slate)";
+      const st = points.stroke ? ` stroke="${points.stroke[i]}" stroke-width="1.3"` : "";
+      s += `<circle cx="${px(points.xs[i]).toFixed(1)}" cy="${py(points.ys[i]).toFixed(1)}" r="${points.r || 2.9}" fill="${f}"${st} opacity="0.9"/>`;
+    }
+  s += `</g></svg>`;
+  return s;
+}
+const fmt = v => !isFinite(v) ? "–" : (v >= 0.0005 || v === 0) ? v.toFixed(3) : v.toExponential(1);
+const trueCurve = () => ({ ys: x1Grid.map(fTrue), color: "var(--green)", width: 1.6, dash: "5 4" });
+
+/* ======================================================================
+   Ansicht 1: 16 Welten
+   ====================================================================== */
+function renderView1(){
+  const nPages = Math.ceil(state.M / PAGE);
+  state.page = Math.max(0, Math.min(state.page, nPages - 1));
+  const from = state.page * PAGE, to = Math.min(from + PAGE, state.M);
+  document.getElementById("pg-info").innerHTML =
+    `Welten <b>${from + 1}–${to}</b> von ${state.M} &nbsp;·&nbsp; Seite ${state.page + 1}/${nPages}`;
+  document.getElementById("pg-prev").disabled = state.page === 0;
+  document.getElementById("pg-next").disabled = state.page >= nPages - 1;
+
+  let html = "";
+  for (let m = from; m < to; m++){
+    const w = worlds[m];
+    html += `<div class="panel"><div class="ptitle">Welt #${m + 1}</div>` +
+      panelSVG({
+        curves: [trueCurve(), { ys: pdCurve(meanAll[m], state.lev), color: "var(--cyan)", width: 2.2 }],
+        points: { xs: w.X[0], ys: w.y }
+      }) + `</div>`;
+  }
+  document.getElementById("grid16").innerHTML = html;
+}
+
+/* ======================================================================
+   Ansicht 2: Der Wald von innen
+   ====================================================================== */
+function renderView2(){
+  const m = Math.min(state.world, state.M - 1);
+  const b = Math.min(state.tree, state.B - 1);
+  const w = worlds[m];
+
+  // Einzelbaumkurven dieser Welt (Partial Dependence)
+  const curves = [];
+  const tmpOut = new Float64Array(NLEV);
+  for (let t = 0; t < state.B; t++){
+    const ys = new Float64Array(GRID_N);
+    for (let g = 0; g < GRID_N; g++){
+      let s = 0;
+      for (let r = 0; r < R_PD; r++) s += predictAtLevel(forests[m][t], evalRows[r * GRID_N + g], state.lev);
+      ys[g] = s / R_PD;
+    }
+    curves.push({ ys, color: "var(--cyan)", width: 1.1, opacity: Math.max(0.12, Math.min(0.55, 6 / state.B)) });
+  }
+  curves.push(trueCurve());
+  curves.push({ ys: pdCurve(meanAll[m], state.lev), color: "var(--indigo)", width: 3 });
+  document.getElementById("inside-svg").innerHTML =
+    panelSVG({ w: 640, h: 380, curves, points: { xs: w.X[0], ys: w.y } });
+
+  // Bootstrap-Ziehung dieses einen Baums
+  const cnt = inBag[m][b];
+  let uniq = 0;
+  const W = 640, H = 200, px = x => 26 + x * (W - 46), py = y => H - 24 - ((y - Y_MIN) / (Y_MAX - Y_MIN)) * (H - 44);
+  let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" style="width:100%;height:auto;display:block;">`;
+  s += `<rect x="0" y="0" width="${W}" height="${H}" fill="#FDFDFE"/>`;
+  s += `<line x1="26" y1="${py(0)}" x2="${W - 20}" y2="${py(0)}" stroke="#EDF0F4"/>`;
+  let d = "";
+  for (let g = 0; g < GRID_N; g++) d += (g ? "L" : "M") + px(x1Grid[g]).toFixed(1) + "," + py(fTrue(x1Grid[g])).toFixed(1);
+  s += `<path d="${d}" fill="none" stroke="var(--green)" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+  for (let i = 0; i < state.n; i++){
+    const c = cnt[i];
+    if (c > 0) uniq++;
+    const r = c === 0 ? 3 : 3 + 2.6 * Math.sqrt(c);
+    s += `<circle cx="${px(w.X[0][i]).toFixed(1)}" cy="${py(w.y[i]).toFixed(1)}" r="${r.toFixed(1)}" ` +
+         (c === 0 ? `fill="none" stroke="#B91C1C" stroke-width="1.6"` : `fill="var(--indigo)" opacity="0.62"`) + `/>`;
+  }
+  s += `<text x="${W - 20}" y="${H - 6}" font-size="11" text-anchor="end" fill="var(--slate)">x₁ →</text>`;
+  s += `</svg>`;
+  document.getElementById("boot-svg").innerHTML = s;
+
+  document.getElementById("tree-no").textContent = b + 1;
+  document.getElementById("st-uniq").textContent = (100 * uniq / state.n).toFixed(1) + " %";
+  document.getElementById("st-oob").textContent  = isNaN(oobErr) ? "– (Bootstrap aus)" : fmt(oobErr);
+  document.getElementById("st-truetest").textContent = fmt(trueTestErr);
+}
+
+/* ======================================================================
+   Ansicht 3: Überlagerung + Zerlegung
+   ====================================================================== */
+function renderView3(){
+  const mean = new Float64Array(GRID_N), std = new Float64Array(GRID_N);
+  const pds = [];
+  for (let m = 0; m < state.M; m++) pds.push(pdCurve(meanAll[m], state.lev));
+  for (let g = 0; g < GRID_N; g++){
+    let s = 0;
+    for (let m = 0; m < state.M; m++) s += pds[m][g];
+    mean[g] = s / state.M;
+    let v = 0;
+    for (let m = 0; m < state.M; m++){ const d = pds[m][g] - mean[g]; v += d * d; }
+    std[g] = Math.sqrt(v / state.M);
+  }
+  const curves = pds.map(ys => ({ ys, color: "var(--cyan)", width: 1.1, opacity: 0.18 }));
+  curves.push(trueCurve());
+  curves.push({ ys: mean, color: "var(--indigo)", width: 3 });
+  document.getElementById("overlay-svg").innerHTML = panelSVG({ w: 640, h: 400, curves, band: { mean, std } });
+
+  const st = stats[state.lev], s2 = state.sigma * state.sigma;
+  document.getElementById("st-b2").textContent  = fmt(st.bias2);
+  document.getElementById("st-va").textContent  = fmt(st.vari);
+  document.getElementById("st-vb").textContent  = fmt(st.varB);
+  document.getElementById("st-vw").textContent  = fmt(st.varW);
+  document.getElementById("st-s2").textContent  = fmt(s2);
+  document.getElementById("st-sum").textContent = fmt(st.bias2 + st.vari + s2);
+  document.getElementById("st-mse").textContent = fmt(trueTestErr);
+}
+
+/* ======================================================================
+   Ansicht 4: Matrix + U-Kurve
+   ====================================================================== */
+function renderView4(){
+  let best = 0;
+  for (let li = 1; li < NLEV; li++) if (stats[li].total < stats[best].total) best = li;
+
+  let html = "";
+  for (let li = 0; li < NLEV; li++){
+    const st = stats[li];
+    const pds = [];
+    for (let m = 0; m < state.M; m++) pds.push(pdCurve(meanAll[m], li));
+    const mean = new Float64Array(GRID_N);
+    for (let g = 0; g < GRID_N; g++){
+      let s = 0;
+      for (let m = 0; m < state.M; m++) s += pds[m][g];
+      mean[g] = s / state.M;
+    }
+    const curves = pds.slice(0, 40).map(ys => ({ ys, color: "var(--cyan)", width: 0.9, opacity: 0.16 }));
+    curves.push(trueCurve());
+    curves.push({ ys: mean, color: "var(--indigo)", width: 2 });
+
+    html += `<div class="panel${li === best ? " optimum" : ""}${li === state.lev ? "" : ""}">` +
+      `<div class="ptitle">${LEAF_LABEL[li]} Blätter</div>` +
+      panelSVG({ w: 260, h: 150, curves }) +
+      `<div class="pstats">` +
+        `<span class="b2">B²&nbsp;<b>${fmt(st.bias2)}</b></span>` +
+        `<span class="va">Var&nbsp;<b>${fmt(st.vari)}</b></span>` +
+        `<span class="to">Σ&nbsp;<b>${fmt(st.total)}</b></span>` +
+      `</div></div>`;
+  }
+  document.getElementById("grid12").innerHTML = html;
+  renderUCurve(best);
+}
+
+function renderUCurve(bestIdx){
+  const logScale = document.getElementById("chk-log").checked;
+  const w = 720, h = 300, mL = 54, mR = 16, mT = 14, mB = 40;
+  const iw = w - mL - mR, ih = h - mT - mB;
+  const s2 = state.sigma * state.sigma;
+
+  const series = [
+    { color: "var(--indigo)",     width: 2, get: (a, li) => stats[li].bias2 },
+    { color: "var(--amber)",      width: 2, get: (a, li) => stats[li].vari },
+    { color: "var(--slate-dark)", width: 3, get: (a, li) => stats[li].total },
+    { color: "var(--slate)",      width: 2, dash: "6 4", dots: false, get: (a, li) => stats1[li].total }
+  ];
+  let vals = [s2];
+  for (let li = 0; li < NLEV; li++) vals.push(stats[li].bias2, stats[li].vari, stats[li].total, stats1[li].total);
+  vals = vals.filter(v => v > 0 && isFinite(v));
+
+  let yMinV, yMaxV, toY;
+  if (logScale){
+    yMinV = Math.log10(Math.max(1e-6, Math.min(...vals)));
+    yMaxV = Math.log10(Math.max(...vals));
+    toY = v => mT + ih - ((Math.log10(Math.max(v, 1e-6)) - yMinV) / (yMaxV - yMinV || 1)) * ih;
+  } else {
+    const sorted = [...vals].sort((a, b) => a - b);
+    yMinV = 0;
+    yMaxV = Math.min(Math.max(...vals), sorted[Math.floor(sorted.length * 0.9)] * 2.2);
+    toY = v => mT + ih - (Math.min(v, yMaxV) / (yMaxV || 1)) * ih;
+  }
+  const toX = li => mL + (li / (NLEV - 1)) * iw;
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img" style="width:100%;height:auto;display:block;">`;
+  svg += `<line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + ih}" stroke="var(--border)"/>`;
+  svg += `<line x1="${mL}" y1="${mT + ih}" x2="${mL + iw}" y2="${mT + ih}" stroke="var(--border)"/>`;
+  for (let li = 0; li < NLEV; li++){
+    svg += `<text x="${toX(li)}" y="${h - 18}" font-size="11" text-anchor="middle" fill="${li === state.lev ? "var(--indigo)" : "var(--slate)"}" ${li === state.lev ? 'font-weight="bold"' : ""}>${LEAF_LABEL[li]}</text>`;
+    svg += `<line x1="${toX(li)}" y1="${mT + ih}" x2="${toX(li)}" y2="${mT + ih + 4}" stroke="var(--border)"/>`;
+  }
+  svg += `<text x="${mL + iw / 2}" y="${h - 3}" font-size="11" text-anchor="middle" fill="var(--slate)" font-weight="bold">Blätter pro Baum (Modellkomplexität) →</text>`;
+  for (let i = 0; i <= 2; i++){
+    const vv = logScale ? Math.pow(10, yMinV + (i / 2) * (yMaxV - yMinV)) : (i / 2) * yMaxV;
+    const yy = toY(vv);
+    svg += `<line x1="${mL - 4}" y1="${yy}" x2="${mL + iw}" y2="${yy}" stroke="#EEF1F5"/>`;
+    svg += `<text x="${mL - 8}" y="${yy + 4}" font-size="10" text-anchor="end" fill="var(--slate)" font-family="Consolas,monospace">${fmt(vv)}</text>`;
+  }
+  const bx = toX(bestIdx);
+  svg += `<line x1="${bx}" y1="${mT}" x2="${bx}" y2="${mT + ih}" stroke="var(--green)" stroke-dasharray="4 4" stroke-width="1.5"/>`;
+  svg += `<text x="${bx + 5}" y="${mT + 14}" font-size="11" fill="var(--green)" font-weight="bold">Optimum: ${LEAF_LABEL[bestIdx]} Blätter</text>`;
+  svg += `<line x1="${mL}" y1="${toY(s2)}" x2="${mL + iw}" y2="${toY(s2)}" stroke="var(--slate)" stroke-dasharray="6 4" stroke-width="1.5"/>`;
+  svg += `<text x="${mL + iw - 4}" y="${toY(s2) - 5}" font-size="11" text-anchor="end" fill="var(--slate)">σ² = ${fmt(s2)} – darunter geht es nie</text>`;
+
+  for (const se of series){
+    let p = "";
+    for (let li = 0; li < NLEV; li++) p += (li ? "L" : "M") + toX(li).toFixed(1) + "," + toY(se.get(null, li)).toFixed(1);
+    svg += `<path d="${p}" fill="none" stroke="${se.color}" stroke-width="${se.width}"${se.dash ? ` stroke-dasharray="${se.dash}"` : ""}/>`;
+    if (se.dots !== false)
+      for (let li = 0; li < NLEV; li++)
+        svg += `<circle cx="${toX(li)}" cy="${toY(se.get(null, li))}" r="3" fill="${se.color}"/>`;
+  }
+  svg += `</svg>`;
+  document.getElementById("ucurve-svg").innerHTML = svg;
+}
+
+/* ======================================================================
+   Einzelbaum-Lupe
+   ----------------------------------------------------------------------
+   Der Baum wird aus demselben Seed noch einmal gebaut, diesmal mit
+   Protokoll: welche Features an jedem Knoten angeboten wurden und welches
+   ohne die mtry-Beschraenkung gewonnen haette. Weil der Zufallsverbrauch
+   identisch bleibt, ist es exakt derselbe Baum wie im Wald.
+   ====================================================================== */
+const SUB = "₀₁₂₃₄₅₆₇₈₉";
+const featName = f => "x" + SUB[f + 1];
+const featColor = f => f === 0 ? "var(--green)" : "var(--slate)";
+
+function buildLupeTree(m, b){
+  const rng = mulberry32(treeSeed(m, b));
+  const w = worlds[m], cnt = new Int32Array(state.n);
+  let idx;
+  if (state.boot){
+    idx = new Array(state.n);
+    for (let i = 0; i < state.n; i++){ const j = Math.floor(rng() * state.n); idx[i] = j; cnt[j]++; }
+  } else {
+    idx = Array.from({ length: state.n }, (_, i) => i);
+    for (let i = 0; i < state.n; i++) cnt[i] = 1;
+  }
+  return { nodes: buildTree(w.X, w.y, idx, rng, P, Math.min(state.mtry, P), true), cnt };
+}
+
+// Einheitliche Farbsprache: Blau nach Ziehungshaeufigkeit, Rot fuer Out-of-Bag
+const bagAlpha = c => Math.min(0.62, 0.15 * c + 0.05);
+const bagFill  = c => c === 0 ? "#FCA5A5" : `rgba(79,70,229,${bagAlpha(c).toFixed(2)})`;
+const bagRing  = c => c === 0 ? "#B91C1C" : "#4F46E5";
+
+function renderTreeChips(){
+  let h = "";
+  for (let b = 0; b < state.B; b++)
+    h += `<button type="button" data-t="${b}"${b === state.tree ? ' class="sel"' : ""}>${b + 1}</button>`;
+  document.getElementById("tree-chips").innerHTML = h;
+}
+
+function renderLupe(){
+  const m = Math.min(state.world, state.M - 1), b = Math.min(state.tree, state.B - 1);
+  const { nodes, cnt } = buildLupeTree(m, b);
+  const S = SPLITS[state.lev];
+  const isInt = id => nodes[id].left >= 0 && nodes[id].ord < S;
+
+  /* --- Layout: Blaetter von links nach rechts, Eltern mittig darueber --- */
+  const pos = new Array(nodes.length);
+  let leafX = 0, maxD = 0;
+  (function walk(id, d){
+    if (d > maxD) maxD = d;
+    if (!isInt(id)){ pos[id] = { x: leafX++, d }; return; }
+    walk(nodes[id].left, d + 1); walk(nodes[id].right, d + 1);
+    pos[id] = { x: (pos[nodes[id].left].x + pos[nodes[id].right].x) / 2, d };
+  })(0, 0);
+
+  const NW = 112, NHI = 56, NHL = 38, GAPX = 126, GAPY = 94, MG = 14;
+  const W = MG * 2 + Math.max(1, leafX) * GAPX;
+  const H = MG * 2 + maxD * GAPY + NHI + 6;
+  const cx = id => MG + (pos[id].x + 0.5) * GAPX;
+  const ty = id => MG + pos[id].d * GAPY;
+
+  let g = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img">`;
+  // Kanten zuerst, damit die Kaesten darueber liegen
+  for (let id = 0; id < nodes.length; id++){
+    if (!isInt(id)) continue;
+    for (const [ch, lab] of [[nodes[id].left, "ja"], [nodes[id].right, "nein"]]){
+      const x1 = cx(id), y1 = ty(id) + NHI, x2 = cx(ch), y2 = ty(ch);
+      g += `<path d="M ${x1} ${y1} C ${x1} ${y1 + 26}, ${x2} ${y2 - 26}, ${x2} ${y2}" fill="none" stroke="#CBD5E1" stroke-width="1.6"/>`;
+      g += `<text x="${(x1 + (x2 - x1) * 0.34).toFixed(1)}" y="${(y1 + 17).toFixed(1)}" font-size="10.5" text-anchor="middle" fill="var(--slate)">${lab}</text>`;
+    }
+  }
+  for (let id = 0; id < nodes.length; id++){
+    if (!pos[id]) continue;
+    const nd = nodes[id], x = cx(id), yv = ty(id);
+    if (isInt(id)){
+      const col = featColor(nd.feat);
+      g += `<rect x="${x - NW / 2}" y="${yv}" width="${NW}" height="${NHI}" rx="9" fill="#fff" stroke="var(--border)" stroke-width="1.5"/>`;
+      // Feature-Vorrat: gefuellt = angeboten, dick = gewaehlt, orange = haette gewonnen
+      const cw = 13, gap = 3.5, tot = P * cw + (P - 1) * gap, x0 = x - tot / 2;
+      for (let f = 0; f < P; f++){
+        const isCand = nd.cand ? nd.cand.indexOf(f) >= 0 : false;
+        const isSel  = nd.feat === f;
+        const isMiss = nd.allFeat === f && !isCand;
+        const fc = featColor(f);
+        let a = `fill="${isCand ? fc : "#F1F5F9"}" fill-opacity="${isSel ? 1 : (isCand ? 0.3 : 1)}" `;
+        a += isMiss ? `stroke="var(--amber)" stroke-width="2.2"`
+                    : `stroke="${isCand ? fc : "var(--border)"}" stroke-width="${isSel ? 2.2 : 1}" stroke-opacity="${isSel ? 1 : 0.55}"`;
+        g += `<rect x="${(x0 + f * (cw + gap)).toFixed(1)}" y="${yv + 7}" width="${cw}" height="${cw}" rx="3" ${a}/>`;
+      }
+      g += `<text x="${x}" y="${yv + 37}" font-size="12.5" text-anchor="middle" font-weight="bold" fill="${col}" font-family="Consolas, monospace">${featName(nd.feat)} ≤ ${nd.thr.toFixed(2)}</text>`;
+      g += `<text x="${x}" y="${yv + 49}" font-size="10" text-anchor="middle" fill="var(--slate)">n = ${nd.n}${nd.ord === 0 ? " · 1. Split" : ""}</text>`;
+    } else {
+      g += `<rect x="${x - NW / 2 + 10}" y="${yv}" width="${NW - 20}" height="${NHL}" rx="9" fill="var(--green-light)" stroke="var(--green)" stroke-width="1.5" stroke-opacity="0.55"/>`;
+      g += `<text x="${x}" y="${yv + 18}" font-size="12" text-anchor="middle" font-weight="bold" fill="var(--slate-dark)" font-family="Consolas, monospace">ŷ = ${nd.val.toFixed(2)}</text>`;
+      g += `<text x="${x}" y="${yv + 31}" font-size="10" text-anchor="middle" fill="var(--slate)">n = ${nd.n}</text>`;
+    }
+  }
+  g += `</svg>`;
+  document.getElementById("tree-svg").innerHTML = g;
+
+  /* --- Trainingsdatensatz: nach x₁ sortiert, Farbtiefe = Ziehungshaeufigkeit --- */
+  const order = Array.from({ length: state.n }, (_, i) => i)
+                     .sort((a, b2) => worlds[m].X[0][a] - worlds[m].X[0][b2]);
+  let th = "";
+  for (let f = 0; f < P; f++) th += `<th>${featName(f)}</th>`;
+  let tb = "";
+  for (const i of order){
+    const c = cnt[i];
+    const bg = c === 0 ? "" : ` style="background:rgba(79,70,229,${bagAlpha(c).toFixed(2)})"`;
+    let tds = "";
+    for (let f = 0; f < P; f++) tds += `<td>${worlds[m].X[f][i].toFixed(2)}</td>`;
+    tb += `<tr class="${c === 0 ? "oob" : ""}"${bg}>${tds}<td>${worlds[m].y[i].toFixed(2)}</td></tr>`;
+  }
+  document.getElementById("ds-table").innerHTML =
+    `<table><thead><tr>${th}<th>y</th></tr></thead><tbody>${tb}</tbody></table>`;
+
+  /* --- Vorhersage dieses einen Baums, Splitschwellen als Stufenkanten --- */
+  const ys = new Float64Array(GRID_N), vl = [];
+  for (let gi = 0; gi < GRID_N; gi++) ys[gi] = predictAtLevel(nodes, evalRows[gi], state.lev);
+  for (let id = 0; id < nodes.length; id++)
+    if (isInt(id) && nodes[id].feat === 0) vl.push(nodes[id].thr);
+  document.getElementById("tree-pred-svg").innerHTML = panelSVG({
+    w: 640, h: 330, vlines: vl,
+    curves: [trueCurve(), { ys, color: "var(--cyan)", width: 2.4 }],
+    points: { xs: worlds[m].X[0], ys: worlds[m].y,
+              fill: Array.from(cnt, bagFill), stroke: Array.from(cnt, bagRing) }
+  });
+
+  /* --- Bilanz --- */
+  let splits = 0, sig = 0, missed = 0;
+  for (let id = 0; id < nodes.length; id++){
+    if (!isInt(id)) continue;
+    splits++;
+    if (nodes[id].feat === 0) sig++;
+    if (nodes[id].cand && nodes[id].allFeat >= 0 && nodes[id].cand.indexOf(nodes[id].allFeat) < 0) missed++;
+  }
+  const pc = v => splits ? ` (${(100 * v / splits).toFixed(0)} %)` : "";
+  document.getElementById("lt-splits").textContent = splits;
+  document.getElementById("lt-leaves").textContent = splits + 1;
+  document.getElementById("lt-sig").textContent    = sig + pc(sig);
+  document.getElementById("lt-noise").textContent  = (splits - sig) + pc(splits - sig);
+  document.getElementById("lt-missed").textContent = missed + pc(missed);
+  document.getElementById("lupe-sub").textContent =
+    `– Welt #${m + 1}, Baum #${b + 1}, abgeschnitten bei ${LEAF_LABEL[state.lev]} Blättern` +
+    (P > 1 ? ` · mtry = ${Math.min(state.mtry, P)} von ${P}` : "");
+}
+
+/* ======================================================================
+   Orchestrierung
+   ====================================================================== */
+function recomputeAll(){
+  rebuildLevels();
+  rebuildGeometry();
+  drawWorlds();
+  invalidateForests();
+  growForests();
+  computeCurves();
+  computeStats();
+  renderAll();
+}
+function recomputeModel(){          // Bäume bleiben, nur Auswertung neu
+  growForests();
+  computeCurves();
+  computeStats();
+  renderAll();
+}
+const RENDER = { v1: renderView1, vl: renderLupe, v2: renderView2,
+                 v3: renderView3, v4: renderView4 };
+const dirty = { v1: true, vl: true, v2: true, v3: true, v4: true };
+let activeView = "v1";
+function renderActive(){
+  if (dirty[activeView]){ RENDER[activeView](); dirty[activeView] = false; }
+}
+function renderAll(){                       // alles als veraltet markieren, nur Sichtbares zeichnen
+  for (const k in dirty) dirty[k] = true;
+  renderTreeChips();
+  renderActive();
+  document.getElementById("clone-warn").classList.toggle(
+    "on", !state.boot && state.mtry >= P && state.B > 1);
+}
+
+let pending = null;
+function schedule(fn){
+  document.getElementById("busy").classList.add("on");
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(() => {
+    pending = null;
+    fn();
+    document.getElementById("busy").classList.remove("on");
+  }, 30);
+}
+
+/* ======================================================================
+   UI-Verdrahtung
+   ====================================================================== */
+function syncLabels(){
+  document.getElementById("v-sig").textContent  = state.sigma.toFixed(2);
+  document.getElementById("v-n").textContent    = state.n;
+  document.getElementById("v-m").textContent    = state.M;
+  document.getElementById("v-k").textContent    = state.k;
+  document.getElementById("v-lev").textContent  = LEAF_LABEL[state.lev];
+  document.getElementById("v-b").textContent    = state.B;
+  document.getElementById("v-mtry").textContent = `${Math.min(state.mtry, P)} von ${P}`;
+  document.getElementById("v-world").textContent  = state.world + 1;
+  document.getElementById("v-lworld").textContent = state.world + 1;
+  document.getElementById("v-tree").textContent   = state.tree + 1;
+}
+function syncRanges(){
+  const sm = document.getElementById("s-mtry");
+  sm.max = P; sm.value = Math.min(state.mtry, P);
+  document.getElementById("wrap-mtry").classList.toggle("off", P === 1);
+  sm.disabled = (P === 1);
+
+  state.world = Math.min(state.world, state.M - 1);
+  state.tree  = Math.min(state.tree,  state.B - 1);
+  for (const id of ["s-world", "s-lworld"]){
+    const sw = document.getElementById(id); sw.max = state.M; sw.value = state.world + 1;
+  }
+  const stt = document.getElementById("s-tree");
+  stt.max = state.B; stt.value = state.tree + 1;
+  syncLabels();
+}
+
+const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+
+on("s-sig", "input", e => { state.sigma = parseFloat(e.target.value); syncLabels(); schedule(recomputeAll); });
+on("s-n",   "input", e => { state.n = +e.target.value; syncLabels(); schedule(recomputeAll); });
+on("s-m",   "input", e => { state.M = +e.target.value; state.page = 0; syncRanges(); schedule(recomputeAll); });
+on("s-k",   "input", e => { state.k = +e.target.value; P = 1 + state.k; state.mtry = Math.min(state.mtry, P); syncRanges(); schedule(recomputeAll); });
+
+on("s-lev", "input", e => { state.lev = +e.target.value; syncLabels(); schedule(() => { computeCurves(); computeStats(); renderAll(); }); });
+on("s-b",   "input", e => { state.B = +e.target.value; syncRanges(); schedule(recomputeModel); });
+on("s-mtry","input", e => { state.mtry = +e.target.value; syncLabels(); schedule(() => { invalidateForests(); recomputeModel(); }); });
+on("c-boot","change", e => { state.boot = e.target.checked; schedule(() => { invalidateForests(); recomputeModel(); }); });
+function pick(kind, v){                       // Welt- bzw. Baumwahl, in beiden Ansichten synchron
+  if (kind === "w") state.world = Math.max(0, Math.min(v, state.M - 1));
+  else              state.tree  = Math.max(0, Math.min(v, state.B - 1));
+  document.getElementById("s-world").value  = state.world + 1;
+  document.getElementById("s-lworld").value = state.world + 1;
+  document.getElementById("s-tree").value   = state.tree + 1;
+  syncLabels(); renderTreeChips();
+  renderView2(); dirty.v2 = false;
+  renderLupe();  dirty.vl = false;
+}
+on("s-world", "input", e => pick("w", +e.target.value - 1));
+on("s-lworld","input", e => pick("w", +e.target.value - 1));
+on("s-tree",  "input", e => pick("t", +e.target.value - 1));
+document.getElementById("tree-chips").addEventListener("click", e => {
+  const t = e.target.closest("button[data-t]");
+  if (t) pick("t", +t.dataset.t);
+});
+
+on("pg-prev", "click", () => { state.page--; renderView1(); });
+on("pg-next", "click", () => { state.page++; renderView1(); });
+
+on("btn-dice", "click", () => { state.seed = (Math.random() * 2 ** 31) | 0; schedule(recomputeAll); });
+on("chk-log", "change", () => renderView4());
+
+document.querySelectorAll(".tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.view).classList.add("active");
+    activeView = btn.dataset.view;
+    renderActive();
+  });
+});
+
+/* ======================================================================
+   Start
+   ====================================================================== */
+rebuildLevels();
+syncRanges();
+recomputeAll();
+</script>
+</body>
+</html>
