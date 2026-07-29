@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISO 25010 &amp; Bug-Triage Arbeitsblatt</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        h2 {
+            margin-top: 40px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+        .generic-note {
+            background-color: #eef2f5;
+            border-left: 4px solid #7f8c8d;
+            padding: 12px 18px;
+            margin: 20px 0 0 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 0.92em;
+            color: #555;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 30px;
+            background-color: #fff;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .ai-section th {
+            background-color: #9b59b6; /* LILA für KI-Metriken zur Unterscheidung */
+        }
+        .ai-header td {
+            background-color: #ebdef0;
+            font-weight: bold;
+            text-align: center;
+            color: #8e44ad;
+        }
+        .triage-table th {
+            background-color: #e67e22; /* ORANGE für das Arbeitsblatt */
+        }
+        .empty-row td {
+            height: 60px; /* Platz zum Schreiben für die Studierenden */
+        }
+        .row-num {
+            width: 32px;
+            text-align: center;
+            color: #999;
+            font-size: 0.85em;
+            background-color: #fcfcfc;
+        }
+        @media print {
+            body { background-color: #fff; margin: 0; }
+            .container { box-shadow: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Qualitäts-Referenz &amp; Arbeitsblatt</h1>
+
+    <div class="generic-note">
+        <strong>Hinweis:</strong> Dieses Blatt ist szenarioübergreifend. Es gilt unverändert für jedes
+        Fallbeispiel. Wie viele Befunde Sie eintragen sollen und worauf besonders zu achten ist,
+        entnehmen Sie dem <strong>szenariospezifischen Arbeitsauftrag</strong>.
+    </div>
+
+    <h2>1. Referenz: ISO 25010 (2023) &amp; KI-Qualität</h2>
+    <p>Nutzen Sie diese Tabelle als Leitfaden zur Klassifizierung der gefundenen Fehler.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 30%;">Merkmal (2023)</th>
+                <th>Leitfrage — einfach gestellt</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Functional Suitability</strong></td>
+                <td>Tut das System das Richtige — vollständig und korrekt?</td>
+            </tr>
+            <tr>
+                <td><strong>Performance Efficiency</strong></td>
+                <td>Ist es schnell und sparsam genug (Zeit, Speicher, Ressourcen)?</td>
+            </tr>
+            <tr>
+                <td><strong>Compatibility</strong></td>
+                <td>Verträgt es sich mit anderen Systemen und kann Daten austauschen?</td>
+            </tr>
+            <tr>
+                <td><strong>Interaction Capability</strong> (früher: Usability)</td>
+                <td>Kommen Menschen gut damit zurecht — lernbar, bedienbar, barrierefrei?</td>
+            </tr>
+            <tr>
+                <td><strong>Reliability</strong></td>
+                <td>Läuft es stabil und erholt sich von Fehlern?</td>
+            </tr>
+            <tr>
+                <td><strong>Security</strong></td>
+                <td>Sind Daten und Zugänge geschützt (Vertraulichkeit, Integrität)?</td>
+            </tr>
+            <tr>
+                <td><strong>Safety</strong> (neu 2023)</td>
+                <td>Kann das System Menschen oder Umwelt gefährden — und ist das abgesichert?</td>
+            </tr>
+            <tr>
+                <td><strong>Maintainability</strong></td>
+                <td>Lässt es sich gut verstehen, ändern und testen?</td>
+            </tr>
+            <tr>
+                <td><strong>Flexibility</strong> (früher: Portability)</td>
+                <td>Lässt es sich an neue Umgebungen und Anforderungen anpassen?</td>
+            </tr>
+
+            <!-- KI Spezifische Sektion -->
+            <tr class="ai-header">
+                <td colspan="2">KI-spezifische Qualität (Zusätzlich zur Norm)</td>
+            </tr>
+            <tr>
+                <td><strong>Fairness</strong></td>
+                <td>Werden bestimmte Gruppen systematisch schlechter behandelt?</td>
+            </tr>
+            <tr>
+                <td><strong>Erklärbarkeit</strong></td>
+                <td>Können wir nachweisen, warum das Modell so entschieden hat?</td>
+            </tr>
+            <tr>
+                <td><strong>Robustheit</strong></td>
+                <td>Was passiert bei schwierigen, verrauschten oder ungewohnten Eingaben?</td>
+            </tr>
+            <tr>
+                <td><strong>Unsicherheit</strong></td>
+                <td>Sagt das Modell, wie sicher es sich ist — und was passiert bei unsicheren Fällen?</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2. Arbeitsblatt: Bug-Triage</h2>
+    <p>Tragen Sie hier die identifizierten Probleme ein, ordnen Sie sie <strong>genau einem</strong>
+       Kriterium aus Tabelle 1 zu und leiten Sie IT-Konsequenzen ab.</p>
+
+    <table class="triage-table">
+        <thead>
+            <tr>
+                <th class="row-num">#</th>
+                <th style="width: 25%;">Gefundenes Problem (aus Text)</th>
+                <th style="width: 18%;">ISO 25010 / KI-Kriterium</th>
+                <th style="width: 24%;">Risiko (Was passiert, wenn wir nichts tun?)</th>
+                <th style="width: 28%;">Konsequenz / Lösungsansatz (Was muss die IT tun?)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Beispiel-Zeile: bewusst szenariofremd, verrät keine Lösung -->
+            <tr>
+                <td class="row-num"><em>Bsp</em></td>
+                <td><em>Die Rechnungs-PDF wird ohne Umlaute erzeugt („Muller" statt „Müller").</em></td>
+                <td><em>Functional Suitability</em></td>
+                <td><em>Kunden reklamieren, Support muss jede Rechnung nacharbeiten.</em></td>
+                <td><em>Zeichenkodierung auf UTF-8 umstellen; Testfall mit Umlauten ins Regressionsset.</em></td>
+            </tr>
+            <!-- Leere Zeilen für die Studierenden -->
+            <tr class="empty-row"><td class="row-num">1</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">2</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">3</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">4</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">5</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">6</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">7</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">8</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">9</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">10</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">11</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">12</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">13</td><td></td><td></td><td></td><td></td></tr>
+            <tr class="empty-row"><td class="row-num">14</td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

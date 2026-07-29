@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbeitsauftrag: DriveCheck-AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-top: 5px solid #e67e22;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 2em;
+        }
+        h2 {
+            color: #d35400;
+            margin-top: 35px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+            font-size: 1.25em;
+        }
+        .task-box {
+            background-color: #fdf6ec;
+            border-left: 4px solid #e67e22;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .check-box {
+            background-color: #eafaf1;
+            border-left: 4px solid #27ae60;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .check-box strong { color: #1e8449; }
+        ol, ul { padding-left: 22px; }
+        li { margin-bottom: 8px; }
+        .quote {
+            font-style: italic;
+            color: #555;
+            background-color: #fafafa;
+            border-left: 3px solid #ccc;
+            padding: 8px 15px;
+            margin: 10px 0;
+        }
+        @media print {
+            body { background-color: #fff; margin: 0; }
+            .container { box-shadow: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Arbeitsauftrag: Bug-Triage DriveCheck-AI</h1>
+    <p>Sie arbeiten mit drei Materialien: der <strong>Szenariobeschreibung</strong>, dem
+       <strong>Beta-Test-Dossier</strong> und dem Blatt
+       <strong>„Qualitäts-Referenz &amp; Arbeitsblatt"</strong>.</p>
+
+    <h2>Aufgabe 0 — Die Zahl der Projektleitung</h2>
+    <div class="task-box">
+        <p>Herr Müller schreibt in seiner Mail:</p>
+        <div class="quote">„Unser Modell ist spitze, unsere Konfusionsmatrix liegt bei starken 94 %!"</div>
+        <ol>
+            <li>Was stimmt an dieser Aussage <strong>fachlich</strong> nicht? Was ist eine Konfusionsmatrix,
+                und welche Kennzahl meint Herr Müller vermutlich?</li>
+            <li>Angenommen, von 100 zurückgegebenen Fahrzeugen haben nur 5 tatsächlich einen neuen Schaden.
+                Wie hoch wäre die Trefferquote eines Modells, das <em>immer</em> „kein Schaden" sagt?</li>
+            <li>Suchen Sie im Dossier den einen Befund, der am deutlichsten zeigt, warum eine hohe
+                Gesamtquote hier nichts beweist. Begründen Sie.</li>
+        </ol>
+    </div>
+
+    <h2>Aufgabe 1 — Triage</h2>
+    <div class="task-box">
+        <p>Werten Sie das Dossier aus und füllen Sie die Triagetabelle auf dem Arbeitsblatt aus.</p>
+        <ul>
+            <li>Formulieren Sie das Problem in <strong>einem Satz</strong> in eigenen Worten.</li>
+            <li>Ordnen Sie <strong>genau ein</strong> Kriterium aus Tabelle 1 zu.</li>
+            <li>Benennen Sie das Risiko für das Unternehmen, wenn nichts geschieht.</li>
+            <li>Formulieren Sie eine <strong>konkrete, technische</strong> Konsequenz — nicht „besser machen",
+                sondern was die IT tatsächlich baut, ändert oder testet.</li>
+        </ul>
+    </div>
+
+    <div class="check-box">
+        <strong>Selbstkontrolle:</strong> Das Dossier enthält <strong>13 Befunde</strong>. Jedes der
+        13 Kriterien aus Tabelle 1 kommt <strong>genau einmal</strong> vor. Bleibt am Ende ein Kriterium
+        leer, haben Sie entweder einen Befund übersehen oder zwei Befunde demselben Kriterium zugeordnet.
+        Prüfen Sie in diesem Fall Ticket #102 und Ticket #201 — dort steckt mehr als ein Befund.
+    </div>
+
+    <h2>Aufgabe 2 — Go oder No-Go?</h2>
+    <div class="task-box">
+        <p>Der Go-Live ist für nächste Woche geplant. Sie sind das QA-Team und müssen eine Empfehlung abgeben.</p>
+        <ol>
+            <li>Markieren Sie jeden Befund mit einer Stufe:
+                <strong>Blocker</strong> (Go-Live unmöglich) &middot;
+                <strong>Kritisch</strong> (muss vor Live behoben werden) &middot;
+                <strong>Wichtig</strong> (in den ersten Wochen danach) &middot;
+                <strong>Gering</strong> (später).</li>
+            <li>Formulieren Sie eine Empfehlung an die Geschäftsführung in maximal fünf Sätzen:
+                <strong>Go, No-Go oder Go mit Auflagen?</strong> Nennen Sie die Auflagen konkret.</li>
+            <li>Begründen Sie Ihre Reihenfolge: Warum wiegt bei Ihnen ein Befund schwerer als ein anderer?
+                Zählt der Schaden für das Unternehmen, für die Kundschaft oder die Gefahr für Leib und Leben?</li>
+        </ol>
+    </div>
+
+    <h2>Zusatz — Für schnelle Teams</h2>
+    <div class="task-box">
+        <p>Die App bucht 800 Euro vollautomatisch ab, ohne dass ein Mensch beteiligt ist. Recherchieren Sie
+           Art. 22 DSGVO: Was gilt für automatisierte Entscheidungen im Einzelfall? Welche zwei Befunde
+           aus Ihrer Tabelle werden dadurch noch brisanter?</p>
+    </div>
+</div>
+
+</body>
+</html>

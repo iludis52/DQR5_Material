@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveCheck-AI - Beta-Test Dossier</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 40px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .email-header {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+        .email-header p {
+            margin: 5px 0;
+        }
+        .ticket {
+            margin-bottom: 30px;
+        }
+        .ticket h3 {
+            font-size: 1.1em;
+            color: #e67e22;
+            margin-bottom: 10px;
+        }
+        blockquote {
+            background-color: #fdfbf7;
+            border-left: 4px solid #e67e22;
+            margin: 0;
+            padding: 15px 20px;
+            font-style: italic;
+            color: #555;
+        }
+        .highlight {
+            background-color: #ffeaa7;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        @media print {
+            body { background-color: #fff; margin: 0; }
+            .container { box-shadow: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>INTERNES DOSSIER: Beta-Test Phase 1 &ndash; DriveCheck-AI</h1>
+
+    <div class="email-header">
+        <p><strong>Von:</strong> Projektleitung (T. Müller)</p>
+        <p><strong>An:</strong> QA-Team &amp; Data Science Unit</p>
+        <p><strong>Betreff:</strong> Dringend: Auswertung der Beta-Tests vor Go-Live!</p>
+        <p><strong>Datum:</strong> 29. Juli 2026</p>
+    </div>
+
+    <div class="email-body">
+        <p>Hallo Team,</p>
+        <p>nächste Woche ist unser Go-Live. Ich habe mir die Rückmeldungen aus dem Feldtest der letzten zwei Wochen angesehen. Keine Panik, das meiste sieht gut aus! Unser Modell ist spitze, <span class="highlight">unsere Konfusionsmatrix liegt bei starken 94 %!</span></p>
+        <p>Trotzdem gibt es hier ein paar gesammelte Tickets und Mails aus verschiedenen Abteilungen, die ihr euch heute ansehen müsst. Bitte kategorisiert diese Probleme, damit wir wissen, wo es brennt.</p>
+        <p>Viele Grüße,<br>T. Müller</p>
+    </div>
+
+    <h2>Anhang: Gesammelte Rückmeldungen (Auszüge)</h2>
+
+    <div class="ticket">
+        <h3>Ticket #102 &ndash; Kunden-Support (Kunde: M. Schmidt)</h3>
+        <blockquote>
+            „Ich stand gestern im Regen auf dem Parkplatz und habe das Video vom Auto gemacht. Die Wassertropfen und Spiegelungen auf dem Lack haben dazu geführt, dass die App plötzlich 12 Kratzer erkannt hat, wo gar keine waren! Beim selben Auto hat es zwei Tage vorher bei Sonnenschein einwandfrei funktioniert &ndash; da hat die App alles richtig erkannt. Abgesehen davon hat der Upload des 4K-Videos über das Handynetz ungelogen 15 Minuten gedauert. Ich stand einfach nur doof rum und habe gewartet. Und als während des Uploads für eine Sekunde das Netz weg war, ist die App komplett abgestürzt. Als ich sie neu gestartet habe, war das Video gelöscht und ich musste von vorn anfangen.“
+        </blockquote>
+    </div>
+
+    <div class="ticket">
+        <h3>Ticket #144 &ndash; Kunden-Support (Kunde: J. Bergmann)</h3>
+        <blockquote>
+            „Ich wollte die App nutzen, aber ich bin stark sehbehindert. Mein Screenreader auf dem Handy liest in der App nur ‚Button 1‘ und ‚Button 2‘ vor. Außerdem vibriert die App nicht oder gibt keinen Ton ab, wenn ich zu nah am Auto stehe oder die Kamera zu schnell bewege. Ich wusste gar nicht, was ich machen soll.“
+        </blockquote>
+    </div>
+
+    <div class="ticket">
+        <h3>E-Mail &ndash; Werkstatt-Team Frankfurt</h3>
+        <blockquote>
+            „Hey IT, euer System treibt uns in den Wahnsinn. Vorgestern hat die App beim silbernen VW Golf einen kapitalen Dachschaden gemeldet. Wir haben nachgesehen: Es war ein riesiger, festgetrockneter Vogelschiss. Das Modell erkennt den Unterschied scheinbar nicht. <br><br>
+            Viel schlimmer war aber gestern: Vorne rechts im Reifen war ein tiefer, 5 Zentimeter langer Riss. Für sicherheitsrelevante Bauteile wie Reifen, Bremsen oder Scheiben gibt es in eurer App überhaupt keine eigene Prüfstufe und keine Pflicht-Sichtprüfung &ndash; alles landet in einem einzigen grünen Haken. Nur weil ein Kollege zufällig noch mal hingeschaut hat, ist das Auto nicht rausgegangen. Sonst wäre dem nächsten Kunden auf der Autobahn der Reifen geplatzt!“
+        </blockquote>
+    </div>
+
+    <div class="ticket">
+        <h3>Slack-Nachricht &ndash; Data Science &amp; MLOps (Dev-Team)</h3>
+        <blockquote>
+            „Wir haben die Logs der letzten Woche analysiert. Bei den teuren, knallroten Sportwagen und den mattschwarz folierten SUVs erkennt das Modell Kratzer fast gar nicht, während es bei den weißen und silbernen Standard-Kombis super funktioniert. Im Klartext: Fahrer:innen von Standard-Kombis bekommen dreimal häufiger eine Schadensrechnung als Fahrer:innen teurer Sonderlackierungen &ndash; bei gleichem tatsächlichem Schadensbild. Da müssen wir ran.<br><br>
+            Außerdem ist uns im Log aufgefallen, dass das Modell bei einigen kleinen Kratzern intern einen Wahrscheinlichkeitswert von nur 52 % ausspuckt. Anstatt aber eine Meldung an einen menschlichen Mitarbeiter zu schicken (‚Bitte manuell prüfen‘), rundet das System einfach hart auf und bucht dem Kunden den Schaden voll ab.“
+        </blockquote>
+    </div>
+
+    <div class="ticket">
+        <h3>E-Mail &ndash; Rechtsabteilung &amp; Compliance</h3>
+        <blockquote>
+            „Wir haben ein massives Problem. Ein Kunde verklagt uns wegen einer Abbuchung von 800 Euro für eine Beule. Unsere App meldet in der Datenbank aber nur: <code>Schaden = True</code>. Wir haben kein Foto mit einer Markierung, keine farbliche Hervorhebung, nichts, was wir dem Richter zeigen könnten, wie die KI zu diesem Schluss kam. Wir stehen mit leeren Händen da. <br><br>
+            Und wo wir gerade dabei sind: Der externe Dienstleister hat uns gemeldet, dass unsere Schnittstelle zum Abrufen der Kundendaten für zwei Tage ohne Passwort erreichbar war. Jeder mit dem Link konnte die Fahrzeughistorie einsehen.“
+        </blockquote>
+    </div>
+
+    <div class="ticket">
+        <h3>Ticket #201 &ndash; System-Administration</h3>
+        <blockquote>
+            „Wir wollten gestern versuchen, das fertige iOS-Modell auch auf den billigen Android-Tablets am Schalter laufen zu lassen, aber die Architektur ist so starr, dass das Modell dort nicht startet. Wir bekommen es nicht auf diese neue Umgebung übertragen. Zudem scheitert permanent der Datenexport an das alte SAP-System der Buchhaltung, weil die JSON-Datenstrukturen nicht verarbeitet werden können. <br><br>
+            Wenn wir jetzt noch das Modell für die Erkennung von Schnee anpassen wollen, müssen wir laut den Devs fast 40 % des Codes umschreiben, weil alles extrem verschachtelt und kaum modular aufgebaut ist.“
+        </blockquote>
+    </div>
+
+</div>
+
+</body>
+</html>
