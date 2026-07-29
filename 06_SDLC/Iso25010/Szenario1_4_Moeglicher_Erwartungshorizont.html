@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erwartungshorizont: DriveCheck-AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #2c3e50; margin-top: 0; }
+        h2 {
+            color: #2c3e50;
+            margin-top: 35px;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 8px;
+            display: inline-block;
+        }
+        .teacher-note {
+            background-color: #fdecea;
+            border-left: 4px solid #c0392b;
+            padding: 12px 18px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 0.95em;
+        }
+        .teacher-note strong { color: #922b21; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 25px;
+            font-size: 0.93em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background-color: #27ae60; color: #fff; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        .num { width: 28px; text-align: center; color: #777; }
+        .crit { font-weight: 600; color: #1e8449; white-space: nowrap; }
+        .crit-ai { font-weight: 600; color: #8e44ad; white-space: nowrap; }
+        .sev { font-weight: 600; white-space: nowrap; }
+        .b-block { color: #c0392b; }
+        .b-crit  { color: #d35400; }
+        .b-wich  { color: #b7950b; }
+        .answer-box {
+            background-color: #eafaf1;
+            border-left: 4px solid #27ae60;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        code { background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+        @media print {
+            body { background-color: #fff; margin: 0; }
+            .container { box-shadow: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Erwartungshorizont &ndash; DriveCheck-AI</h1>
+    <p><em>Nur für die Lehrkraft.</em></p>
+
+    <div class="teacher-note">
+        <strong>Konstruktionsprinzip:</strong> Das Dossier ist als <strong>Bijektion</strong> angelegt &ndash;
+        13 Befunde, 13 Kriterien, jedes genau einmal. Die Textfassung wurde gezielt so entschärft, dass keine
+        zwei Kriterien gleich plausibel auf denselben Befund passen. Wenn Sie das Dossier später erweitern,
+        prüfen Sie diese Eigenschaft erneut, sonst bricht die Selbstkontrolle in Aufgabe 1.
+    </div>
+
+    <h2>Aufgabe 0 — Die 94 %</h2>
+    <div class="answer-box">
+        <p><strong>1. Fachlicher Fehler:</strong> Eine Konfusionsmatrix ist eine <em>Tabelle</em> mit vier
+           Feldern (TP, FP, FN, TN) und kein einzelner Prozentwert. Herr Müller meint vermutlich die
+           <strong>Accuracy</strong> (Gesamt-Trefferquote), die man aus der Matrix berechnet.</p>
+        <p><strong>2. Rechnung:</strong> Bei 5 Schadensfällen von 100 Fahrzeugen erreicht ein Modell, das
+           immer „kein Schaden" sagt, eine Accuracy von <strong>95 %</strong> &ndash; und ist damit
+           <em>besser</em> als das Produktivmodell, obwohl es nichts kann. Klassisches
+           <strong>Accuracy-Paradoxon</strong> bei unbalancierten Klassen.</p>
+        <p><strong>3. Belegender Befund:</strong> Der übersehene Reifenriss (Werkstatt Frankfurt) ist ein
+           <strong>False Negative</strong> &ndash; genau der Fehlertyp, den die Accuracy versteckt.
+           Aussagekräftig wäre hier der <strong>Recall</strong> (Sensitivität) für sicherheitsrelevante
+           Schäden, getrennt ausgewiesen nach Subgruppen.</p>
+        <p><em>Anschlussfrage im Plenum:</em> Welcher Fehlertyp ist hier teurer &ndash; FP oder FN?
+           (FP = unberechtigte Rechnung, Ärger und Rückerstattung. FN = geplatzter Reifen.
+           Antwort: nicht symmetrisch, daher darf man nicht auf Accuracy optimieren.)</p>
+    </div>
+
+    <h2>Aufgabe 1 — Die 13 Zuordnungen</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="num">#</th>
+                <th style="width:23%;">Befund (Quelle)</th>
+                <th style="width:14%;">Kriterium</th>
+                <th style="width:22%;">Risiko</th>
+                <th style="width:29%;">Konsequenz für die IT</th>
+                <th>Stufe</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="num">1</td>
+                <td>Regen und Spiegelungen erzeugen 12 Phantomkratzer; bei Sonne funktioniert dasselbe Auto (#102)</td>
+                <td class="crit-ai">Robustheit</td>
+                <td>Falschabrechnungen bei jedem Regentag; Beschwerdewelle, Rückerstattungen</td>
+                <td>Training mit Wetter-Augmentierung (Tropfen, Reflexe, Nässe); Bildqualitätsprüfung vor der Analyse; bei schlechten Bedingungen Aufnahme ablehnen statt auswerten</td>
+                <td class="sev b-crit">Kritisch</td>
+            </tr>
+            <tr>
+                <td class="num">2</td>
+                <td>15 Minuten Upload für ein 4K-Video über Mobilfunk (#102)</td>
+                <td class="crit">Performance Efficiency</td>
+                <td>Kunden brechen ab; Rückgabestation blockiert; Datenvolumen-Kosten</td>
+                <td>Vorverarbeitung auf dem Gerät; Kompression und Auflösungsreduktion; nur ausgewählte Schlüsselbilder statt Vollvideo übertragen</td>
+                <td class="sev b-wich">Wichtig</td>
+            </tr>
+            <tr>
+                <td class="num">3</td>
+                <td>Absturz bei kurzem Netzausfall, Video danach gelöscht (#102)</td>
+                <td class="crit">Reliability</td>
+                <td>Datenverlust; kompletter Prozess muss wiederholt werden; Vertrauensverlust</td>
+                <td>Lokale Zwischenspeicherung vor dem Upload; wiederaufnehmbarer (resumable) Upload mit Auto-Resume; Fehlerbehandlung statt Absturz</td>
+                <td class="sev b-crit">Kritisch</td>
+            </tr>
+            <tr>
+                <td class="num">4</td>
+                <td>Screenreader liest nur „Button 1"; kein akustisches oder haptisches Feedback (#144)</td>
+                <td class="crit">Interaction Capability</td>
+                <td>Ausschluss von Menschen mit Behinderung; Verstoß gegen Barrierefreiheitsrecht (BFSG); Reputationsschaden</td>
+                <td>Sprechende Labels und Alternativtexte für alle Bedienelemente; Ton- und Vibrationsfeedback zur Kameraführung; Test mit TalkBack/VoiceOver ins Abnahmeverfahren</td>
+                <td class="sev b-crit">Kritisch</td>
+            </tr>
+            <tr>
+                <td class="num">5</td>
+                <td>Festgetrockneter Vogelschiss wird als Dachschaden gemeldet (Werkstatt)</td>
+                <td class="crit">Functional Suitability</td>
+                <td>Unberechtigte Rechnungen; Rückbuchungen; Support-Aufwand</td>
+                <td>Trainingsdaten um Verschmutzungen erweitern; eigene Klasse „Verschmutzung" einführen; Schwellwerte nachjustieren; Regressionstests mit Schmutzbildern</td>
+                <td class="sev b-crit">Kritisch</td>
+            </tr>
+            <tr>
+                <td class="num">6</td>
+                <td>Keine eigene Prüfstufe für sicherheitsrelevante Bauteile; Reifenriss läuft unter „grüner Haken" (Werkstatt)</td>
+                <td class="crit">Safety</td>
+                <td>Unfallgefahr für die nächsten Mietenden; Personenschaden; Produkthaftung, ggf. strafrechtliche Folgen</td>
+                <td>Reifen, Bremsen, Scheiben als eigene Prüfkategorie mit Pflicht-Sichtprüfung durch Personal; Fahrzeugfreigabe erst nach Vier-Augen-Bestätigung; Recall dieser Kategorie separat messen</td>
+                <td class="sev b-block">Blocker</td>
+            </tr>
+            <tr>
+                <td class="num">7</td>
+                <td>Kratzer werden bei Sonderlackierungen kaum erkannt; Kombi-Fahrende bekommen dreimal häufiger eine Rechnung (Dev)</td>
+                <td class="crit-ai">Fairness</td>
+                <td>Systematische Benachteiligung einer Kundengruppe; Diskriminierungsvorwurf; rechtliche Angreifbarkeit der Abrechnung</td>
+                <td>Datensatz nach Lackfarbe und Fahrzeugklasse ausbalancieren; Kennzahlen je Subgruppe getrennt ausweisen statt nur Gesamtwert; Schwellwerte pro Gruppe prüfen</td>
+                <td class="sev b-crit">Kritisch</td>
+            </tr>
+            <tr>
+                <td class="num">8</td>
+                <td>Bei 52 % Konfidenz wird hart aufgerundet und abgebucht statt eskaliert (Dev)</td>
+                <td class="crit-ai">Unsicherheit</td>
+                <td>Zweifelsfälle werden zulasten der Kundschaft entschieden; Klagerisiko</td>
+                <td>Unsicherheitskorridor definieren (z. B. 40&ndash;70 % &rarr; kein Automatismus); Human-in-the-Loop mit Prüf-Queue; Konfidenzwert mitspeichern und im Prozess anzeigen</td>
+                <td class="sev b-block">Blocker</td>
+            </tr>
+            <tr>
+                <td class="num">9</td>
+                <td>Datenbank speichert nur <code>Schaden = True</code>, kein Nachweis (Legal)</td>
+                <td class="crit-ai">Erklärbarkeit</td>
+                <td>Forderung vor Gericht nicht belegbar; Prozessverlust; alle Altfälle angreifbar</td>
+                <td>Beweiskette speichern: Originalbild, markierter Bildausschnitt (Bounding Box), Konfidenz, Modellversion, Zeitstempel &ndash; revisionssicher und dem Vertrag zugeordnet</td>
+                <td class="sev b-block">Blocker</td>
+            </tr>
+            <tr>
+                <td class="num">10</td>
+                <td>Kundendaten-Schnittstelle zwei Tage ohne Passwort erreichbar (Legal)</td>
+                <td class="crit">Security</td>
+                <td>Datenschutzverletzung; Meldepflicht nach Art. 33 DSGVO; Bußgeld; Vertrauensverlust</td>
+                <td>Authentifizierung und Autorisierung nachrüsten; Zugriffsprotokoll auswerten, wer zugegriffen hat; Meldeprozess auslösen; Penetrationstest vor Go-Live</td>
+                <td class="sev b-block">Blocker</td>
+            </tr>
+            <tr>
+                <td class="num">11</td>
+                <td>iOS-Modell startet auf den Android-Tablets nicht; Architektur zu starr (#201)</td>
+                <td class="crit">Flexibility</td>
+                <td>Bindung an teure Hardware; Ausrollen auf weitere Stationen blockiert</td>
+                <td>Modell in ein plattformunabhängiges Format überführen (ONNX/TFLite); Abstraktionsschicht zwischen App und Laufzeitumgebung; Zielplattformen in die Anforderungen aufnehmen</td>
+                <td class="sev b-wich">Wichtig</td>
+            </tr>
+            <tr>
+                <td class="num">12</td>
+                <td>JSON-Export scheitert am SAP-System der Buchhaltung (#201)</td>
+                <td class="crit">Compatibility</td>
+                <td>Manuelle Nacherfassung; Buchungsfehler; verzögerte Abrechnung</td>
+                <td>Adapter/Middleware mit dem von SAP erwartetem Format (z. B. IDoc/CSV); Schnittstellenspezifikation mit der Buchhaltung abstimmen und vertraglich fixieren</td>
+                <td class="sev b-wich">Wichtig</td>
+            </tr>
+            <tr>
+                <td class="num">13</td>
+                <td>Für die Schnee-Erkennung müssten 40 % des Codes umgeschrieben werden; kaum modular (#201)</td>
+                <td class="crit">Maintainability</td>
+                <td>Jede Änderung wird teuer und langsam; hohe Gefahr, beim Umbau neue Fehler einzubauen</td>
+                <td>Modularisierung: Datenvorverarbeitung, Modell und Geschäftslogik trennen; automatisierte Tests und Regressionsset aufbauen; technische Schulden dokumentieren und einplanen</td>
+                <td class="sev b-wich">Wichtig</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="teacher-note">
+        <strong>Typische Fehlzuordnungen &ndash; und wie Sie sie auflösen:</strong>
+        <ul>
+            <li><strong>#1 als Functional Suitability:</strong> Nachfragen &ndash; „Funktioniert es bei Sonne?"
+                Ja. Also kann das System es grundsätzlich; es scheitert an den <em>Eingabebedingungen</em>
+                &rarr; Robustheit.</li>
+            <li><strong>#6 als Functional Suitability:</strong> Nachfragen &ndash; „Was ist die
+                <em>Folge</em>?" Nicht eine falsche Rechnung, sondern ein geplatzter Reifen bei Tempo 130.
+                Sobald Leib und Leben betroffen sind &rarr; Safety. Der Erkennungsfehler an sich ist
+                bereits durch #5 abgedeckt.</li>
+            <li><strong>#7 als Robustheit:</strong> Nachfragen &ndash; „Wer wird dadurch benachteiligt?"
+                Bei #1 niemand systematisch, bei #7 eine bestimmte Kundengruppe &rarr; Fairness.</li>
+            <li><strong>#13 als Flexibility:</strong> Abgrenzung &ndash; Flexibility fragt nach der
+                <em>Umgebung</em> (läuft es woanders?), Maintainability nach dem <em>Aufwand einer
+                Änderung</em> (wie teuer ist der Umbau?).</li>
+        </ul>
+    </div>
+
+    <h2>Aufgabe 2 — Go/No-Go</h2>
+    <div class="answer-box">
+        <p><strong>Erwartete Empfehlung: No-Go bzw. Go nur mit Auflagen.</strong> Vier Blocker sprechen
+           gegen den Termin:</p>
+        <ul>
+            <li><strong>#6 Safety</strong> &ndash; Gefahr für Leib und Leben, nicht verhandelbar.</li>
+            <li><strong>#10 Security</strong> &ndash; bereits eingetretener Datenschutzvorfall, Meldepflicht läuft.</li>
+            <li><strong>#9 Erklärbarkeit</strong> und <strong>#8 Unsicherheit</strong> &ndash; zusammen bedeuten
+                sie: Das System bucht Geld ab, kann die Forderung nicht belegen und eskaliert Zweifelsfälle nicht.</li>
+        </ul>
+        <p><strong>Mögliche Auflagen für ein „Go mit Auflagen":</strong> Start als Assistenzsystem statt
+           Automatik &ndash; die KI schlägt vor, ein Mensch gibt frei; keine automatische Abbuchung;
+           sicherheitsrelevante Teile immer per Sichtprüfung; Schnittstelle sofort absichern;
+           Beweiskette ab Tag 1 mitschreiben; Pilotbetrieb an zwei Stationen statt flächendeckend.</p>
+        <p><em>Bewertungsschwerpunkt:</em> nicht die Stufe selbst, sondern die <strong>Begründung der
+           Reihenfolge</strong>. Gute Antworten unterscheiden Schaden für das Unternehmen (Geld, Ruf)
+           von Schaden für Dritte (Gesundheit, Grundrechte) und priorisieren Letzteres.</p>
+    </div>
+
+    <h2>Zusatzaufgabe — Art. 22 DSGVO</h2>
+    <div class="answer-box">
+        <p>Art. 22 DSGVO gibt betroffenen Personen das Recht, nicht einer ausschließlich automatisierten
+           Entscheidung mit rechtlicher Wirkung unterworfen zu werden. Eine automatische Abbuchung von
+           800 Euro ohne jede menschliche Beteiligung fällt darunter. Verlangt werden mindestens:
+           Eingreifen einer Person, Darlegung des eigenen Standpunkts und Anfechtungsmöglichkeit.</p>
+        <p>Brisanter werden dadurch <strong>#8 (Unsicherheit)</strong> &ndash; es gibt gar keinen
+           Eskalationspfad zu einem Menschen &ndash; und <strong>#9 (Erklärbarkeit)</strong> &ndash; ohne
+           Nachweis kann die betroffene Person die Entscheidung nicht sinnvoll anfechten.</p>
+        <p><em>Optionaler Ausbau Richtung EU AI Act:</em> Ist DriveCheck-AI ein Hochrisikosystem?
+           Diskussionswert &ndash; die Diskussion selbst ist der Lerngewinn.</p>
+    </div>
+</div>
+
+</body>
+</html>
