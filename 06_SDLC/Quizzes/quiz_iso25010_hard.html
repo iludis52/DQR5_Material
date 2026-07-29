@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISO 25010 Wissens-Check (Advanced)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Sticky Header für Fortschritt und Fehler */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes {
+            color: #dc3545;
+        }
+
+        /* Fortschrittsbalken */
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Container für alle Fragen */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>ISO 25010 (Advanced Level)</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Was unterscheidet das Qualitätsmerkmal 'Safety' (Sicherheit) fundamental von 'Security' (Informationssicherheit) im Kontext der ISO 25010 (2023)?",
+            options: [
+                "Safety fokussiert sich auf die Vermeidung von physischen Schäden an Mensch und Umwelt, während Security primär den Schutz von Systemdaten und Zugängen adressiert.",
+                "Safety bezieht sich auf die fehlerfreie Ausführung von mathematischen Algorithmen, während Security die korrekte Speicherung von Benutzereinstellungen adressiert.",
+                "Safety beschreibt die Fähigkeit des Systems zur schnellen Wiederherstellung nach Abstürzen, während Security die dauerhafte Verfügbarkeit der Hardware adressiert.",
+                "Safety gewährleistet die reibungslose Kompatibilität mit veralteten Schnittstellen, während Security die Verschlüsselung der internen Datenbanken adressiert."
+            ],
+            correct: 0,
+            explanation: "Exakt. 'Safety' wurde 2023 hinzugefügt, um Risiken für Menschenleben oder die Umwelt (z.B. bei medizinischen KIs oder autonomen Fahren) abzubilden, während 'Security' die klassische IT-Sicherheit meint."
+        },
+        {
+            text: "Welcher spezifische Aspekt fällt in der ISO 25010 unter den Hauptbegriff 'Maintainability' (Wartbarkeit) und ist besonders für langfristige Software-Projekte kritisch?",
+            options: [
+                "Die Skalierbarkeit der Server, welche sicherstellt, dass bei plötzlichen Lastspitzen durch viele Nutzer die Antwortzeiten des Gesamtsystems konstant niedrig bleiben.",
+                "Die Fehlertoleranz der App, welche sicherstellt, dass bei fehlerhaften Benutzereingaben sofort eine leicht verständliche Warnmeldung auf dem Bildschirm angezeigt wird.",
+                "Die Modularität des Codes, welche sicherstellt, dass Änderungen an einer einzelnen Komponente minimale Auswirkungen auf das restliche funktionierende System haben.",
+                "Die Interoperabilität der API, welche sicherstellt, dass externe Dienstleister über standardisierte JSON-Formate problemlos und sicher auf unsere Datenbank zugreifen."
+            ],
+            correct: 2,
+            explanation: "Korrekt! Modularität, Analysierbarkeit und Modifizierbarkeit sind zentrale Sub-Charakteristiken der Wartbarkeit (Maintainability)."
+        },
+        {
+            text: "Wenn ein System trotz eines Hardware-Ausfalls oder fehlerhafter Benutzereingaben weiterhin auf einem akzeptablen Leistungsniveau funktioniert, spricht man von...",
+            options: [
+                "...einer hohen 'Flexibility' (Flexibilität), insbesondere im Bereich der sogenannten Portierbarkeit und der Fähigkeit zur reibungslosen Hardware-Migration.",
+                "...einer hohen 'Compatibility' (Kompatibilität), insbesondere im Bereich der sogenannten Koexistenz und der Fähigkeit zur simultanen Datenverarbeitung.",
+                "...einer hohen 'Interaction Capability' (Interaktionsfähigkeit), insbesondere im Bereich der sogenannten Erlernbarkeit und der Fähigkeit zur klaren Benutzerführung.",
+                "...einer hohen 'Reliability' (Zuverlässigkeit), insbesondere im Bereich der sogenannten Fehlertoleranz und der Fähigkeit zur raschen Systemwiederherstellung."
+            ],
+            correct: 3,
+            explanation: "Richtig. Fehlertoleranz (Fault Tolerance) und Wiederherstellbarkeit (Recoverability) sind die zentralen Pfeiler der Zuverlässigkeit (Reliability)."
+        },
+        {
+            text: "Im Bereich der KI-spezifischen Qualitätsmerkmale: Wie grenzt sich 'Robustheit' am besten von der allgemeinen 'Zuverlässigkeit' ab?",
+            options: [
+                "Robustheit bewertet spezifisch, wie schnell ein Algorithmus bei exponentiell wachsenden Datensätzen (Big Data) auf verschiedenen Cloud-Servern parallel berechnet.",
+                "Robustheit bewertet spezifisch, wie fair ein System bei unterschiedlichen demografischen Gruppen (Bias-Vermeidung) in der automatisierten Entscheidungsfindung reagiert.",
+                "Robustheit bewertet spezifisch, wie stabil ein Modell bei verrauschten, gedrehten oder absichtlich manipulierten Eingabedaten (Adversarial Attacks) entscheidet.",
+                "Robustheit bewertet spezifisch, wie transparent eine KI bei hochkomplexen Vorhersagen (Deep Learning) ihre internen Gewichtungen für den Endanwender visualisiert."
+            ],
+            correct: 2,
+            explanation: "Genau! Robustheit bezieht sich bei KI explizit auf die Stabilität der Inferenz bei Rauschen oder gezielten Störungen (wie Adversarial Patches)."
+        },
+        {
+            text: "Ein Nutzer installiert eine neue Software, die daraufhin andere, bereits vorhandene Programme auf dem Computer blockiert. Welches ISO 25010-Merkmal wurde hier primär verletzt?",
+            options: [
+                "Das Merkmal 'Maintainability' (Wartbarkeit), genauer gesagt der Aspekt der Analysierbarkeit, da die Software ihre internen Fehlerprotokolle nicht korrekt exportieren kann.",
+                "Das Merkmal 'Functional Suitability' (Funktionale Eignung), genauer gesagt der Aspekt der Korrektheit, da die Software ihre versprochenen Hauptfunktionen nicht abliefert.",
+                "Das Merkmal 'Compatibility' (Kompatibilität), genauer gesagt der Aspekt der Koexistenz, da die Software ihre Systemumgebung nicht negativ beeinträchtigen darf.",
+                "Das Merkmal 'Performance Efficiency' (Leistungseffizienz), genauer gesagt der Aspekt des Zeitverhaltens, da die Software ihre Ladeprozesse nicht ausreichend optimiert."
+            ],
+            correct: 2,
+            explanation: "Richtig. Kompatibilität besteht aus Interoperabilität (Datenaustausch) und Koexistenz (keine negativen Auswirkungen auf andere Software auf demselben System)."
+        },
+        {
+            text: "Warum wird bei KI-Modellen das Merkmal 'Unsicherheit' (Uncertainty) zusätzlich zu den klassischen ISO 25010 Metriken als essenziell für die Software-Qualität betrachtet?",
+            options: [
+                "Weil ein KI-System idealerweise permanent überprüfen sollte, ob die Trainingsdaten lizenzfrei sind, um juristische Streitigkeiten (Copyright-Infringement) abzuwehren.",
+                "Weil ein KI-System idealerweise transparent kommunizieren sollte, wann es sich bei einer Vorhersage nicht sicher ist, um menschliche Überprüfungen auszulösen.",
+                "Weil ein KI-System idealerweise automatisch erkennen sollte, auf welchen Hardware-Architekturen es läuft, um unnötige Berechnungen (Resource-Wasting) zu unterbinden.",
+                "Weil ein KI-System idealerweise kontinuierlich messen sollte, wie viele Nutzer gleichzeitig online sind, um dynamische Skalierungen (Load-Balancing) durchzuführen."
+            ],
+            correct: 1,
+            explanation: "Exakt. Modelle dürfen nicht immer blind 100% Sicherheit vortäuschen. Die korrekte Angabe von Unsicherheit erlaubt sinnvolle 'Human-in-the-Loop'-Entscheidungen."
+        },
+        {
+            text: "'Interaction Capability' (früher Usability) umfasst mehr als nur ein schickes Design. Welcher der folgenden Aspekte gehört laut der Norm zwingend in diese Kategorie?",
+            options: [
+                "Die explizite Berücksichtigung von Barrierefreiheit (Accessibility), sodass auch Menschen mit physischen oder kognitiven Einschränkungen das System problemlos bedienen können.",
+                "Die explizite Verschlüsselung von Nutzerpasswörtern (Cryptography), sodass auch Angreifer mit enormer Rechenleistung das System unter keinen Umständen kompromittieren können.",
+                "Die explizite Dokumentation von Programmier-Schnittstellen (API-Design), sodass auch externe Entwickler-Teams das System jederzeit ohne großen Aufwand erweitern können.",
+                "Die explizite Bereitstellung von automatisierten Backups (Data-Recovery), sodass auch Administratoren mit wenig Erfahrung das System nach einem Server-Crash wiederherstellen können."
+            ],
+            correct: 0,
+            explanation: "Richtig! Accessibility (Barrierefreiheit) ist eine formale Sub-Charakteristik der Interaction Capability und verlangt, dass Systeme für Menschen mit unterschiedlichsten Fähigkeiten nutzbar sind."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
