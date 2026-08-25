@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Interaction Wissens-Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .mistakes { color: #dc3545; }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1>Feature Interaction – Grundverständnis</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // MODULARITÄT: Hier einfach weitere Objekte hinzufügen, um neue Fragen zu generieren.
+    const questions = [
+        {
+            text: "In welchem der folgenden Fälle liegt eine Feature Interaction vor?",
+            options: [
+                "Ein höherer Preis senkt immer die Nachfrage, egal bei welchem Produkt.",
+                "Größere Wohnungen kosten generell mehr als kleinere Wohnungen.",
+                "Zwei Sensoren liefern fast immer denselben Messwert.",
+                "Koffein wirkt stärker, wenn man müde ist."
+            ],
+            correct: 3,
+            explanation: "Bei Koffein hängt die Wirkung von einem zweiten Merkmal (Müdigkeit) ab – das ist Interaktion. Preis und Wohnungsgröße sind reine Haupteffekte (feste Wirkung), die beiden Sensoren nur ein Fall von Korrelation."
+        },
+        {
+            text: "Zwei Merkmale wirken rein additiv auf die Zielgröße. Was folgt daraus?",
+            options: [
+                "Der Effekt jedes Merkmals ist unabhängig vom anderen.",
+                "Die beiden Merkmale müssen stark korreliert sein.",
+                "Mindestens eines der Merkmale ist unwichtig für die Vorhersage.",
+                "Die Zielgröße lässt sich nur mit einem Entscheidungsbaum vorhersagen."
+            ],
+            correct: 0,
+            explanation: "Additiv heißt: Die Vorhersage ist die Summe der Einzelwirkungen, der Interaktionsterm ist null. Der Effekt des einen Merkmals ist dann unabhängig von der Ausprägung des anderen – mit Korrelation oder Wichtigkeit hat das nichts zu tun."
+        },
+        {
+            text: "Ein Modell schätzt die Motorleistung (in PS) aus Turbolader (ja/nein) und Kraftstoff (Standard/Premium): ohne Turbo & Standard = 100, ohne Turbo & Premium = 110, mit Turbo & Standard = 140, mit Turbo & Premium = 180. Wie groß ist der Interaktionsterm?",
+            options: [
+                "0",
+                "30",
+                "40",
+                "80"
+            ],
+            correct: 1,
+            explanation: "Turbo bringt bei Standard-Kraftstoff 140 − 100 = 40 PS, bei Premium 180 − 110 = 70 PS. Der Interaktionsterm ist die Differenz dieser Differenzen: 70 − 40 = 30. Additiv erwartet man denselben Turbo-Gewinn – hier ist er kraftstoffabhängig."
+        },
+        {
+            text: "Welche Aussage beschreibt KEINE Interaktion, sondern nur einen Haupteffekt?",
+            options: [
+                "Ein Klebstoff haftet nur auf trockenem Untergrund.",
+                "Ein Medikament wirkt bei Kindern anders als bei Erwachsenen.",
+                "Ein wärmerer Raum erhöht den Stromverbrauch der Kühlung.",
+                "Ein Werkzeug schneidet gut nur bei hoher Drehzahl und scharfer Klinge."
+            ],
+            correct: 2,
+            explanation: "Beim wärmeren Raum wirkt eine Größe (Temperatur) für sich auf die Zielgröße – ein Haupteffekt. Klebstoff, Medikament und Werkzeug beschreiben Wirkungen, die von einem zweiten Merkmal abhängen (Trockenheit, Altersgruppe, Drehzahl + Klinge) – das sind Interaktionen."
+        },
+        {
+            text: "Ein rein lineares, additives Modell (nur x₁ und x₂) soll eine Interaktion abbilden. Was ist dafür nötig?",
+            options: [
+                "Nichts – lineare Modelle erfassen Interaktionen automatisch.",
+                "Man muss die Zielgröße vorher logarithmieren.",
+                "Man muss die beiden Merkmale normalisieren (skalieren).",
+                "Man muss ein Kombinationsmerkmal wie x₁·x₂ ergänzen."
+            ],
+            correct: 3,
+            explanation: "Ein additives lineares Modell ist strukturell interaktionsblind. Erst ein explizit ergänzter Kombinationsterm (etwa das Produkt x₁·x₂) bringt die Wechselwirkung hinein. Bäume und Forests finden solche Kombinationen dagegen von selbst."
+        },
+        {
+            text: "Ein Sprint-Training verbessert die Leistung bei ausgeruhten Sportlern, verschlechtert sie aber bei übermüdeten. Wie heißt dieses Muster?",
+            options: [
+                "Ein Haupteffekt, der bei allen Sportlern gleich stark wirkt.",
+                "Eine Korrelation zwischen Training und Ausgeruhtheit.",
+                "Eine Interaktion mit Vorzeichenwechsel.",
+                "Ein Messfehler, der sich bei Übermüdung häuft."
+            ],
+            correct: 2,
+            explanation: "Dasselbe Training hilft im einen Kontext (ausgeruht) und schadet im anderen (übermüdet) – die Wirkung kehrt ihr Vorzeichen um. Das ist die stärkste Form einer Interaktion, kein Haupteffekt und keine bloße Korrelation."
+        },
+        {
+            text: "„Mehr Regen → feuchterer Boden → höheres Pflanzenwachstum.“ Wie ist der Zusammenhang zwischen Regen und Wachstum am besten beschrieben?",
+            options: [
+                "Direkt – Regen wirkt unmittelbar auf das Pflanzenwachstum.",
+                "Indirekt – über die Bodenfeuchte vermittelt.",
+                "Als Interaktion mit Vorzeichenwechsel.",
+                "Es besteht gar kein kausaler Zusammenhang."
+            ],
+            correct: 1,
+            explanation: "Regen wirkt nicht unmittelbar, sondern über die Bodenfeuchte (Regen → Feuchte → Wachstum). Das ist ein indirekter, vermittelter Effekt (Kette) – zu unterscheiden von einer direkten Interaktion, bei der die Wirkung von A direkt von B abhängt."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(title);
+            card.appendChild(text);
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return;
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>

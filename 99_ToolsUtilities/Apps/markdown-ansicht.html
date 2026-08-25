@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="de" data-thema="handout-blau">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown-Ansicht · iludis</title>
+
+<!--
+  ============================================================================
+  Markdown-Ansicht — monolithische Web-App
+  ----------------------------------------------------------------------------
+  Bibliotheken werden zuerst vom CDN geladen, bei Fehlschlag aus ./vendor/.
+  Für den Offline-Betrieb neben diese Datei einen Ordner "vendor" legen mit:
+      vendor/markdown-it.min.js
+      vendor/markdown-it-footnote.min.js
+      vendor/highlight.min.js
+      vendor/mermaid.min.js
+      vendor/katex.min.js
+      vendor/katex-auto-render.min.js
+      vendor/katex/katex.min.css   (+ Unterordner "fonts")
+
+  Zwei getrennte Stylesheets:
+    #css-app       — nur die Bedienoberfläche
+    #css-dokument  — Stile, Dokumentsatz, Druck; wird beim HTML-Export
+                     unverändert in die gesicherte Datei übernommen
+  ============================================================================
+-->
+
+<link id="katex-css" rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+      onerror="this.onerror=null;this.href='./vendor/katex/katex.min.css';">
+
+<style id="css-app">
+/* ==========================================================================
+   Bedienoberfläche (bewusst zurückhaltend — das Dokument ist der Star)
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --chrome-bg:     #1f2933;
+  --chrome-bg-2:   #f2f4f7;
+  --chrome-fg:     #e7ecf2;
+  --chrome-fg-dim: #9aa8b6;
+  --chrome-linie:  #d6dbe1;
+  --akzent:        #0969DA;
+  --leiste-hoehe:  52px;
+  --seiten-breite: 300px;
+}
+
+/* Wurzel darf unter keinen Umständen scrollen — sonst schiebt ein
+   programmatischer Scroll die Werkzeugleiste unerreichbar aus dem Bild. */
+html { overflow: hidden; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: Arial, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: #1f2933;
+  background: var(--arbeit-bg, #e4e7eb);
+  display: grid;
+  grid-template-rows: var(--leiste-hoehe) 1fr 26px;
+  grid-template-columns: var(--seiten-breite) 1fr;
+  grid-template-areas: "leiste leiste" "seite blatt" "status status";
+  overflow: hidden;
+}
+body.ohne-seitenleiste { grid-template-columns: 0 1fr; }
+
+/* --- Werkzeugleiste ------------------------------------------------------ */
+.leiste {
+  grid-area: leiste;
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid #000;
+  overflow-x: auto; overflow-y: hidden;
+}
+.leiste::-webkit-scrollbar { height: 0; }
+.marke {
+  font-weight: 700; letter-spacing: .04em; font-size: 13px;
+  padding-right: 10px; margin-right: 2px;
+  border-right: 1px solid #3a4652; height: 26px; line-height: 26px;
+  white-space: nowrap; flex: none;
+}
+.marke span { color: var(--chrome-fg-dim); font-weight: 400; }
+
+.knopf {
+  font: inherit; font-size: 13px;
+  background: #2c3742; color: var(--chrome-fg);
+  border: 1px solid #3f4b58; border-radius: 5px;
+  padding: 6px 11px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap; flex: none;
+}
+.knopf:hover { background: #38424e; }
+.knopf:active { background: #232c35; }
+.knopf.primaer { background: var(--akzent); border-color: var(--akzent); }
+.knopf.primaer:hover { background: #0b7ef5; }
+.knopf[disabled] { opacity: .4; cursor: default; }
+.knopf:focus-visible, select:focus-visible,
+input:focus-visible, .datei-eintrag:focus-visible {
+  outline: 2px solid #7cc0ff; outline-offset: 2px;
+}
+
+.leiste select {
+  font: inherit; font-size: 13px; flex: none;
+  background: #2c3742; color: var(--chrome-fg);
+  border: 1px solid #3f4b58; border-radius: 5px; padding: 6px 8px;
+}
+.leiste label.schalter {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  color: var(--chrome-fg-dim); font-size: 12.5px; cursor: pointer;
+  white-space: nowrap;
+}
+.trenner { width: 1px; height: 26px; background: #3a4652; margin: 0 4px; flex: none; }
+.dehner  { flex: 1 0 8px; }
+
+.zoomfeld { display: inline-flex; flex: none; }
+.zoomfeld .knopf { border-radius: 0; padding: 6px 9px; }
+.zoomfeld .knopf:first-child { border-radius: 5px 0 0 5px; }
+.zoomfeld .knopf:last-child  { border-radius: 0 5px 5px 0; border-left: none; }
+
+.breitenfeld { display: inline-flex; align-items: center; gap: 7px; flex: none; }
+.breitenfeld input[type="range"] { width: 118px; accent-color: var(--akzent); cursor: pointer; }
+.breitenfeld .wert {
+  font-size: 11.5px; color: var(--chrome-fg-dim);
+  min-width: 46px; font-variant-numeric: tabular-nums;
+}
+.breitenfeld .wert.gesetzt { color: var(--chrome-fg); }
+
+/* --- Seitenleiste -------------------------------------------------------- */
+.seitenleiste {
+  grid-area: seite;
+  background: var(--chrome-bg-2);
+  border-right: 1px solid var(--chrome-linie);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+body.ohne-seitenleiste .seitenleiste { display: none; }
+.abschnitt { display: flex; flex-direction: column; min-height: 0; }
+.abschnitt.dateien { flex: 1 1 45%; border-bottom: 1px solid var(--chrome-linie); }
+.abschnitt.gliederung { flex: 1 1 55%; }
+.abschnitt > h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: #64748b; margin: 0; padding: 11px 14px 7px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.abschnitt > h2 em {
+  font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.abschnitt .inhalt { overflow-y: auto; padding: 0 8px 12px; }
+
+.datei-eintrag {
+  display: block; width: 100%; text-align: left;
+  font: inherit; font-size: 13px; color: #26313c;
+  background: none; border: 0; border-radius: 5px;
+  padding: 6px 8px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.datei-eintrag:hover { background: #e3e8ef; }
+.datei-eintrag.aktiv { background: var(--akzent); color: #fff; }
+.datei-eintrag .pfad { color: #7b8794; font-size: 11.5px; }
+.datei-eintrag.aktiv .pfad { color: #cfe4ff; }
+
+.gliederung a {
+  display: block; font-size: 13px; color: #26313c; text-decoration: none;
+  padding: 4px 8px; border-radius: 5px; border-left: 2px solid transparent;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gliederung a:hover { background: #e3e8ef; }
+.gliederung a.aktiv { border-left-color: var(--akzent); color: var(--akzent); font-weight: 700; }
+.gliederung a.stufe-2 { padding-left: 20px; }
+.gliederung a.stufe-3 { padding-left: 34px; font-size: 12.5px; color: #52606d; }
+.gliederung a.stufe-4 { padding-left: 48px; font-size: 12.5px; color: #7b8794; }
+.leer-hinweis { color: #7b8794; font-size: 12.5px; padding: 4px 8px 10px; line-height: 1.5; }
+
+/* --- Statuszeile --------------------------------------------------------- */
+.status {
+  grid-area: status;
+  background: var(--chrome-bg); color: var(--chrome-fg-dim);
+  font-size: 11.5px; display: flex; align-items: center; gap: 14px;
+  padding: 0 12px; overflow: hidden; white-space: nowrap;
+}
+.status b { color: var(--chrome-fg); font-weight: 400; }
+.status .ok   { color: #6ee7a8; }
+.status .weg  { color: #f0a04b; }
+.status .fehl { color: #f47272; }
+
+/* --- Arbeitsfläche ------------------------------------------------------- */
+.arbeitsflaeche {
+  grid-area: blatt;
+  overflow-y: auto; overflow-x: hidden;
+  padding: var(--arbeit-innen, 26px);
+  padding-bottom: 110px;
+  background: var(--arbeit-bg, #e4e7eb);
+  scroll-behavior: smooth;
+}
+
+/* --- Startzustand -------------------------------------------------------- */
+.start { max-width: 620px; margin: 4vh auto; color: #3e4c59; line-height: 1.6; }
+.start h1 { font-size: 24px; margin: 0 0 6px; color: #1f2933; }
+.start p.unter { color: #64748b; margin: 0 0 26px; }
+.start .karte {
+  background: #fff; border: 1px solid #dde3ea; border-radius: 8px;
+  padding: 18px 20px; margin-bottom: 14px;
+}
+.start .karte h3 { margin: 0 0 8px; font-size: 14px; }
+.start code {
+  background: #eef1f5; border-radius: 3px; padding: 1px 5px;
+  font-family: Consolas, "Courier New", monospace; font-size: 12.5px;
+}
+.start ul { margin: 6px 0 0; padding-left: 20px; }
+.start li { margin: 3px 0; }
+
+@media print {
+  .leiste, .seitenleiste, .status, .start { display: none !important; }
+  html, body { overflow: visible; height: auto; }
+  body { display: block; background: #fff; }
+  .arbeitsflaeche { overflow: visible; padding: 0; background: #fff; }
+}
+</style>
+
+<style id="css-dokument">
+/* ==========================================================================
+   Stile (Themes) — steuern ausschließlich das Dokument, nicht die App.
+   Dieser Block wird beim HTML-Export mitgesichert.
+   ========================================================================== */
+:root { --zoom: 1; }
+
+/* -- Handout /blau: die Word-Vorlage als Bildschirm-Entsprechung ---------- */
+html[data-thema="handout-blau"] {
+  --arbeit-bg:  #e4e7eb;
+  --dok-bg:     #ffffff;
+  --dok-fg:     #14202b;
+  --dok-akzent: #0969DA;
+  --dok-leise:  #5a6b7b;
+  --dok-linie:  #dbe1e8;
+  --dok-schrift: Arial, "Helvetica Neue", sans-serif;
+  --dok-code-schrift: Consolas, "Courier New", monospace;
+  --dok-fs: 11.2pt; --dok-lh: 1.55;
+  --dok-breite: 21cm;
+  --dok-innen: 2.4cm 2.5cm 2.6cm;
+  --dok-code-bg: #f5f7fa;
+  --dok-tab-kopf: #eef3f9;
+}
+/* -- Handout /grün: gleiche Struktur, eigener Farbklang ------------------- */
+html[data-thema="handout-gruen"] {
+  --arbeit-bg:  #e6eae4;
+  --dok-bg:     #fffefa;
+  --dok-fg:     #17241d;
+  --dok-akzent: #0f7a4f;
+  --dok-leise:  #55685e;
+  --dok-linie:  #dae2dc;
+  --dok-schrift: Arial, "Helvetica Neue", sans-serif;
+  --dok-code-schrift: Consolas, "Courier New", monospace;
+  --dok-fs: 11.2pt; --dok-lh: 1.55;
+  --dok-breite: 21cm;
+  --dok-innen: 2.4cm 2.5cm 2.6cm;
+  --dok-code-bg: #f4f8f5;
+  --dok-tab-kopf: #edf5f0;
+}
+/* -- Beamer: Projektion, hoher Kontrast, große Schrift -------------------- */
+html[data-thema="beamer"] {
+  --arbeit-bg:  #0d1319;
+  --dok-bg:     #141c24;
+  --dok-fg:     #e8eef4;
+  --dok-akzent: #4da3ff;
+  --dok-leise:  #93a4b4;
+  --dok-linie:  #2b3947;
+  --dok-schrift: "Segoe UI", Arial, sans-serif;
+  --dok-code-schrift: Consolas, "Courier New", monospace;
+  --dok-fs: 17pt; --dok-lh: 1.6;
+  --dok-breite: 30cm;
+  --dok-innen: 2cm 2.4cm 3cm;
+  --dok-code-bg: #0d151d;
+  --dok-tab-kopf: #1b2733;
+  --dok-schatten: none;
+  --dok-radius: 6px;
+}
+/* -- Vollbreite: randlos, nutzt die ganze Fensterbreite ------------------- */
+html[data-thema="voll"] {
+  --arbeit-bg:  #ffffff;
+  --dok-bg:     #ffffff;
+  --dok-fg:     #16202a;
+  --dok-akzent: #0969DA;
+  --dok-leise:  #5a6b7b;
+  --dok-linie:  #e0e5ea;
+  --dok-schrift: "Segoe UI", Arial, sans-serif;
+  --dok-code-schrift: Consolas, "Courier New", monospace;
+  --dok-fs: 11.5pt; --dok-lh: 1.6;
+  --dok-breite: 100%;
+  --dok-innen: 22px 30px 80px;
+  --dok-code-bg: #f6f8fa;
+  --dok-tab-kopf: #f2f5f8;
+  --dok-schatten: none;
+  --dok-radius: 0;
+  --arbeit-innen: 0;
+}
+/* -- GitHub: vertraute Vorschau, betont neutral --------------------------- */
+html[data-thema="github"] {
+  --arbeit-bg:  #f0f2f5;
+  --dok-bg:     #ffffff;
+  --dok-fg:     #1f2328;
+  --dok-akzent: #0969DA;
+  --dok-leise:  #656d76;
+  --dok-linie:  #d1d9e0;
+  --dok-schrift: -apple-system, "Segoe UI", "Noto Sans", Arial, sans-serif;
+  --dok-code-schrift: ui-monospace, Consolas, monospace;
+  --dok-fs: 12pt; --dok-lh: 1.6;
+  --dok-breite: 22cm;
+  --dok-innen: 2cm 2.2cm 3cm;
+  --dok-code-bg: #f6f8fa;
+  --dok-tab-kopf: #f6f8fa;
+  --dok-radius: 6px;
+  --dok-rahmen: 1px solid #d1d9e0;
+  --dok-schatten: none;
+}
+
+/* ==========================================================================
+   Blatt und Dokumentsatz
+   ========================================================================== */
+.blatt {
+  margin: 0 auto;
+  max-width: var(--breite-override, var(--dok-breite, 21cm));
+  background: var(--dok-bg, #fff);
+  color: var(--dok-fg, #14202b);
+  padding: var(--dok-innen, 2.4cm 2.5cm 2.6cm);
+  box-shadow: var(--dok-schatten, 0 1px 3px rgba(15,30,50,.14), 0 12px 32px rgba(15,30,50,.10));
+  border-radius: var(--dok-radius, 3px);
+  border: var(--dok-rahmen, none);
+}
+
+.dokument {
+  font-family: var(--dok-schrift);
+  font-size: calc(var(--dok-fs) * var(--zoom, 1));
+  line-height: var(--dok-lh);
+  color: var(--dok-fg);
+  overflow-wrap: break-word;
+}
+.dokument > :first-child { margin-top: 0; }
+.dokument p { margin: 0 0 .85em; }
+
+.dokument h1, .dokument h2, .dokument h3,
+.dokument h4, .dokument h5, .dokument h6 {
+  font-family: var(--dok-schrift);
+  line-height: 1.25; margin: 1.6em 0 .5em;
+  scroll-margin-top: 20px; break-after: avoid; page-break-after: avoid;
+}
+.dokument h1 {
+  font-size: 1.9em; color: var(--dok-akzent);
+  margin-top: 0; padding-bottom: .28em;
+  border-bottom: 2px solid var(--dok-akzent);
+}
+.dokument h2 {
+  font-size: 1.42em; color: var(--dok-akzent);
+  padding-bottom: .2em; border-bottom: 1px solid var(--dok-linie);
+}
+.dokument h3 { font-size: 1.16em; }
+.dokument h4 { font-size: 1.02em; color: var(--dok-leise); }
+
+/* GitHub setzt Überschriften neutral — deutlicher Unterschied zum Handout */
+html[data-thema="github"] .dokument h1,
+html[data-thema="github"] .dokument h2 {
+  color: var(--dok-fg); font-weight: 600;
+  border-bottom: 1px solid var(--dok-linie);
+}
+html[data-thema="github"] .dokument h1 { font-size: 2em; }
+html[data-thema="github"] .dokument h2 { font-size: 1.5em; }
+html[data-thema="voll"] .dokument h1 { font-size: 1.7em; }
+
+.dokument a { color: var(--dok-akzent); text-decoration: none; border-bottom: 1px solid currentColor; }
+.dokument a:hover { opacity: .78; }
+.dokument a.md-verweis { border-bottom-style: dashed; cursor: pointer; }
+.dokument a.fehlt { color: #b42318; border-bottom-style: dotted; }
+
+.dokument ul, .dokument ol { margin: 0 0 .9em; padding-left: 1.5em; }
+.dokument li { margin: .22em 0; }
+.dokument li > ul, .dokument li > ol { margin-bottom: .2em; }
+.dokument li.aufgabe { list-style: none; margin-left: -1.35em; }
+.dokument li.aufgabe input { margin-right: .5em; }
+
+.dokument hr { border: 0; border-top: 1px solid var(--dok-linie); margin: 1.8em 0; }
+
+.dokument blockquote {
+  margin: 1em 0; padding: .1em 1.1em;
+  border-left: 3px solid var(--dok-linie); color: var(--dok-leise);
+}
+
+/* -- Tabellen: breite Tabellen scrollen, statt rechts herauszulaufen ------ */
+.tabelle-huelle {
+  margin: 1.1em 0; max-width: 100%;
+  overflow-x: auto; overflow-y: hidden;
+  border-radius: 3px;
+}
+.tabelle-huelle table { margin: 0; }
+.tabelle-huelle.scrollt { box-shadow: inset -14px 0 12px -14px rgba(0,0,0,.28); }
+.dokument table {
+  border-collapse: collapse; width: 100%;
+  margin: 1.1em 0; font-size: .94em;
+  break-inside: avoid;
+}
+.dokument th, .dokument td {
+  border: 1px solid var(--dok-linie);
+  padding: .46em .7em; text-align: left; vertical-align: top;
+}
+.dokument th { background: var(--dok-tab-kopf); font-weight: 700; }
+
+/* -- Code ----------------------------------------------------------------- */
+.dokument code {
+  font-family: var(--dok-code-schrift); font-size: .88em;
+  background: var(--dok-code-bg);
+  border: 1px solid var(--dok-linie); border-radius: 3px;
+  padding: .08em .32em;
+}
+.dokument pre {
+  background: var(--dok-code-bg);
+  border: 1px solid var(--dok-linie); border-left: 3px solid var(--dok-akzent);
+  border-radius: 4px; padding: .8em 1em; margin: 1em 0;
+  overflow-x: auto; break-inside: avoid;
+}
+.dokument pre code { background: none; border: 0; padding: 0; font-size: .86em; line-height: 1.5; }
+.sprach-marke {
+  display: block; font-family: var(--dok-code-schrift);
+  font-size: .68em; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--dok-leise); margin-bottom: .5em;
+}
+
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: #a2298c; }
+.hljs-string, .hljs-regexp, .hljs-attr { color: #0a7a44; }
+.hljs-number, .hljs-symbol { color: #b45309; }
+.hljs-comment, .hljs-quote { color: var(--dok-leise); font-style: italic; }
+.hljs-title, .hljs-function .hljs-title, .hljs-section { color: #0550ae; }
+.hljs-type, .hljs-class .hljs-title, .hljs-name { color: #0f766e; }
+.hljs-variable, .hljs-template-variable, .hljs-params { color: var(--dok-fg); }
+.hljs-meta, .hljs-doctag { color: #6b7280; }
+html[data-thema="beamer"] .hljs-keyword, html[data-thema="beamer"] .hljs-built_in,
+html[data-thema="beamer"] .hljs-literal, html[data-thema="beamer"] .hljs-selector-tag { color: #ff9ee0; }
+html[data-thema="beamer"] .hljs-string, html[data-thema="beamer"] .hljs-attr { color: #86efac; }
+html[data-thema="beamer"] .hljs-number { color: #fbbf24; }
+html[data-thema="beamer"] .hljs-title, html[data-thema="beamer"] .hljs-section { color: #7cc0ff; }
+html[data-thema="beamer"] .hljs-type, html[data-thema="beamer"] .hljs-name { color: #5eead4; }
+
+/* -- Abbildungen ---------------------------------------------------------- */
+.dokument img { max-width: 100%; height: auto; border-radius: 2px; }
+.dokument figure { margin: 1.3em 0; text-align: center; break-inside: avoid; }
+.dokument figure img { border: 1px solid var(--dok-linie); }
+.dokument figcaption { font-size: .84em; color: var(--dok-leise); margin-top: .55em; text-align: center; }
+.dokument figcaption .nummer { font-weight: 700; color: var(--dok-fg); }
+.bild-fehlt {
+  display: inline-block; padding: .7em 1em; text-align: left;
+  border: 1px dashed #d98b8b; border-radius: 4px;
+  background: #fdf3f3; color: #a83232; font-size: .85em;
+}
+html[data-thema="beamer"] .bild-fehlt { background: #2a1a1a; border-color: #7a4040; color: #ff9b9b; }
+
+/* -- Mermaid -------------------------------------------------------------- */
+.mermaid-huelle { margin: 1.3em 0; text-align: center; break-inside: avoid; }
+.mermaid { display: inline-block; max-width: 100%; }
+.mermaid svg { max-width: 100%; height: auto; }
+.mermaid-fehler {
+  text-align: left; font-family: var(--dok-code-schrift); font-size: .8em;
+  border: 1px dashed #d98b8b; background: #fdf3f3; color: #a83232;
+  padding: .7em 1em; border-radius: 4px; white-space: pre-wrap;
+}
+
+/* -- Hinweisboxen (Hausstil) ---------------------------------------------- */
+.callout {
+  --box-farbe: var(--dok-akzent);
+  --box-flaeche: #f3f8ff;
+  margin: 1.15em 0; padding: .85em 1.1em .9em;
+  border: 1px solid var(--box-farbe);
+  border-left: 4px solid var(--box-farbe);
+  border-radius: 4px; background: var(--box-flaeche);
+  break-inside: avoid;
+}
+.callout > :last-child { margin-bottom: 0; }
+.callout-titel { font-weight: 700; color: var(--box-farbe); margin: 0 0 .4em; font-size: .95em; }
+.callout-konzept, .callout-hinweis, .callout-note { --box-farbe: #0969DA; --box-flaeche: #f2f8ff; }
+.callout-warnung, .callout-warning, .callout-caution { --box-farbe: #b45309; --box-flaeche: #fffaf0; }
+.callout-tipp, .callout-tip, .callout-faustregel { --box-farbe: #17803d; --box-flaeche: #f2fbf5; }
+.callout-prompt { --box-farbe: #4f46e5; --box-flaeche: #f5f4ff; }
+.callout-tool { --box-farbe: #0f766e; --box-flaeche: #f0fbfa; }
+.callout-merke, .callout-important { --box-farbe: #7e22ce; --box-flaeche: #faf5ff; }
+html[data-thema="handout-gruen"] .callout-konzept,
+html[data-thema="handout-gruen"] .callout-hinweis,
+html[data-thema="handout-gruen"] .callout-note { --box-farbe: #0f7a4f; --box-flaeche: #f1f9f4; }
+html[data-thema="beamer"] .callout { --box-flaeche: rgba(255,255,255,.05); }
+html[data-thema="beamer"] .callout-konzept, html[data-thema="beamer"] .callout-hinweis,
+html[data-thema="beamer"] .callout-note    { --box-farbe: #6cb6ff; }
+html[data-thema="beamer"] .callout-warnung, html[data-thema="beamer"] .callout-warning,
+html[data-thema="beamer"] .callout-caution { --box-farbe: #f5b544; }
+html[data-thema="beamer"] .callout-tipp, html[data-thema="beamer"] .callout-tip,
+html[data-thema="beamer"] .callout-faustregel { --box-farbe: #6ee7a8; }
+html[data-thema="beamer"] .callout-prompt  { --box-farbe: #a5a0ff; }
+html[data-thema="beamer"] .callout-tool    { --box-farbe: #5eead4; }
+html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-important { --box-farbe: #d8a5ff; }
+
+/* -- Kopfzeile aus dem Frontmatter ---------------------------------------- */
+.dok-kopf {
+  margin: 0 0 1.8em; padding-bottom: .9em;
+  border-bottom: 1px solid var(--dok-linie);
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1em; font-size: .82em; color: var(--dok-leise);
+}
+.dok-kopf .titel { font-weight: 700; color: var(--dok-fg); font-size: 1.06em; }
+
+/* -- Fußnoten ------------------------------------------------------------- */
+.dokument .footnotes {
+  margin-top: 2.4em; padding-top: .9em;
+  border-top: 1px solid var(--dok-linie);
+  font-size: .86em; color: var(--dok-leise);
+}
+.dokument .footnotes ol { padding-left: 1.3em; }
+.dokument .footnote-backref { border-bottom: none; }
+
+/* ==========================================================================
+   Druck (A4, unabhängig vom gewählten Bildschirmstil)
+   ========================================================================== */
+@page { size: A4; margin: 20mm 18mm 22mm; }
+@media print {
+  .blatt {
+    max-width: none; padding: 0; box-shadow: none;
+    border: none; border-radius: 0; background: #fff;
+  }
+  .dokument { color: #000; font-size: 11pt; }
+  .dokument a { color: #000; border-bottom: none; }
+  .tabelle-huelle { overflow: visible; box-shadow: none; }
+  .dokument pre, .dokument table, .dokument figure,
+  .callout, .mermaid-huelle { break-inside: avoid; }
+  .dokument h1, .dokument h2, .dokument h3 { break-after: avoid; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="leiste">
+  <div class="marke">iludis <span>· Markdown-Ansicht</span></div>
+
+  <button class="knopf primaer" id="btn-ordner">Ordner öffnen</button>
+  <button class="knopf" id="btn-datei">Datei öffnen</button>
+
+  <div class="trenner"></div>
+
+  <label class="schalter" for="wahl-stil">Stil</label>
+  <select id="wahl-stil" title="Stil in Echtzeit umschalten">
+    <option value="handout-blau">Handout /blau</option>
+    <option value="handout-gruen">Handout /grün</option>
+    <option value="beamer">Beamer (dunkel)</option>
+    <option value="voll">Vollbreite (randlos)</option>
+    <option value="github">GitHub</option>
+  </select>
+
+  <div class="zoomfeld">
+    <button class="knopf" id="btn-kleiner" title="Schrift verkleinern">A−</button>
+    <button class="knopf" id="btn-groesser" title="Schrift vergrößern">A+</button>
+  </div>
+
+  <div class="breitenfeld" title="Satzbreite des Blattes">
+    <input type="range" id="wahl-breite" min="560" max="2600" step="20" value="794">
+    <span class="wert" id="breite-wert">auto</span>
+    <button class="knopf" id="btn-breite-auto" title="Zur Breite des Stils zurück">auto</button>
+  </div>
+
+  <div class="trenner"></div>
+
+  <button class="knopf" id="btn-neu" disabled title="Datei neu einlesen (F5)">Neu laden</button>
+  <label class="schalter" title="Datei alle 1,5 s auf Änderungen prüfen">
+    <input type="checkbox" id="opt-auto"> automatisch
+  </label>
+
+  <div class="dehner"></div>
+
+  <button class="knopf" id="btn-leiste" title="Seitenleiste ein-/ausblenden">Seitenleiste</button>
+  <button class="knopf" id="btn-html" disabled
+          title="Aktuelle Darstellung als eigenständige HTML-Datei sichern (Strg+Umschalt+S)">Als HTML sichern</button>
+  <button class="knopf" id="btn-druck" title="Drucken / als PDF sichern (Strg+P)">Drucken</button>
+</header>
+
+<aside class="seitenleiste">
+  <section class="abschnitt dateien">
+    <h2>Dateien <em id="datei-zahl"></em></h2>
+    <div class="inhalt" id="datei-liste">
+      <p class="leer-hinweis">Noch kein Ordner geöffnet.</p>
+    </div>
+  </section>
+  <section class="abschnitt gliederung">
+    <h2>Gliederung</h2>
+    <div class="inhalt gliederung" id="gliederung">
+      <p class="leer-hinweis">Erscheint, sobald ein Dokument geladen ist.</p>
+    </div>
+  </section>
+</aside>
+
+<main class="arbeitsflaeche" id="arbeitsflaeche">
+  <div class="start" id="start">
+    <h1>Markdown-Dateien lokal anzeigen</h1>
+    <p class="unter">Nichts wird hochgeladen — alles bleibt im Browser.</p>
+
+    <div class="karte">
+      <h3>Ordner öffnen statt Datei öffnen</h3>
+      <p style="margin:0">Nur beim Öffnen eines <em>Ordners</em> können Abbildungen wie
+      <code>![Schema](bilder/schema.png)</code> aufgelöst werden — der Browser kennt sonst
+      keine relativen Pfade. Zusätzlich lassen sich dann Verweise zwischen
+      <code>.md</code>-Dateien anklicken.</p>
+      <p style="margin:.7em 0 0">Ordner lässt sich auch per Drag &amp; Drop hier ablegen.</p>
+    </div>
+
+    <div class="karte">
+      <h3>Unterstützte Auszeichnung</h3>
+      <ul>
+        <li>Markdown mit Tabellen, Fußnoten, Aufgabenlisten</li>
+        <li>Mermaid-Diagramme im Codeblock <code>```mermaid</code></li>
+        <li>Formeln mit <code>$…$</code> und <code>$$…$$</code></li>
+        <li>Hinweisboxen: <code>&gt; [!TIPP]</code> oder <code>:::warnung Titel … :::</code><br>
+            Typen: hinweis, konzept, warnung, tipp, faustregel, prompt, tool, merke</li>
+        <li>YAML-Frontmatter mit <code>titel:</code> und <code>autor:</code> für die Kopfzeile</li>
+      </ul>
+    </div>
+
+    <div class="karte">
+      <h3>Als HTML sichern</h3>
+      <p style="margin:0">Sichert genau die aktuelle Darstellung als eigenständige Datei —
+      Stil, Satzbreite, Diagramme und Abbildungen eingebettet. Damit wird aus der Ansicht
+      ein Formatierungswerkzeug für weitergabefähige Dokumente.</p>
+    </div>
+  </div>
+
+  <article class="blatt" id="blatt" hidden>
+    <div class="dokument" id="dokument"></div>
+  </article>
+</main>
+
+<footer class="status">
+  <span id="status-datei">Keine Datei geladen</span>
+  <span style="flex:1"></span>
+  <span id="status-bib">Bibliotheken werden geladen …</span>
+</footer>
+
+<input type="file" id="eingabe-ordner" webkitdirectory directory multiple hidden>
+<input type="file" id="eingabe-datei" accept=".md,.markdown,.mdown,.txt" hidden>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   1. Bibliotheken: CDN zuerst, dann ./vendor/
+   ========================================================================== */
+const KATEX_CSS_CDN = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
+
+const BIBLIOTHEKEN = [
+  { schluessel: "md", name: "markdown-it", pflicht: true,
+    cdn: "https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js",
+    lokal: "./vendor/markdown-it.min.js", vorhanden: () => !!window.markdownit },
+  { schluessel: "fussnoten", name: "Fußnoten", still: true,
+    cdn: "https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js",
+    lokal: "./vendor/markdown-it-footnote.min.js", vorhanden: () => !!window.markdownitFootnote },
+  { schluessel: "hljs", name: "highlight.js",
+    cdn: "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js",
+    lokal: "./vendor/highlight.min.js", vorhanden: () => !!window.hljs },
+  { schluessel: "mermaid", name: "Mermaid",
+    cdn: "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js",
+    lokal: "./vendor/mermaid.min.js", vorhanden: () => !!window.mermaid },
+  { schluessel: "katex", name: "KaTeX",
+    cdn: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
+    lokal: "./vendor/katex.min.js", vorhanden: () => !!window.katex },
+  { schluessel: "katexAuto", name: "KaTeX-Autorender", still: true, nach: "katex",
+    cdn: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
+    lokal: "./vendor/katex-auto-render.min.js", vorhanden: () => !!window.renderMathInElement }
+];
+
+const herkunft = {};
+
+function skriptLaden(url) {
+  return new Promise((fertig, fehler) => {
+    const s = document.createElement("script");
+    s.src = url;
+    s.onload = fertig;
+    s.onerror = () => fehler(new Error(url));
+    document.head.appendChild(s);
+  });
+}
+
+async function bibliothekLaden(eintrag) {
+  for (const [quelle, url] of [["CDN", eintrag.cdn], ["lokal", eintrag.lokal]]) {
+    try {
+      await skriptLaden(url);
+      if (eintrag.vorhanden()) { herkunft[eintrag.schluessel] = quelle; return true; }
+    } catch (e) { /* nächste Quelle */ }
+  }
+  herkunft[eintrag.schluessel] = null;
+  return false;
+}
+
+async function alleBibliothekenLaden() {
+  await Promise.all(BIBLIOTHEKEN.filter(b => !b.nach).map(bibliothekLaden));
+  for (const b of BIBLIOTHEKEN.filter(b => b.nach)) {
+    if (herkunft[b.nach]) await bibliothekLaden(b);
+  }
+  statusBibliothekenZeigen();
+}
+
+function statusBibliothekenZeigen() {
+  const teile = BIBLIOTHEKEN.filter(b => !b.still).map(b => {
+    const q = herkunft[b.schluessel];
+    const klasse = q === "CDN" ? "ok" : q === "lokal" ? "weg" : "fehl";
+    return `${b.name} <span class="${klasse}">${q || "fehlt"}</span>`;
+  });
+  document.getElementById("status-bib").innerHTML = teile.join(" · ");
+}
+
+/* ==========================================================================
+   2. Markdown-Parser
+   ========================================================================== */
+let md = null;
+
+function parserAufbauen() {
+  md = window.markdownit({ html: true, linkify: true, typographer: false, breaks: false });
+  if (window.markdownitFootnote) md.use(window.markdownitFootnote);
+
+  md.renderer.rules.fence = function (tokens, idx) {
+    const token = tokens[idx];
+    const sprache = (token.info || "").trim().split(/\s+/)[0].toLowerCase();
+
+    if (sprache === "mermaid") {
+      // Quelltext konservieren — Mermaid ersetzt sein Ziel-DOM destruktiv,
+      // ein erneutes Zeichnen beim Stilwechsel wäre sonst unmöglich.
+      return `<div class="mermaid-huelle"><div class="mermaid" data-quelle="${
+        encodeURIComponent(token.content)}"></div></div>`;
+    }
+
+    let rumpf = escHtml(token.content);
+    let klasse = "";
+    if (window.hljs && sprache && window.hljs.getLanguage(sprache)) {
+      try {
+        rumpf = window.hljs.highlight(token.content, { language: sprache }).value;
+        klasse = ' class="hljs language-' + sprache + '"';
+      } catch (e) { /* unveränderter Rumpf */ }
+    }
+    const marke = sprache ? `<span class="sprach-marke">${escHtml(sprache)}</span>` : "";
+    return `<pre>${marke}<code${klasse}>${rumpf}</code></pre>\n`;
+  };
+
+  const alterText = md.renderer.rules.text || ((t, i, o, e, s) => s.renderToken(t, i, o));
+  md.renderer.rules.text = function (tokens, idx, opts, env, self) {
+    const inhalt = tokens[idx].content;
+    const treffer = inhalt.match(/^\[( |x|X)\]\s+([\s\S]*)$/);
+    if (treffer && idx >= 2 && tokens[idx - 1] && tokens[idx - 1].type === "paragraph_open") {
+      const gesetzt = treffer[1].toLowerCase() === "x";
+      return `<input type="checkbox" disabled${gesetzt ? " checked" : ""}>` + escHtml(treffer[2]);
+    }
+    return alterText(tokens, idx, opts, env, self);
+  };
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function frontmatterTrennen(text) {
+  const treffer = text.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!treffer) return { kopf: {}, rumpf: text };
+  const kopf = {};
+  treffer[1].split(/\r?\n/).forEach(zeile => {
+    const t = zeile.match(/^([A-Za-zäöüß_][\w äöüÄÖÜß-]*)\s*:\s*(.*)$/);
+    if (t) kopf[t[1].trim().toLowerCase()] = t[2].trim().replace(/^["']|["']$/g, "");
+  });
+  return { kopf, rumpf: text.slice(treffer[0].length) };
+}
+
+function containerUmschreiben(text) {
+  const zeilen = text.split(/\r?\n/);
+  const raus = [];
+  let inCode = false, offen = 0;
+
+  for (const zeile of zeilen) {
+    if (/^\s{0,3}(```|~~~)/.test(zeile)) { inCode = !inCode; raus.push(zeile); continue; }
+    if (inCode) { raus.push(zeile); continue; }
+
+    if (/^:::+\s*$/.test(zeile)) {
+      if (offen > 0) { offen--; raus.push("", "</div>", ""); continue; }
+      raus.push(zeile); continue;
+    }
+    const auf = zeile.match(/^:::+\s*([A-Za-zäöüß-]+)\s*(.*)$/);
+    if (auf) {
+      offen++;
+      raus.push("", `<div class="callout callout-${auf[1].toLowerCase()}">`,
+        auf[2].trim() ? `<p class="callout-titel">${escHtml(auf[2].trim())}</p>` : "", "");
+      continue;
+    }
+    raus.push(zeile);
+  }
+  while (offen-- > 0) raus.push("", "</div>", "");
+  return raus.join("\n");
+}
+
+const BOX_TITEL = {
+  hinweis: "Hinweis", note: "Hinweis", konzept: "Konzept",
+  warnung: "Achtung", warning: "Achtung", caution: "Vorsicht",
+  tipp: "Tipp", tip: "Tipp", faustregel: "Faustregel",
+  prompt: "Prompt", tool: "Werkzeug", merke: "Merke", important: "Wichtig"
+};
+
+function blockzitateUmwandeln(wurzel) {
+  wurzel.querySelectorAll("blockquote").forEach(zitat => {
+    const erst = zitat.firstElementChild;
+    if (!erst || erst.tagName !== "P") return;
+    const treffer = erst.innerHTML.match(/^\s*\[!([A-Za-zäöüß]+)\]\s*(.*?)(<br\s*\/?>|$)/i);
+    if (!treffer) return;
+
+    const typ = treffer[1].toLowerCase();
+    const eigenerTitel = treffer[2].trim();
+    erst.innerHTML = erst.innerHTML.slice(treffer[0].length).replace(/^\s*/, "");
+
+    const box = document.createElement("div");
+    box.className = "callout callout-" + typ;
+    const kopf = document.createElement("p");
+    kopf.className = "callout-titel";
+    kopf.textContent = eigenerTitel || BOX_TITEL[typ] || treffer[1];
+    box.appendChild(kopf);
+    while (zitat.firstChild) box.appendChild(zitat.firstChild);
+    if (erst.textContent.trim() === "" && !erst.querySelector("img")) erst.remove();
+    zitat.replaceWith(box);
+  });
+}
+
+/* ==========================================================================
+   3. Dateiverwaltung
+   ========================================================================== */
+const zustand = {
+  dateien: new Map(),
+  aktuellerPfad: null,
+  ordnerName: null,
+  blobs: new Map(),
+  zuletztGeaendert: 0,
+  autoTimer: null,
+  zoom: 1,
+  breite: null      // null = Breite des gewählten Stils
+};
+
+const MD_ENDUNGEN = /\.(md|markdown|mdown|mkd|txt)$/i;
+const BILD_ENDUNGEN = /\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+const STILE = ["handout-blau", "handout-gruen", "beamer", "voll", "github"];
+
+async function ordnerOeffnen() {
+  if (!window.showDirectoryPicker) { document.getElementById("eingabe-ordner").click(); return; }
+  let griff;
+  try {
+    griff = await window.showDirectoryPicker({ mode: "read" });
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    meldung("Der Ordner-Dialog ist hier nicht verfügbar (bei Aufruf über file:// blockiert " +
+            "Chrome die API). Besser über einen lokalen Server öffnen — z. B. Live Server in VS Code.");
+    document.getElementById("eingabe-ordner").click();
+    return;
+  }
+  blobsFreigeben();
+  zustand.dateien.clear();
+  zustand.ordnerName = griff.name;
+  await ordnerEinlesen(griff, "");
+  dateilisteZeichnen();
+  ersteDateiOeffnen();
+}
+
+async function ordnerEinlesen(verzeichnis, praefix, tiefe = 0) {
+  if (tiefe > 6) return;
+  for await (const [name, griff] of verzeichnis.entries()) {
+    if (name.startsWith(".") || name === "node_modules") continue;
+    const pfad = praefix ? praefix + "/" + name : name;
+    if (griff.kind === "directory") {
+      await ordnerEinlesen(griff, pfad, tiefe + 1);
+    } else {
+      const art = MD_ENDUNGEN.test(name) ? "md" : BILD_ENDUNGEN.test(name) ? "bild" : "sonst";
+      if (art === "sonst") continue;
+      zustand.dateien.set(pfad.toLowerCase(),
+        { pfad, name, art, griff, holen: () => griff.getFile() });
+    }
+  }
+}
+
+function ordnerAusEingabe(dateiliste) {
+  blobsFreigeben();
+  zustand.dateien.clear();
+  let wurzel = null;
+  for (const datei of dateiliste) {
+    const rel = (datei.webkitRelativePath || datei.name).replace(/\\/g, "/");
+    if (!wurzel) wurzel = rel.split("/")[0];
+    const ohneWurzel = rel.includes("/") ? rel.slice(rel.indexOf("/") + 1) : rel;
+    const art = MD_ENDUNGEN.test(datei.name) ? "md"
+              : BILD_ENDUNGEN.test(datei.name) ? "bild" : "sonst";
+    if (art === "sonst" || datei.name.startsWith(".")) continue;
+    zustand.dateien.set(ohneWurzel.toLowerCase(),
+      { pfad: ohneWurzel, name: datei.name, art, griff: null, holen: async () => datei });
+  }
+  zustand.ordnerName = wurzel || "Ordner";
+  dateilisteZeichnen();
+  ersteDateiOeffnen();
+}
+
+async function einzelneDateiOeffnen() {
+  if (!window.showOpenFilePicker) { document.getElementById("eingabe-datei").click(); return; }
+  try {
+    const [griff] = await window.showOpenFilePicker({
+      types: [{ description: "Markdown", accept: { "text/markdown": [".md", ".markdown", ".mdown", ".txt"] } }]
+    });
+    blobsFreigeben();
+    zustand.dateien.clear();
+    zustand.ordnerName = null;
+    zustand.dateien.set(griff.name.toLowerCase(),
+      { pfad: griff.name, name: griff.name, art: "md", griff, holen: () => griff.getFile() });
+    dateilisteZeichnen();
+    dateiAnzeigen(griff.name.toLowerCase());
+  } catch (e) { if (e && e.name !== "AbortError") meldung("Datei konnte nicht geöffnet werden."); }
+}
+
+function ersteDateiOeffnen() {
+  const mdDateien = [...zustand.dateien.values()].filter(d => d.art === "md");
+  if (!mdDateien.length) { meldung("In diesem Ordner liegen keine Markdown-Dateien."); return; }
+  const bevorzugt = mdDateien.find(d => /^(index|readme|start)\.md$/i.test(d.name)) || mdDateien[0];
+  dateiAnzeigen(bevorzugt.pfad.toLowerCase());
+}
+
+function dateilisteZeichnen() {
+  const behaelter = document.getElementById("datei-liste");
+  const mdDateien = [...zustand.dateien.values()]
+    .filter(d => d.art === "md")
+    .sort((a, b) => a.pfad.localeCompare(b.pfad, "de"));
+
+  document.getElementById("datei-zahl").textContent =
+    mdDateien.length ? mdDateien.length + (zustand.ordnerName ? " · " + zustand.ordnerName : "") : "";
+
+  if (!mdDateien.length) {
+    behaelter.innerHTML = '<p class="leer-hinweis">Keine Markdown-Dateien gefunden.</p>';
+    return;
+  }
+  behaelter.innerHTML = "";
+  mdDateien.forEach(datei => {
+    const knopf = document.createElement("button");
+    knopf.className = "datei-eintrag";
+    knopf.dataset.pfad = datei.pfad.toLowerCase();
+    const ordner = datei.pfad.includes("/") ? datei.pfad.slice(0, datei.pfad.lastIndexOf("/") + 1) : "";
+    knopf.innerHTML = (ordner ? `<span class="pfad">${escHtml(ordner)}</span>` : "") + escHtml(datei.name);
+    knopf.title = datei.pfad;
+    knopf.addEventListener("click", () => dateiAnzeigen(datei.pfad.toLowerCase()));
+    behaelter.appendChild(knopf);
+  });
+  markiereAktiveDatei();
+}
+
+function markiereAktiveDatei() {
+  document.querySelectorAll(".datei-eintrag").forEach(k =>
+    k.classList.toggle("aktiv", k.dataset.pfad === zustand.aktuellerPfad));
+}
+
+/* ==========================================================================
+   4. Anzeige
+   ========================================================================== */
+async function dateiAnzeigen(pfadKlein, scrollHalten = false) {
+  const eintrag = zustand.dateien.get(pfadKlein);
+  if (!eintrag) { meldung("Datei nicht gefunden: " + pfadKlein); return; }
+
+  const flaeche = document.getElementById("arbeitsflaeche");
+  const scrollVorher = flaeche.scrollTop;
+
+  let datei;
+  try { datei = await eintrag.holen(); }
+  catch (e) { meldung("Datei konnte nicht gelesen werden — evtl. verschoben oder gelöscht."); return; }
+
+  const text = await datei.text();
+  zustand.aktuellerPfad = pfadKlein;
+  zustand.zuletztGeaendert = datei.lastModified;
+
+  await rendern(text, eintrag);
+  markiereAktiveDatei();
+
+  document.getElementById("btn-neu").disabled = false;
+  document.getElementById("btn-html").disabled = false;
+  document.getElementById("status-datei").innerHTML =
+    `<b>${escHtml(eintrag.pfad)}</b> · ${(datei.size / 1024).toFixed(1)} kB · ` +
+    `zuletzt geändert ${new Date(datei.lastModified).toLocaleString("de-DE")}`;
+
+  flaeche.scrollTop = scrollHalten ? scrollVorher : 0;
+}
+
+async function rendern(quelltext, eintrag) {
+  const { kopf, rumpf } = frontmatterTrennen(quelltext);
+  const ziel = document.getElementById("dokument");
+
+  ziel.innerHTML = (kopf.titel || kopf.title ? kopfzeileBauen(kopf) : "") +
+                   md.render(containerUmschreiben(rumpf));
+
+  document.getElementById("start").hidden = true;
+  document.getElementById("blatt").hidden = false;
+
+  blockzitateUmwandeln(ziel);
+  aufgabenlistenKennzeichnen(ziel);
+  tabellenEinhuellen(ziel);
+  ueberschriftenNummerieren(ziel);
+  abbildungenAufbereiten(ziel);
+  await bilderAufloesen(ziel, eintrag);
+  verweiseVerdrahten(ziel, eintrag);
+  matheRendern(ziel);
+  await mermaidRendern(ziel);
+  gliederungZeichnen(ziel);
+  tabellenSchattenPruefen();
+}
+
+function kopfzeileBauen(kopf) {
+  const titel = kopf.titel || kopf.title || "";
+  const rechts = [kopf.autor || kopf.author, kopf.datum || kopf.date, kopf.kurs, kopf.version]
+    .filter(Boolean).join(" · ");
+  return `<div class="dok-kopf"><span class="titel">${escHtml(titel)}</span>` +
+         `<span>${escHtml(rechts)}</span></div>`;
+}
+
+function aufgabenlistenKennzeichnen(wurzel) {
+  wurzel.querySelectorAll('li input[type="checkbox"]').forEach(kasten => {
+    const punkt = kasten.closest("li");
+    if (punkt) punkt.classList.add("aufgabe");
+  });
+}
+
+/* Breite Tabellen bekommen einen scrollbaren Rahmen, statt aus dem Blatt zu laufen */
+function tabellenEinhuellen(wurzel) {
+  wurzel.querySelectorAll("table").forEach(tabelle => {
+    if (tabelle.parentElement && tabelle.parentElement.classList.contains("tabelle-huelle")) return;
+    const huelle = document.createElement("div");
+    huelle.className = "tabelle-huelle";
+    tabelle.replaceWith(huelle);
+    huelle.appendChild(tabelle);
+  });
+}
+function tabellenSchattenPruefen() {
+  document.querySelectorAll(".tabelle-huelle").forEach(h =>
+    h.classList.toggle("scrollt", h.scrollWidth > h.clientWidth + 2));
+}
+
+function slug(text) {
+  return text.toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 60) || "abschnitt";
+}
+function ueberschriftenNummerieren(wurzel) {
+  const vergeben = new Set();
+  wurzel.querySelectorAll("h1, h2, h3, h4").forEach(h => {
+    let id = h.id || slug(h.textContent);
+    let n = 2;
+    while (vergeben.has(id)) id = slug(h.textContent) + "-" + n++;
+    vergeben.add(id);
+    h.id = id;
+  });
+}
+
+function abbildungenAufbereiten(wurzel) {
+  let nummer = 0;
+  wurzel.querySelectorAll("p > img:only-child").forEach(bild => {
+    const absatz = bild.parentElement;
+    const beschriftung = (bild.getAttribute("title") || bild.getAttribute("alt") || "").trim();
+    const abb = document.createElement("figure");
+    abb.appendChild(bild);
+    if (beschriftung) {
+      nummer++;
+      const unter = document.createElement("figcaption");
+      unter.innerHTML = `<span class="nummer">Abb. ${nummer}:</span> ${escHtml(beschriftung)}`;
+      abb.appendChild(unter);
+    }
+    absatz.replaceWith(abb);
+  });
+}
+
+function pfadNormalisieren(basisOrdner, relativ) {
+  const teile = [];
+  ((basisOrdner ? basisOrdner + "/" : "") + relativ).split("/").forEach(t => {
+    if (t === "" || t === ".") return;
+    if (t === "..") teile.pop(); else teile.push(t);
+  });
+  return teile.join("/");
+}
+
+async function bilderAufloesen(wurzel, eintrag) {
+  const basis = eintrag && eintrag.pfad.includes("/")
+    ? eintrag.pfad.slice(0, eintrag.pfad.lastIndexOf("/")) : "";
+
+  for (const bild of wurzel.querySelectorAll("img")) {
+    let quelle = bild.getAttribute("src") || "";
+    try { quelle = decodeURI(quelle); } catch (e) { /* roher Pfad */ }
+    if (!quelle || /^([a-z]+:)?\/\//i.test(quelle) || quelle.startsWith("data:")) continue;
+
+    const pfad = pfadNormalisieren(basis, quelle.split("#")[0].split("?")[0]);
+    const treffer = zustand.dateien.get(pfad.toLowerCase());
+
+    if (!treffer) {
+      const ersatz = document.createElement("span");
+      ersatz.className = "bild-fehlt";
+      ersatz.textContent = "Abbildung nicht gefunden: " + pfad +
+        (zustand.ordnerName ? "" : " — dafür muss der Ordner geöffnet sein, nicht die Einzeldatei.");
+      bild.replaceWith(ersatz);
+      continue;
+    }
+    try {
+      let url = zustand.blobs.get(pfad.toLowerCase());
+      if (!url) {
+        url = URL.createObjectURL(await treffer.holen());
+        zustand.blobs.set(pfad.toLowerCase(), url);
+      }
+      bild.src = url;
+    } catch (e) {
+      bild.replaceWith(document.createTextNode("[Abbildung nicht lesbar: " + pfad + "]"));
+    }
+  }
+}
+
+function blobsFreigeben() {
+  zustand.blobs.forEach(url => URL.revokeObjectURL(url));
+  zustand.blobs.clear();
+}
+
+/* Scrollen ausschließlich innerhalb der Arbeitsfläche — scrollIntoView()
+   bewegt auch die Wurzel und schiebt die Werkzeugleiste aus dem Bild. */
+function zuElementScrollen(el) {
+  const flaeche = document.getElementById("arbeitsflaeche");
+  const ziel = el.getBoundingClientRect().top
+             - flaeche.getBoundingClientRect().top
+             + flaeche.scrollTop - 14;
+  flaeche.scrollTo({ top: Math.max(0, ziel), behavior: "smooth" });
+}
+
+function verweiseVerdrahten(wurzel, eintrag) {
+  const basis = eintrag && eintrag.pfad.includes("/")
+    ? eintrag.pfad.slice(0, eintrag.pfad.lastIndexOf("/")) : "";
+
+  wurzel.querySelectorAll("a[href]").forEach(link => {
+    const ziel = link.getAttribute("href");
+    if (!ziel) return;
+
+    if (ziel.startsWith("#")) {
+      link.addEventListener("click", ev => {
+        ev.preventDefault();
+        let id = ziel.slice(1);
+        try { id = decodeURIComponent(id); } catch (e) { /* roher Anker */ }
+        const el = document.getElementById(id) || document.getElementById(ziel.slice(1));
+        if (el) zuElementScrollen(el);
+      });
+      return;
+    }
+    if (/^([a-z]+:)?\/\//i.test(ziel) || /^(mailto|tel):/i.test(ziel)) {
+      link.target = "_blank"; link.rel = "noopener";
+      return;
+    }
+
+    // Alles Relative bleibt in der App — sonst navigiert der Browser weg
+    // und die Ansicht ist verloren.
+    let roh = ziel.split("#")[0];
+    try { roh = decodeURI(roh); } catch (e) { /* roher Pfad */ }
+    const pfad = pfadNormalisieren(basis, roh).toLowerCase();
+
+    if (MD_ENDUNGEN.test(roh)) {
+      link.classList.add("md-verweis");
+      if (!zustand.dateien.has(pfad)) {
+        link.classList.add("fehlt");
+        link.title = "Nicht im geöffneten Ordner: " + pfad;
+        link.addEventListener("click", ev => { ev.preventDefault(); meldung("Nicht im Ordner: " + pfad); });
+        return;
+      }
+      link.addEventListener("click", ev => { ev.preventDefault(); dateiAnzeigen(pfad); });
+      return;
+    }
+    link.classList.add("fehlt");
+    link.title = "Relativer Verweis, hier nicht auflösbar: " + roh;
+    link.addEventListener("click", ev => {
+      ev.preventDefault();
+      meldung("Der Verweis auf „" + roh + "“ lässt sich in der Ansicht nicht öffnen.");
+    });
+  });
+}
+
+function matheRendern(wurzel) {
+  if (!window.renderMathInElement) return;
+  try {
+    window.renderMathInElement(wurzel, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\(", right: "\\)", display: false }
+      ],
+      ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+      throwOnError: false
+    });
+  } catch (e) { /* Formelsatz ist optional */ }
+}
+
+let mermaidBereit = false;
+function mermaidVorbereiten() {
+  if (!window.mermaid) return;
+  const thema = document.documentElement.dataset.thema;
+  window.mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "loose",
+    theme: thema === "beamer" ? "dark" : "default",
+    fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--dok-schrift") || "Arial"
+  });
+  mermaidBereit = true;
+}
+
+async function mermaidRendern(wurzel) {
+  const knoten = [...wurzel.querySelectorAll(".mermaid")];
+  if (!knoten.length) return;
+
+  if (!window.mermaid) {
+    knoten.forEach(k => {
+      k.className = "mermaid-fehler";
+      k.textContent = "Mermaid ist nicht geladen (weder CDN noch ./vendor/mermaid.min.js).\n\n" +
+                      decodeURIComponent(k.dataset.quelle || "");
+    });
+    return;
+  }
+  if (!mermaidBereit) mermaidVorbereiten();
+
+  knoten.forEach(k => {
+    k.removeAttribute("data-processed");
+    k.innerHTML = "";
+    k.textContent = decodeURIComponent(k.dataset.quelle || "");
+  });
+
+  try {
+    await window.mermaid.run({ nodes: knoten, suppressErrors: true });
+  } catch (e) {
+    knoten.forEach(k => {
+      if (!k.querySelector("svg")) {
+        k.className = "mermaid-fehler";
+        k.textContent = "Diagramm konnte nicht gezeichnet werden:\n" +
+                        decodeURIComponent(k.dataset.quelle || "");
+      }
+    });
+  }
+}
+
+let beobachter = null;
+function gliederungZeichnen(wurzel) {
+  const behaelter = document.getElementById("gliederung");
+  const ueberschriften = [...wurzel.querySelectorAll("h1, h2, h3, h4")];
+  if (!ueberschriften.length) {
+    behaelter.innerHTML = '<p class="leer-hinweis">Dieses Dokument hat keine Überschriften.</p>';
+    return;
+  }
+  behaelter.innerHTML = "";
+  ueberschriften.forEach(h => {
+    const a = document.createElement("a");
+    a.href = "#" + h.id;
+    a.className = "stufe-" + h.tagName[1];
+    a.textContent = h.textContent;
+    a.title = h.textContent;
+    a.addEventListener("click", ev => { ev.preventDefault(); zuElementScrollen(h); });
+    behaelter.appendChild(a);
+  });
+
+  if (beobachter) beobachter.disconnect();
+  beobachter = new IntersectionObserver(eintraege => {
+    eintraege.forEach(e => {
+      if (!e.isIntersecting) return;
+      behaelter.querySelectorAll("a").forEach(a =>
+        a.classList.toggle("aktiv", a.getAttribute("href") === "#" + e.target.id));
+    });
+  }, { root: document.getElementById("arbeitsflaeche"), rootMargin: "0px 0px -75% 0px", threshold: 0 });
+  ueberschriften.forEach(h => beobachter.observe(h));
+}
+
+/* ==========================================================================
+   5. Stil, Zoom, Satzbreite
+   ========================================================================== */
+function stilSetzen(name) {
+  if (!STILE.includes(name)) name = STILE[0];
+  document.documentElement.dataset.thema = name;
+  document.getElementById("wahl-stil").value = name;
+  merken("stil", name);
+  breitenanzeigeAktualisieren();
+  // Nur die Diagrammebene muss neu gezeichnet werden — Text und Layout
+  // folgen den CSS-Variablen ohne erneutes Parsen.
+  if (window.mermaid) {
+    mermaidVorbereiten();
+    mermaidRendern(document.getElementById("dokument")).then(tabellenSchattenPruefen);
+  } else {
+    tabellenSchattenPruefen();
+  }
+}
+
+function zoomSetzen(faktor) {
+  zustand.zoom = Math.min(2.2, Math.max(0.7, Math.round(faktor * 100) / 100));
+  document.documentElement.style.setProperty("--zoom", zustand.zoom);
+  merken("zoom", String(zustand.zoom));
+  tabellenSchattenPruefen();
+}
+
+function breiteSetzen(px) {
+  zustand.breite = px;
+  if (px === null) {
+    document.documentElement.style.removeProperty("--breite-override");
+    merken("breite", "");
+  } else {
+    document.documentElement.style.setProperty("--breite-override", px + "px");
+    merken("breite", String(px));
+  }
+  breitenanzeigeAktualisieren();
+  tabellenSchattenPruefen();
+}
+
+function breitenanzeigeAktualisieren() {
+  const anzeige = document.getElementById("breite-wert");
+  const regler = document.getElementById("wahl-breite");
+  if (zustand.breite === null) {
+    anzeige.textContent = "auto";
+    anzeige.classList.remove("gesetzt");
+    const ist = Math.round(document.getElementById("blatt").getBoundingClientRect().width);
+    if (ist > 0) regler.value = Math.min(+regler.max, Math.max(+regler.min, ist));
+  } else {
+    anzeige.textContent = zustand.breite + " px";
+    anzeige.classList.add("gesetzt");
+    regler.value = zustand.breite;
+  }
+}
+
+async function neuLaden() {
+  if (zustand.aktuellerPfad) await dateiAnzeigen(zustand.aktuellerPfad, true);
+}
+
+function autoPruefungSetzen(an) {
+  clearInterval(zustand.autoTimer);
+  zustand.autoTimer = null;
+  merken("auto", an ? "1" : "0");
+  if (!an) return;
+  zustand.autoTimer = setInterval(async () => {
+    const eintrag = zustand.dateien.get(zustand.aktuellerPfad);
+    if (!eintrag) return;
+    try {
+      const datei = await eintrag.holen();
+      if (datei.lastModified !== zustand.zuletztGeaendert) await dateiAnzeigen(zustand.aktuellerPfad, true);
+    } catch (e) { /* nächster Durchlauf */ }
+  }, 1500);
+}
+
+function meldung(text) {
+  document.getElementById("status-datei").innerHTML =
+    `<span style="color:#f0a04b">${escHtml(text)}</span>`;
+}
+
+function merken(schluessel, wert) {
+  try { localStorage.setItem("md-ansicht-" + schluessel, wert); } catch (e) {}
+}
+function erinnern(schluessel) {
+  try { return localStorage.getItem("md-ansicht-" + schluessel); } catch (e) { return null; }
+}
+
+/* ==========================================================================
+   6. Export: aktuelle Darstellung als eigenständige HTML-Datei
+   ========================================================================== */
+async function alsDatenUrl(url) {
+  if (!url || url.startsWith("data:")) return url;
+  const antwort = await fetch(url);
+  const blob = await antwort.blob();
+  return await new Promise((ok, fehler) => {
+    const leser = new FileReader();
+    leser.onload = () => ok(leser.result);
+    leser.onerror = fehler;
+    leser.readAsDataURL(blob);
+  });
+}
+
+async function alsHtmlSichern() {
+  const eintrag = zustand.dateien.get(zustand.aktuellerPfad);
+  if (!eintrag) return;
+
+  const knopf = document.getElementById("btn-html");
+  const beschriftung = knopf.textContent;
+  knopf.textContent = "sichere …"; knopf.disabled = true;
+
+  try {
+    const klon = document.getElementById("dokument").cloneNode(true);
+
+    // Abbildungen einbetten — Blob-URLs gelten nur in dieser Sitzung
+    for (const bild of klon.querySelectorAll("img")) {
+      try { bild.src = await alsDatenUrl(bild.src); } catch (e) { /* Bild bleibt außen vor */ }
+    }
+    // Mermaid-Quelltexte werden nicht mitgesichert; das SVG steht bereits im Klon
+    klon.querySelectorAll(".mermaid").forEach(m => m.removeAttribute("data-quelle"));
+
+    // Verweise auf .md zeigen im Export auf die entsprechende .html
+    klon.querySelectorAll("a[href]").forEach(a => {
+      const ziel = a.getAttribute("href") || "";
+      if (MD_ENDUNGEN.test(ziel.split("#")[0])) {
+        a.setAttribute("href", ziel.replace(/\.(md|markdown|mdown|mkd|txt)(?=$|#)/i, ".html"));
+      }
+      a.classList.remove("md-verweis", "fehlt");
+      a.removeAttribute("title");
+    });
+
+    const stil = document.documentElement.dataset.thema;
+    const dokCss = document.getElementById("css-dokument").textContent;
+    const brauchtKatex = !!klon.querySelector(".katex");
+    const kopfTitel = document.querySelector(".dok-kopf .titel");
+    const ersteUeberschrift = klon.querySelector("h1");
+    const titel = ((kopfTitel && kopfTitel.textContent)
+                || (ersteUeberschrift && ersteUeberschrift.textContent)
+                || eintrag.name.replace(/\.[^.]+$/, "")).trim();
+
+    const stilAttribute = [
+      zustand.zoom !== 1 ? `--zoom:${zustand.zoom}` : "",
+      zustand.breite !== null ? `--breite-override:${zustand.breite}px` : ""
+    ].filter(Boolean).join(";");
+
+    const html =
+`<!DOCTYPE html>
+<html lang="de" data-thema="${stil}"${stilAttribute ? ` style="${stilAttribute}"` : ""}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(titel)}</title>
+${brauchtKatex ? `<link rel="stylesheet" href="${KATEX_CSS_CDN}"
+      onerror="this.onerror=null;this.href='./vendor/katex/katex.min.css';">` : ""}
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--arbeit-bg, #e4e7eb);
+  padding: var(--arbeit-innen, 26px);
+  padding-bottom: 60px;
+}
+${dokCss}
+</style>
+</head>
+<body>
+<article class="blatt">
+${klon.outerHTML}
+</article>
+</body>
+</html>`;
+
+    const name = eintrag.name.replace(/\.[^.]+$/, "") + ".html";
+    await dateiHerunterladen(html, name);
+    document.getElementById("status-datei").innerHTML =
+      `<b>${escHtml(name)}</b> gesichert · Stil „${escHtml(stil)}“` +
+      (brauchtKatex ? " · Formelsatz benötigt beim Öffnen die KaTeX-CSS" : "");
+  } catch (e) {
+    if (!(e && e.name === "AbortError")) {
+      meldung("Sichern fehlgeschlagen: " + (e && e.message ? e.message : e));
+    }
+  } finally {
+    knopf.textContent = beschriftung; knopf.disabled = false;
+  }
+}
+
+async function dateiHerunterladen(text, name) {
+  const blob = new Blob([text], { type: "text/html;charset=utf-8" });
+  if (window.showSaveFilePicker) {
+    try {
+      const griff = await window.showSaveFilePicker({
+        suggestedName: name,
+        types: [{ description: "HTML-Datei", accept: { "text/html": [".html"] } }]
+      });
+      const strom = await griff.createWritable();
+      await strom.write(blob);
+      await strom.close();
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") throw e;
+      /* sonst: klassischer Download */
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ==========================================================================
+   7. Verdrahtung
+   ========================================================================== */
+document.getElementById("btn-ordner").addEventListener("click", ordnerOeffnen);
+document.getElementById("btn-datei").addEventListener("click", einzelneDateiOeffnen);
+document.getElementById("btn-neu").addEventListener("click", neuLaden);
+document.getElementById("btn-html").addEventListener("click", alsHtmlSichern);
+document.getElementById("btn-druck").addEventListener("click", () => window.print());
+document.getElementById("btn-groesser").addEventListener("click", () => zoomSetzen(zustand.zoom + 0.1));
+document.getElementById("btn-kleiner").addEventListener("click", () => zoomSetzen(zustand.zoom - 0.1));
+document.getElementById("btn-leiste").addEventListener("click", () => {
+  document.body.classList.toggle("ohne-seitenleiste");
+  setTimeout(() => { breitenanzeigeAktualisieren(); tabellenSchattenPruefen(); }, 60);
+});
+document.getElementById("wahl-stil").addEventListener("change", e => stilSetzen(e.target.value));
+document.getElementById("wahl-breite").addEventListener("input", e => breiteSetzen(parseInt(e.target.value, 10)));
+document.getElementById("btn-breite-auto").addEventListener("click", () => breiteSetzen(null));
+document.getElementById("opt-auto").addEventListener("change", e => autoPruefungSetzen(e.target.checked));
+
+document.getElementById("eingabe-ordner").addEventListener("change", e => {
+  if (e.target.files.length) ordnerAusEingabe(e.target.files);
+});
+document.getElementById("eingabe-datei").addEventListener("change", async e => {
+  const datei = e.target.files[0];
+  if (!datei) return;
+  blobsFreigeben();
+  zustand.dateien.clear();
+  zustand.ordnerName = null;
+  zustand.dateien.set(datei.name.toLowerCase(),
+    { pfad: datei.name, name: datei.name, art: "md", griff: null, holen: async () => datei });
+  dateilisteZeichnen();
+  dateiAnzeigen(datei.name.toLowerCase());
+});
+
+document.addEventListener("dragover", e => { e.preventDefault(); });
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  const posten = [...e.dataTransfer.items].filter(i => i.kind === "file");
+  if (!posten.length || !posten[0].getAsFileSystemHandle) return;
+  const griff = await posten[0].getAsFileSystemHandle();
+  blobsFreigeben(); zustand.dateien.clear();
+  if (griff.kind === "directory") {
+    zustand.ordnerName = griff.name;
+    await ordnerEinlesen(griff, "");
+    dateilisteZeichnen(); ersteDateiOeffnen();
+  } else {
+    zustand.ordnerName = null;
+    zustand.dateien.set(griff.name.toLowerCase(),
+      { pfad: griff.name, name: griff.name, art: "md", griff, holen: () => griff.getFile() });
+    dateilisteZeichnen(); dateiAnzeigen(griff.name.toLowerCase());
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "F5" && zustand.aktuellerPfad) { e.preventDefault(); neuLaden(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "o") { e.preventDefault(); ordnerOeffnen(); }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+    e.preventDefault(); alsHtmlSichern();
+  }
+});
+
+// Letzte Sicherung gegen ein durchgerutschtes Scrollen der Wurzel
+window.addEventListener("scroll", () => {
+  const w = document.scrollingElement || document.documentElement;
+  if (w.scrollTop) w.scrollTop = 0;
+}, { passive: true });
+
+window.addEventListener("resize", () => {
+  breitenanzeigeAktualisieren();
+  tabellenSchattenPruefen();
+});
+
+/* -- Start ---------------------------------------------------------------- */
+(async function start() {
+  const stil = erinnern("stil");
+  stilSetzen(STILE.includes(stil) ? stil : "handout-blau");
+  zoomSetzen(parseFloat(erinnern("zoom") || "1") || 1);
+  const breite = erinnern("breite");
+  breiteSetzen(breite ? parseInt(breite, 10) : null);
+
+  await alleBibliothekenLaden();
+
+  if (!window.markdownit) {
+    document.getElementById("start").innerHTML =
+      '<h1>markdown-it konnte nicht geladen werden</h1>' +
+      '<p class="unter">Ohne diese Bibliothek lässt sich nichts darstellen.</p>' +
+      '<div class="karte"><h3>So beheben</h3><p style="margin:0">Entweder eine ' +
+      'Internetverbindung herstellen oder neben dieser Datei einen Ordner ' +
+      '<code>vendor</code> mit <code>markdown-it.min.js</code> anlegen.</p></div>';
+    return;
+  }
+  parserAufbauen();
+  if (window.mermaid) mermaidVorbereiten();
+
+  if (erinnern("auto") === "1") {
+    document.getElementById("opt-auto").checked = true;
+    autoPruefungSetzen(true);
+  }
+})();
+</script>
+</body>
+</html>

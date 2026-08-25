@@ -44,8 +44,13 @@ body {
   color: #3a3a5c;
 }
 
+/* (e) Textfenster +150px.
+   Rechnung: vorher 1000px App − 210px Sidebar = 790px Chat-Spalte.
+   Die Sidebar wächst wegen der neuen Anzeigen auf 226px, also
+   1166px − 226px = 940px = 790px + 150px. */
 .app {
-  width: 1000px;
+  width: 1166px;
+  max-width: 98vw;
   height: 600px;
   background: #ffffff;
   border-radius: 20px;
@@ -104,8 +109,8 @@ body {
 }
 
 /* Spezifische Breiten für bessere Optik */
-#apiBase { min-width: 210px; }
-#apiKey { min-width: 240px; flex: 1; }
+#apiBase { min-width: 190px; }
+#apiKey { min-width: 200px; flex: 1; }
 #modelName { min-width: 180px; }
 
 .btn-sysprompt {
@@ -137,8 +142,40 @@ body {
   color: #7c3aed;
 }
 
+/* (d) Konfig-Buttons */
+.btn-cfg {
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #7a82a6;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn-cfg:hover {
+  border-color: #4aa8d8;
+  background: #eef8fd;
+  color: #2b7ba8;
+}
+.btn-cfg:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: #e4e8f4;
+  background: #ffffff;
+  color: #b0b8d4;
+}
+.cfg-group {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+
 /* ══════════════════════════════════════════
-   SYSTEMPROMPT-POPUP (Overlay)
+   POPUPS (Overlay)
    ══════════════════════════════════════════ */
 .popup-overlay {
   display: none;
@@ -172,6 +209,11 @@ body {
 @keyframes popupIn {
   from { opacity: 0; transform: translateY(12px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup { animation: none; }
+  * { transition-duration: 0.01ms !important; }
 }
 
 .popup-header {
@@ -242,6 +284,17 @@ body {
   line-height: 1.4;
 }
 
+.popup-warn {
+  font-size: 12px;
+  color: #a86a20;
+  background: #fff8ec;
+  border: 2px solid #ffe0b8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
 .popup-footer {
   padding: 12px 20px;
   border-top: 2px solid #e4e8f4;
@@ -273,6 +326,74 @@ body {
   color: #fff;
 }
 .popup-btn-ok:hover { background: #6d28d9; }
+
+.popup-btn-neutral {
+  background: #f0f2fa;
+  color: #5a60a0;
+  border-color: #e4e8f4;
+}
+.popup-btn-neutral:hover { background: #e6eaf6; }
+
+/* Checkbox-Zeile im Konfig-Popup */
+.cfg-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  color: #5a60a0;
+  line-height: 1.45;
+  margin-top: 4px;
+  cursor: pointer;
+}
+.cfg-check input { margin-top: 2px; width: 16px; height: 16px; accent-color: #ff7b54; cursor: pointer; }
+
+.cfg-list {
+  font-size: 13px;
+  color: #5a60a0;
+  line-height: 1.7;
+  background: #fafbff;
+  border: 2px solid #e4e8f4;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.cfg-list b { color: #3a3a5c; }
+.cfg-list .cfg-empty { color: #b0b8d4; }
+
+/* Dateiname für die zu speichernde Konfiguration */
+.cfg-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.cfg-name-row label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #7a82a6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.cfg-name-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid #e4e8f4;
+  background: #ffffff;
+  color: #3a3a5c;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.cfg-name-row input:focus { border-color: #a78bfa; }
+.cfg-name-row .ext {
+  font-size: 12px;
+  color: #9aa0c0;
+  font-family: Consolas, monospace;
+  font-weight: 700;
+}
 
 /* ══════════════════════════════════════════
    HAUPTBEREICH
@@ -538,15 +659,35 @@ body {
 .btn-send:hover { background: linear-gradient(135deg, #ff8a30, #ff6a40); }
 .btn-send:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
-.btn-pdf {
+.btn-file {
   background: #f0f2fa;
   color: #7a82a6;
   min-width: 42px;
   font-size: 16px;
   border: 2px solid #e4e8f4;
+  position: relative;
 }
-.btn-pdf:hover { background: #e8ecf8; color: #5a60a0; }
-.btn-pdf.has-file { background: #e8f8ee; color: #40a060; border-color: #c0e8cc; }
+.btn-file:hover { background: #e8ecf8; color: #5a60a0; }
+.btn-file.has-file { background: #e8f8ee; color: #40a060; border-color: #c0e8cc; }
+
+.file-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #40a060;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #f8f9fe;
+}
+.btn-file.has-file .file-count { display: flex; }
 
 .btn-reset {
   background: #f0f2fa;
@@ -557,21 +698,35 @@ body {
 }
 .btn-reset:hover { background: #e8ecf8; color: #5a60a0; }
 
-#pdfInput { display: none; }
+#fileInput { display: none; }
+
+/* Sichtbarer Tastaturfokus */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #ffb37a;
+  outline-offset: 2px;
+}
 
 /* ══════════════════════════════════════════
    SIDEBAR
    ══════════════════════════════════════════ */
 .sidebar {
-  width: 210px;
+  width: 226px;
   background: #f8f9fe;
   border-left: 2px solid #e4e8f4;
-  padding: 20px 16px;
+  padding: 18px 14px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 18px;
   flex-shrink: 0;
+  overflow-y: auto;
 }
+
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: #d4d8ea; border-radius: 3px; }
 
 .sidebar h3 {
   font-size: 11px;
@@ -579,10 +734,10 @@ body {
   letter-spacing: 1.2px;
   color: #7a82a6;
   font-weight: 800;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.setting-group { display: flex; flex-direction: column; }
+.setting-group { display: flex; flex-direction: column; flex-shrink: 0; }
 
 .slider-row {
   display: flex;
@@ -592,6 +747,7 @@ body {
 
 .slider-row input[type="range"] {
   flex: 1;
+  min-width: 0;
   -webkit-appearance: none;
   appearance: none;
   height: 6px;
@@ -610,6 +766,14 @@ body {
   box-shadow: 0 1px 4px rgba(255,123,84,0.3);
 }
 
+.slider-row input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #ff7b54;
+  cursor: pointer;
+  border: 3px solid #fff;
+}
+
 .slider-val {
   font-size: 14px;
   font-weight: 800;
@@ -619,45 +783,195 @@ body {
   font-family: monospace;
 }
 
-.sidebar select {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 2px solid #e4e8f4;
-  background: #ffffff;
-  color: #3a3a5c;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  cursor: pointer;
+/* (a) Kontext-Limit: Slider + exakte Eingabe */
+.ctx-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
-.sidebar select:focus { border-color: #ff9b44; }
+.ctx-head h3 { margin-bottom: 0; }
+.ctx-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ff7b54;
+  font-family: Consolas, monospace;
+}
+.ctx-exact-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ctx-exact-row input[type="number"] {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 2px solid #e4e8f4;
+  background: #fff;
+  color: #3a3a5c;
+  font-size: 12px;
+  font-family: Consolas, monospace;
+  outline: none;
+}
+.ctx-exact-row input[type="number"]:focus { border-color: #ff9b44; }
+.ctx-exact-row span { font-size: 11px; color: #9aa0c0; font-weight: 700; }
+/* Skalenbeschriftung: absolut positioniert, weil der Regler logarithmisch
+   ist – gleichmäßig verteilte Labels wären schlicht falsch. */
+.ctx-scale {
+  position: relative;
+  height: 12px;
+  margin-top: 3px;
+  font-size: 9px;
+  color: #b0b8d4;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.ctx-scale span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.ctx-scale span:first-child { transform: translateX(0); }
+.ctx-scale span:last-child  { transform: translateX(-100%); }
 
-.pdf-info {
+/* (b) Token-Zähler */
+.tok-block {
+  background: #ffffff;
+  border: 2px solid #e4e8f4;
+  border-radius: 12px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tok-row { display: flex; flex-direction: column; gap: 4px; }
+
+.tok-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7a82a6;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.tok-label .pct {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  color: #5a60a0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tok-bar {
+  height: 7px;
+  background: #eef0fa;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tok-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #6ec1a0, #40a060);
+  transition: width 0.3s ease;
+}
+.tok-fill.warn { background: linear-gradient(90deg, #ffc470, #ff9b44); }
+.tok-fill.crit { background: linear-gradient(90deg, #ff8a80, #e05050); }
+.tok-fill.session { background: linear-gradient(90deg, #9db6f0, #6a8ccc); }
+
+.tok-detail {
   font-size: 11px;
   color: #7a82a6;
-  line-height: 1.5;
-  padding: 8px 10px;
+  font-family: Consolas, monospace;
+  line-height: 1.6;
+}
+.tok-detail b { color: #3a3a5c; font-weight: 700; }
+.tok-detail .in  { color: #c06020; font-weight: 700; }
+.tok-detail .out { color: #4a7ab0; font-weight: 700; }
+
+.tok-note {
+  font-size: 10px;
+  color: #a8afd0;
+  line-height: 1.45;
+  border-top: 1px dashed #e4e8f4;
+  padding-top: 7px;
+}
+.tok-note b { color: #7a82a6; }
+
+/* (c) Anhänge-Liste */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.file-list::-webkit-scrollbar { width: 5px; }
+.file-list::-webkit-scrollbar-thumb { background: #d4d8ea; border-radius: 3px; }
+
+.file-item {
+  font-size: 11px;
+  color: #7a82a6;
+  line-height: 1.45;
+  padding: 7px 9px;
   background: #ffffff;
   border-radius: 10px;
   border: 2px solid #e4e8f4;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
-.pdf-info .filename {
+.file-item .kind {
+  font-size: 12px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.file-item .meta { flex: 1; min-width: 0; }
+.file-item .filename {
   color: #40a060;
   font-weight: 700;
   word-break: break-all;
+  display: block;
 }
-.pdf-info .remove-pdf {
+.file-item .size { font-family: Consolas, monospace; font-size: 10px; }
+.file-item .remove-file {
+  color: #d0b0b0;
+  cursor: pointer;
+  font-weight: 800;
+  flex-shrink: 0;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.2;
+}
+.file-item .remove-file:hover { color: #e05050; }
+
+.file-clear {
+  font-size: 11px;
   color: #e05050;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-weight: 700;
   cursor: pointer;
   text-decoration: underline;
-  margin-top: 4px;
-  display: inline-block;
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0;
 }
-.pdf-info .remove-pdf:hover { color: #c03030; }
+.file-clear:hover { color: #c03030; }
 
 .model-badge {
   margin-top: auto;
-  padding: 10px 12px;
+  padding: 9px 11px;
   background: #ffffff;
   border-radius: 12px;
   border: 2px solid #e4e8f4;
@@ -665,6 +979,7 @@ body {
   font-size: 11px;
   color: #7a82a6;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 .model-badge strong {
   display: block;
@@ -672,6 +987,7 @@ body {
   color: #5a60a0;
   margin-top: 2px;
   font-weight: 800;
+  word-break: break-all;
 }
 
 /* ── Leerzustand ── */
@@ -697,8 +1013,8 @@ body {
 
   <!-- ── Top Bar: API-Konfiguration + Systemprompt ── -->
   <div class="top-bar">
-    
-    <!-- a) API Base URL Dropdown -->
+
+    <!-- API Base URL Dropdown -->
     <label for="apiBase">API</label>
     <select id="apiBase" class="config-select">
       <option value="https://openrouter.ai/api/v1">OpenRouter</option>
@@ -706,13 +1022,20 @@ body {
       <option value="http://localhost:1234/v1">Localhost</option>
     </select>
 
-    <!-- b) API-Key Eingabe -->
+    <!-- API-Key Eingabe -->
     <label for="apiKey">Key</label>
     <input type="password" id="apiKey" placeholder="API-Key …" autocomplete="off" spellcheck="false">
 
-    <!-- c) Modell-Name Eingabe -->
+    <!-- Modell-Name Eingabe -->
     <label for="modelName">Modell</label>
-    <input type="text" id="modelName" placeholder="z.B. llama3-8b" value=" ">
+    <input type="text" id="modelName" placeholder="z.B. llama3-8b">
+
+    <!-- (d) Konfiguration als Datei speichern / laden -->
+    <div class="cfg-group">
+      <button class="btn-cfg" id="cfgSaveBtn" title="Aktuelle Konfiguration als .json-Datei speichern">💾 Konfig speichern</button>
+      <button class="btn-cfg" id="cfgLoadBtn" title="Konfigurationsdatei vom Rechner laden">📂 Konfig laden</button>
+      <input type="file" id="cfgFileInput" accept=".json,application/json" style="display:none">
+    </div>
 
     <!-- Systemprompt Button -->
     <button class="btn-sysprompt" id="sysPromptBtn" title="Systemprompt festlegen">
@@ -729,12 +1052,51 @@ body {
         <button class="popup-close" id="sysPromptClose" title="Schließen">✕</button>
       </div>
       <div class="popup-body">
-        <textarea id="sysPromptText" placeholder="Hier den Systemprompt eingeben, z.B.&#10;&#10;„Du bist ein freundlicher Lernhelfer für Grundschulkinder. Erkläre alles einfach und mit Beispielen.""></textarea>
+        <textarea id="sysPromptText" placeholder="Hier den Systemprompt eingeben, z.B.&#10;&#10;„Du bist ein freundlicher Lernhelfer für Grundschulkinder. Erkläre alles einfach und mit Beispielen.“"></textarea>
         <div class="popup-hint">Der Systemprompt wird bei jeder Nachricht als Anweisung an das Modell mitgeschickt. Er bleibt aktiv, bis du ihn zurücksetzt.</div>
       </div>
       <div class="popup-footer">
         <button class="popup-btn popup-btn-reset" id="sysPromptReset">Zurücksetzen</button>
         <button class="popup-btn popup-btn-ok" id="sysPromptOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── (d) Konfig-speichern-Popup ── -->
+  <div class="popup-overlay" id="cfgSaveOverlay">
+    <div class="popup">
+      <div class="popup-header">
+        <span class="popup-icon">💾</span>
+        <h2>Konfiguration als Datei speichern</h2>
+        <button class="popup-close" id="cfgSaveClose" title="Schließen">✕</button>
+      </div>
+      <div class="popup-body">
+        <div class="cfg-list" id="cfgSavePreview"></div>
+
+        <div class="cfg-name-row">
+          <label for="cfgFileName">Dateiname</label>
+          <input type="text" id="cfgFileName" placeholder="z. B. openrouter-qwen" spellcheck="false">
+          <span class="ext">.json</span>
+        </div>
+
+        <label class="cfg-check">
+          <input type="checkbox" id="cfgIncludeKey" checked>
+          <span>API-Key mitspeichern</span>
+        </label>
+        <label class="cfg-check">
+          <input type="checkbox" id="cfgIncludeSettings" checked>
+          <span>Temperatur, Token-Limit und Systemprompt mitspeichern</span>
+        </label>
+
+        <div class="popup-warn">
+          <b>Wichtig:</b> Die Datei ist reiner Klartext. Wer sie öffnet, liest den API-Key mit.
+          Auf geteilten Rechnern oder für Dateien, die weitergegeben werden, den Key besser
+          abwählen — Provider und Modell allein sind unkritisch.
+        </div>
+      </div>
+      <div class="popup-footer">
+        <button class="popup-btn popup-btn-neutral" id="cfgSaveCancel">Abbrechen</button>
+        <button class="popup-btn popup-btn-ok" id="cfgSaveConfirm">Speichern …</button>
       </div>
     </div>
   </div>
@@ -747,7 +1109,7 @@ body {
       <div class="messages" id="messages">
         <div class="empty-state" id="emptyState">
           <div class="icon">✦</div>
-          <p>Neuer Chat mit <strong id="chatModelName">GPT-2</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>
+          <p>Neuer Chat mit <strong id="chatModelName">deinem Modell</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>
         </div>
       </div>
       <div class="typing-indicator" id="typing">
@@ -757,8 +1119,11 @@ body {
       <!-- Eingabeleiste -->
       <div class="input-bar">
         <textarea id="userInput" placeholder="Nachricht eingeben …" rows="1"></textarea>
-        <button class="btn btn-pdf" id="pdfBtn" title="PDF hochladen (max. 1 MB)">📄</button>
-        <input type="file" id="pdfInput" accept="application/pdf">
+        <button class="btn btn-file" id="fileBtn" title="Dateien anhängen (PDF, HTML, MD, TXT)">
+          📎<span class="file-count" id="fileCount">0</span>
+        </button>
+        <input type="file" id="fileInput" multiple
+               accept=".pdf,.html,.htm,.md,.markdown,.txt,.text,.csv,application/pdf,text/html,text/markdown,text/plain">
         <button class="btn btn-send" id="sendBtn" title="Senden">Senden</button>
         <button class="btn btn-reset" id="resetBtn" title="Neuer Chat">⟳</button>
       </div>
@@ -766,6 +1131,7 @@ body {
 
     <!-- ── Sidebar ── -->
     <div class="sidebar">
+
       <div class="setting-group">
         <h3>Temperatur</h3>
         <div class="slider-row">
@@ -774,19 +1140,63 @@ body {
         </div>
       </div>
 
+      <!-- (a) Freier Token-Schieberegler bis 1 000 000 -->
       <div class="setting-group">
-        <h3>Kontextfenster</h3>
-        <select id="contextWindow">
-          <option value="500">500 Tokens</option>
-          <option value="1000">1 000 Tokens</option>
-          <option value="4000" selected>4 000 Tokens</option>
-          <option value="8000">8 000 Tokens</option>
-        </select>
+        <div class="ctx-head">
+          <h3>Token-Limit</h3>
+          <span class="ctx-value" id="ctxVal">4 000</span>
+        </div>
+        <input type="range" id="ctxSlider" min="0" max="1000" step="1" value="274"
+               aria-label="Token-Limit des Kontextfensters">
+        <div class="ctx-scale">
+          <span style="left:0%">500</span>
+          <span style="left:30.3%">5 K</span>
+          <span style="left:60.6%">50 K</span>
+          <span style="left:100%">1 M</span>
+        </div>
+        <div class="ctx-exact-row">
+          <input type="number" id="ctxExact" min="500" max="1000000" step="500" value="4000"
+                 aria-label="Token-Limit exakt eingeben">
+          <span>Tok.</span>
+        </div>
       </div>
 
-      <div class="setting-group" id="pdfInfoGroup" style="display:none;">
-        <h3>PDF-Kontext</h3>
-        <div class="pdf-info" id="pdfInfo"></div>
+      <!-- (b) Token-Zähler -->
+      <div class="setting-group">
+        <h3>Token-Verbrauch</h3>
+        <div class="tok-block">
+
+          <div class="tok-row">
+            <div class="tok-label">
+              <span>Nächster Request</span>
+              <span class="pct" id="ctxPct">0 %</span>
+            </div>
+            <div class="tok-bar"><div class="tok-fill" id="ctxFill"></div></div>
+            <div class="tok-detail" id="ctxDetail">0 / 4 000 Tok.</div>
+          </div>
+
+          <div class="tok-row">
+            <div class="tok-label">
+              <span>Session gesamt</span>
+              <span class="pct" id="sesPct">0 %</span>
+            </div>
+            <div class="tok-bar"><div class="tok-fill session" id="sesFill"></div></div>
+            <div class="tok-detail" id="sesDetail">
+              <span class="in">In 0</span> · <span class="out">Out 0</span><br><b>Σ 0</b> Tok.
+            </div>
+          </div>
+
+          <div class="tok-note" id="tokNote">
+            <b>≈</b> geschätzt (4 Zeichen ≈ 1 Token), bis die API echte Zahlen liefert.
+          </div>
+        </div>
+      </div>
+
+      <!-- (c) Anhänge -->
+      <div class="setting-group" id="fileInfoGroup" style="display:none;">
+        <h3>Anhänge</h3>
+        <div class="file-list" id="fileList"></div>
+        <button class="file-clear" id="clearFilesBtn">Alle entfernen</button>
       </div>
 
       <div class="model-badge">
@@ -803,29 +1213,51 @@ body {
   // ══════════════════════════════════════════
   //  KONFIGURATION
   // ══════════════════════════════════════════
-  const PDF_MAX_BYTES = 1 * 1024 * 1024;
+  const FILE_MAX_BYTES  = 10 * 1024 * 1024;   // pro Datei
+  const FILES_MAX_COUNT = 12;                 // gleichzeitig angehängt
+  const CHARS_PER_TOKEN = 4;                  // grobe Heuristik für Schätzungen
+  const CTX_MIN = 500;
+  const CTX_MAX = 1000000;
+  // Anteil des Token-Limits, den Anhänge maximal belegen dürfen
+  const ATTACH_BUDGET_SHARE = 0.75;
 
   // ══════════════════════════════════════════
   //  DOM-REFERENZEN
   // ══════════════════════════════════════════
   const $ = id => document.getElementById(id);
-  const messagesEl  = $('messages');
-  const typing      = $('typing');
-  const userInput   = $('userInput');
-  const sendBtn     = $('sendBtn');
-  const resetBtn    = $('resetBtn');
-  const apiKeyInput = $('apiKey');
-  const apiBaseSelect = $('apiBase');
+  const messagesEl     = $('messages');
+  const typing         = $('typing');
+  const userInput      = $('userInput');
+  const sendBtn        = $('sendBtn');
+  const resetBtn       = $('resetBtn');
+  const apiKeyInput    = $('apiKey');
+  const apiBaseSelect  = $('apiBase');
   const modelNameInput = $('modelName');
-  const chatModelName = $('chatModelName');
-  const sidebarModel = $('sidebarModel');
-  const tempSlider  = $('temperature');
-  const tempVal     = $('tempVal');
-  const ctxSelect   = $('contextWindow');
-  const pdfBtn      = $('pdfBtn');
-  const pdfInput    = $('pdfInput');
-  const pdfInfoGrp  = $('pdfInfoGroup');
-  const pdfInfoEl   = $('pdfInfo');
+  const sidebarModel   = $('sidebarModel');
+  const tempSlider     = $('temperature');
+  const tempVal        = $('tempVal');
+
+  // (a) Token-Limit
+  const ctxSlider = $('ctxSlider');
+  const ctxExact  = $('ctxExact');
+  const ctxValEl  = $('ctxVal');
+
+  // (b) Token-Zähler
+  const ctxFill    = $('ctxFill');
+  const ctxPctEl   = $('ctxPct');
+  const ctxDetail  = $('ctxDetail');
+  const sesFill    = $('sesFill');
+  const sesPctEl   = $('sesPct');
+  const sesDetail  = $('sesDetail');
+  const tokNote    = $('tokNote');
+
+  // (c) Anhänge
+  const fileBtn      = $('fileBtn');
+  const fileInput    = $('fileInput');
+  const fileInfoGrp  = $('fileInfoGroup');
+  const fileListEl   = $('fileList');
+  const fileCountEl  = $('fileCount');
+  const clearFilesBtn= $('clearFilesBtn');
 
   // ── Systemprompt-Popup DOM ──
   const sysPromptBtn     = $('sysPromptBtn');
@@ -835,13 +1267,156 @@ body {
   const sysPromptOk      = $('sysPromptOk');
   const sysPromptReset   = $('sysPromptReset');
 
+  // ── (d) Konfig-Popup DOM ──
+  const cfgSaveBtn      = $('cfgSaveBtn');
+  const cfgLoadBtn      = $('cfgLoadBtn');
+  const cfgSaveOverlay  = $('cfgSaveOverlay');
+  const cfgSaveClose    = $('cfgSaveClose');
+  const cfgSaveCancel   = $('cfgSaveCancel');
+  const cfgSaveConfirm  = $('cfgSaveConfirm');
+  const cfgSavePreview  = $('cfgSavePreview');
+  const cfgFileName     = $('cfgFileName');
+  const cfgFileInput    = $('cfgFileInput');
+  const cfgIncludeKey   = $('cfgIncludeKey');
+  const cfgIncludeSet   = $('cfgIncludeSettings');
+
   // ══════════════════════════════════════════
   //  ZUSTAND
   // ══════════════════════════════════════════
-  let conversation = [];
-  let isStreaming = false;
-  let pdfContext = null;
-  let systemPrompt = '';
+  let conversation  = [];
+  let isStreaming   = false;
+  let attachments   = [];      // [{id, name, kind, text, chars}]
+  let systemPrompt  = '';
+  let ctxTokens     = 4000;    // aktuelles Token-Limit (a)
+  let currentCfgName = '';     // zuletzt gespeicherte/geladene Konfigurationsdatei
+
+  // (b) Zählerstände
+  let sessionIn      = 0;      // kumulierte Input-Tokens
+  let sessionOut     = 0;      // kumulierte Output-Tokens
+  let usageIsExact   = false;  // true, sobald die API echte usage-Zahlen liefert
+  let usageSupported = true;   // stream_options wird vom Endpoint akzeptiert
+
+  const fmt = n => Math.round(n).toLocaleString('de-DE');
+
+  // ══════════════════════════════════════════
+  //  (a) TOKEN-LIMIT: LOGARITHMISCHER SCHIEBEREGLER
+  // ══════════════════════════════════════════
+  // Ein linearer Regler von 500 bis 1 000 000 wäre unbrauchbar: 99 % des Wegs
+  // lägen oberhalb von 10 000. Deshalb logarithmische Abbildung des
+  // Reglerwegs (0…1000) auf den Tokenbereich, plus Rundung auf glatte Werte.
+
+  const LOG_MIN = Math.log10(CTX_MIN);
+  const LOG_MAX = Math.log10(CTX_MAX);
+
+  function posToTokens(pos) {
+    const t = Math.min(1, Math.max(0, pos / 1000));
+    return snapNice(Math.pow(10, LOG_MIN + t * (LOG_MAX - LOG_MIN)));
+  }
+
+  function tokensToPos(tok) {
+    const clamped = Math.min(CTX_MAX, Math.max(CTX_MIN, tok));
+    const t = (Math.log10(clamped) - LOG_MIN) / (LOG_MAX - LOG_MIN);
+    return Math.round(t * 1000);
+  }
+
+  function snapNice(v) {
+    let s;
+    if (v < 2000)       s = 100;
+    else if (v < 10000) s = 500;
+    else if (v < 50000) s = 1000;
+    else if (v < 200000)s = 5000;
+    else                s = 10000;
+    return Math.min(CTX_MAX, Math.max(CTX_MIN, Math.round(v / s) * s));
+  }
+
+  function formatTokens(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 2) + ' M';
+    if (n >= 1000)    return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + ' K';
+    return String(n);
+  }
+
+  function setCtxTokens(tok, syncSlider = true, syncExact = true) {
+    ctxTokens = Math.min(CTX_MAX, Math.max(CTX_MIN, Math.round(tok) || CTX_MIN));
+    ctxValEl.textContent = formatTokens(ctxTokens);
+    if (syncSlider) ctxSlider.value = tokensToPos(ctxTokens);
+    if (syncExact)  ctxExact.value  = ctxTokens;
+    updateTokenMeter();
+  }
+
+  ctxSlider.addEventListener('input', () => {
+    setCtxTokens(posToTokens(parseInt(ctxSlider.value, 10)), false, true);
+  });
+
+  ctxExact.addEventListener('change', () => {
+    const v = parseInt(ctxExact.value, 10);
+    setCtxTokens(isNaN(v) ? ctxTokens : v, true, true);
+  });
+
+  // ══════════════════════════════════════════
+  //  (b) TOKEN-ZÄHLER
+  // ══════════════════════════════════════════
+  // Zwei Größen, die man nicht verwechseln darf:
+  //
+  //  1. "Nächster Request": Was beim nächsten Senden tatsächlich ins
+  //     Kontextfenster geht (Systemprompt + Anhänge + behaltener Verlauf).
+  //     Diese Zahl MUSS unter dem Limit bleiben – dafür ist das Limit da.
+  //
+  //  2. "Session gesamt": Summe aller je gesendeten Input- und empfangenen
+  //     Output-Tokens. Diese Zahl wächst über die ganze Sitzung und darf
+  //     100 % überschreiten – jeder Turn schickt den Verlauf erneut mit.
+  //     Sie ist die kostenrelevante Größe.
+
+  function estTokens(chars) {
+    return Math.ceil(chars / CHARS_PER_TOKEN);
+  }
+
+  function pctClass(el, pct) {
+    el.classList.remove('warn', 'crit');
+    if (pct >= 95)      el.classList.add('crit');
+    else if (pct >= 75) el.classList.add('warn');
+  }
+
+  function pctText(p) {
+    if (p === 0)  return '0 %';
+    if (p < 10)   return p.toFixed(1) + ' %';
+    return Math.round(p) + ' %';
+  }
+
+  function updateTokenMeter() {
+    // 1) Belegung des nächsten Requests
+    const preview   = buildMessages();
+    const charsNow  = preview.reduce((s, m) => s + m.content.length, 0);
+    const tokensNow = estTokens(charsNow);
+    const ctxPct    = ctxTokens > 0 ? (tokensNow / ctxTokens) * 100 : 0;
+
+    ctxFill.style.width = Math.min(100, ctxPct).toFixed(1) + '%';
+    pctClass(ctxFill, ctxPct);
+    ctxPctEl.textContent = pctText(ctxPct);
+    ctxDetail.textContent = '≈ ' + fmt(tokensNow) + ' / ' + fmt(ctxTokens) + ' Tok.';
+
+    // 2) Session-Summe
+    const sesTotal = sessionIn + sessionOut;
+    const sesPct   = ctxTokens > 0 ? (sesTotal / ctxTokens) * 100 : 0;
+    const mark     = usageIsExact ? '' : '≈ ';
+
+    sesFill.style.width  = Math.min(100, sesPct).toFixed(1) + '%';
+    sesPctEl.textContent = pctText(sesPct);
+    sesDetail.innerHTML =
+      '<span class="in">In ' + mark + fmt(sessionIn) + '</span> · ' +
+      '<span class="out">Out ' + mark + fmt(sessionOut) + '</span><br>' +
+      '<b>Σ ' + mark + fmt(sesTotal) + '</b> Tok.';
+
+    tokNote.innerHTML = usageIsExact
+      ? 'Session-Werte: <b>echte</b> API-Zahlen. Der obere Balken bleibt eine Schätzung.'
+      : '<b>≈</b> geschätzt (4 Zeichen ≈ 1 Token), bis die API echte Zahlen liefert.';
+  }
+
+  function resetTokenCounter() {
+    sessionIn = 0;
+    sessionOut = 0;
+    usageIsExact = false;
+    updateTokenMeter();
+  }
 
   // ══════════════════════════════════════════
   //  SYSTEMPROMPT-POPUP LOGIK
@@ -868,6 +1443,7 @@ body {
     systemPrompt = sysPromptText.value.trim();
     updateSysPromptBtnState();
     closeSysPromptPopup();
+    updateTokenMeter();
     if (systemPrompt) addSystemBubble('Systemprompt gesetzt.');
   });
 
@@ -876,6 +1452,7 @@ body {
     systemPrompt = '';
     updateSysPromptBtnState();
     closeSysPromptPopup();
+    updateTokenMeter();
     addSystemBubble('Systemprompt entfernt.');
   });
 
@@ -884,9 +1461,247 @@ body {
   }
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sysPromptOverlay.classList.contains('visible')) {
-      closeSysPromptPopup();
+    if (e.key !== 'Escape') return;
+    if (sysPromptOverlay.classList.contains('visible')) closeSysPromptPopup();
+    if (cfgSaveOverlay.classList.contains('visible'))   closeCfgPopup();
+  });
+
+  // ══════════════════════════════════════════
+  //  (d) KONFIGURATION ALS DATEI SPEICHERN / LADEN
+  // ══════════════════════════════════════════
+  // Ablage als .json-Datei auf dem Rechner. Damit lassen sich beliebig viele
+  // Profile nebeneinander halten (ein Provider pro Datei, ein Kurs pro Datei …).
+  //
+  // Zwei Wege, weil die File System Access API nicht überall existiert:
+  //   1. showSaveFilePicker / showOpenFilePicker – echter Datei-Dialog mit
+  //      frei wählbarem Ablageort (Chrome, Edge, Opera).
+  //   2. Download-Link bzw. <input type="file"> – Fallback für Firefox und
+  //      Safari. Speichert in den Download-Ordner statt an einen frei
+  //      gewählten Ort; funktional gleichwertig, nur weniger komfortabel.
+
+  const CFG_TYPE = 'generalChatApp.config';
+  const CFG_PICKER_TYPES = [{
+    description: 'Chat-Konfiguration',
+    accept: { 'application/json': ['.json'] }
+  }];
+
+  // Wird auf false gesetzt, sobald die API im aktuellen Kontext scheitert
+  // (z. B. beim Öffnen über file:// in manchen Browsern).
+  let fsApiSave = typeof window.showSaveFilePicker === 'function';
+  let fsApiOpen = typeof window.showOpenFilePicker === 'function';
+
+  function sanitizeFilename(name) {
+    return String(name || '')
+      .replace(/\.json$/i, '')
+      .replace(/[\\/:*?"<>|]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80);
+  }
+
+  function suggestFilename() {
+    const model = modelNameInput.value.trim().split('/').pop();
+    const provider = apiBaseSelect.options[apiBaseSelect.selectedIndex].text.toLowerCase();
+    return sanitizeFilename(model ? provider + '-' + model : provider + '-konfig') || 'chat-konfig';
+  }
+
+  function buildConfigObject() {
+    const cfg = {
+      type: CFG_TYPE,
+      version: 1,
+      savedAt: new Date().toISOString(),
+      apiBase: apiBaseSelect.value,
+      model:   modelNameInput.value.trim()
+    };
+    if (cfgIncludeKey.checked) cfg.apiKey = apiKeyInput.value.trim();
+    if (cfgIncludeSet.checked) {
+      cfg.temperature  = parseFloat(tempSlider.value);
+      cfg.ctxTokens    = ctxTokens;
+      cfg.systemPrompt = systemPrompt;
     }
+    return cfg;
+  }
+
+  function openCfgPopup() {
+    const model = modelNameInput.value.trim();
+    const key   = apiKeyInput.value.trim();
+
+    cfgSavePreview.innerHTML =
+      '<div>API: <b>' + escapeHtml(apiBaseSelect.options[apiBaseSelect.selectedIndex].text) + '</b></div>' +
+      '<div>Modell: <b>' + (model ? escapeHtml(model) : '<span class="cfg-empty">– leer –</span>') + '</b></div>' +
+      '<div>Key: <b>' + (key ? maskKey(key) : '<span class="cfg-empty">– leer –</span>') + '</b></div>';
+
+    cfgFileName.value = currentCfgName || suggestFilename();
+    cfgSaveOverlay.classList.add('visible');
+    cfgFileName.focus();
+    cfgFileName.select();
+  }
+
+  function closeCfgPopup() {
+    cfgSaveOverlay.classList.remove('visible');
+  }
+
+  function maskKey(k) {
+    if (k.length <= 8) return '••••';
+    return escapeHtml(k.slice(0, 4)) + '••••••••' + escapeHtml(k.slice(-4));
+  }
+
+  function downloadJson(json, filename) {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function saveConfigToFile() {
+    const name = sanitizeFilename(cfgFileName.value) || suggestFilename();
+    const json = JSON.stringify(buildConfigObject(), null, 2);
+    const withKey = cfgIncludeKey.checked;
+    closeCfgPopup();
+
+    // showSaveFilePicker muss vor dem ersten await laufen, damit die
+    // Nutzerinteraktion des Klicks noch gültig ist.
+    if (fsApiSave) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name + '.json',
+          types: CFG_PICKER_TYPES
+        });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        currentCfgName = sanitizeFilename(handle.name);
+        cfgDone(handle.name, withKey);
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;   // Dialog abgebrochen
+        fsApiSave = false;                              // Dialog nicht nutzbar
+      }
+    }
+
+    downloadJson(json, name + '.json');
+    currentCfgName = name;
+    cfgDone(name + '.json', withKey, true);
+  }
+
+  function cfgDone(filename, withKey, viaDownload) {
+    addSystemBubble(
+      'Konfiguration gespeichert als „' + filename + '“' +
+      (withKey ? ' (inkl. API-Key)' : ' (ohne API-Key)') +
+      (viaDownload ? ' – im Download-Ordner.' : '.')
+    );
+  }
+
+  async function loadConfigFromFile() {
+    if (fsApiOpen) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: CFG_PICKER_TYPES,
+          multiple: false
+        });
+        const file = await handle.getFile();
+        applyConfigText(await file.text(), file.name);
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        fsApiOpen = false;
+        addSystemBubble('Datei-Dialog nicht verfügbar – bitte „Konfig laden“ erneut klicken.');
+        return;
+      }
+    }
+    cfgFileInput.click();
+  }
+
+  cfgFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    cfgFileInput.value = '';
+    if (!file) return;
+    try {
+      applyConfigText(await file.text(), file.name);
+    } catch (err) {
+      showError('Datei konnte nicht gelesen werden: ' + err.message);
+    }
+  });
+
+  function applyConfigText(text, filename) {
+    let cfg;
+    try {
+      cfg = JSON.parse(text);
+    } catch {
+      showError('„' + filename + '“ ist keine gültige JSON-Datei.');
+      return;
+    }
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+      showError('„' + filename + '“ enthält keine Konfiguration.');
+      return;
+    }
+    if (cfg.type && cfg.type !== CFG_TYPE) {
+      showError('„' + filename + '“ ist eine Datei anderen Typs (' + escapeHtml(String(cfg.type)) + ').');
+      return;
+    }
+    applyConfig(cfg, filename);
+  }
+
+  function applyConfig(cfg, filename) {
+    const loaded = [];
+    const skipped = [];
+
+    if (cfg.apiBase) {
+      if ([...apiBaseSelect.options].some(o => o.value === cfg.apiBase)) {
+        apiBaseSelect.value = cfg.apiBase;
+        usageSupported = true;
+        loaded.push('API');
+      } else {
+        skipped.push('unbekannte API-Adresse');
+      }
+    }
+    if (cfg.model)  { modelNameInput.value = cfg.model; loaded.push('Modell'); }
+    if (cfg.apiKey) { apiKeyInput.value = cfg.apiKey;   loaded.push('Key'); }
+
+    if (typeof cfg.temperature === 'number' && cfg.temperature >= 0 && cfg.temperature <= 1) {
+      tempSlider.value = cfg.temperature;
+      tempVal.textContent = cfg.temperature.toFixed(2);
+      loaded.push('Temperatur');
+    }
+    if (typeof cfg.ctxTokens === 'number' && isFinite(cfg.ctxTokens)) {
+      setCtxTokens(cfg.ctxTokens);
+      loaded.push('Token-Limit');
+    }
+    if (typeof cfg.systemPrompt === 'string') {
+      systemPrompt = cfg.systemPrompt;
+      updateSysPromptBtnState();
+      if (systemPrompt) loaded.push('Systemprompt');
+    }
+
+    currentCfgName = sanitizeFilename(filename);
+    updateModelLabels();
+    updateTokenMeter();
+
+    if (!loaded.length) {
+      showError('„' + filename + '“ enthielt keine verwertbaren Einstellungen.');
+      return;
+    }
+    addSystemBubble(
+      'Geladen aus „' + filename + '“: ' + loaded.join(', ') +
+      (skipped.length ? ' — übersprungen: ' + skipped.join(', ') : '') + '.'
+    );
+  }
+
+  cfgSaveBtn.addEventListener('click', openCfgPopup);
+  cfgLoadBtn.addEventListener('click', loadConfigFromFile);
+  cfgSaveClose.addEventListener('click', closeCfgPopup);
+  cfgSaveCancel.addEventListener('click', closeCfgPopup);
+  cfgSaveConfirm.addEventListener('click', saveConfigToFile);
+  cfgSaveOverlay.addEventListener('click', (e) => {
+    if (e.target === cfgSaveOverlay) closeCfgPopup();
+  });
+  cfgFileName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveConfigToFile(); }
   });
 
   // ══════════════════════════════════════════
@@ -952,11 +1767,11 @@ body {
   }
 
   function escapeHtml(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   // ══════════════════════════════════════════
-  //  COPY-BUTTON FÜR CODE-BLOCKS (d)
+  //  COPY-BUTTON FÜR CODE-BLOCKS
   // ══════════════════════════════════════════
 
   function addCopyButtonsToMessage(msgEl) {
@@ -967,11 +1782,11 @@ body {
       const btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.innerText = 'Kopieren';
-      
+
       btn.addEventListener('click', () => {
         const code = pre.querySelector('code');
         const codeText = code ? code.innerText : pre.innerText;
-        
+
         navigator.clipboard.writeText(codeText).then(() => {
           btn.innerText = '✓ Kopiert';
           btn.classList.add('copied');
@@ -991,7 +1806,7 @@ body {
   }
 
   // ══════════════════════════════════════════
-  //  PDF-EXTRAKTION (pdf.js)
+  //  (c) DATEI-ANHÄNGE: PDF, HTML, MD, TXT
   // ══════════════════════════════════════════
 
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -1003,67 +1818,144 @@ body {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const text = content.items.map(item => item.str).join(' ');
-      pages.push(text);
+      pages.push(content.items.map(item => item.str).join(' '));
     }
     return pages.join('\n\n');
   }
 
-  pdfBtn.addEventListener('click', () => pdfInput.click());
+  // HTML → Fließtext. Skript-, Style- und Head-Inhalte fliegen raus,
+  // sonst würde der halbe Kontext mit CSS-Regeln gefüllt.
+  function htmlToText(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, style, noscript, svg, template').forEach(n => n.remove());
+    const body = doc.body || doc.documentElement;
+    const raw = body ? (body.textContent || '') : '';
+    return raw
+      .replace(/[ \t\u00a0]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .split('\n').map(l => l.trim()).join('\n')
+      .trim();
+  }
 
-  pdfInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  function kindOf(file) {
+    const n = file.name.toLowerCase();
+    if (n.endsWith('.pdf'))  return { key: 'pdf',  icon: '📄', label: 'PDF' };
+    if (n.endsWith('.html') || n.endsWith('.htm')) return { key: 'html', icon: '🌐', label: 'HTML' };
+    if (n.endsWith('.md') || n.endsWith('.markdown')) return { key: 'md', icon: '📝', label: 'Markdown' };
+    if (n.endsWith('.txt') || n.endsWith('.text')) return { key: 'txt', icon: '📃', label: 'Text' };
+    if (n.endsWith('.csv')) return { key: 'csv', icon: '📊', label: 'CSV' };
+    if (file.type === 'application/pdf') return { key: 'pdf', icon: '📄', label: 'PDF' };
+    if (file.type.startsWith('text/'))   return { key: 'txt', icon: '📃', label: 'Text' };
+    return null;
+  }
 
-    if (file.size > PDF_MAX_BYTES) {
-      showError(`PDF zu groß (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum: 1 MB.`);
-      pdfInput.value = '';
-      return;
-    }
+  async function readFileAsText(file) {
+    const kind = kindOf(file);
+    if (!kind) throw new Error('Dateityp nicht unterstützt (erlaubt: PDF, HTML, MD, TXT, CSV).');
 
-    try {
-      pdfBtn.textContent = '⏳';
+    if (kind.key === 'pdf') {
       const buffer = await file.arrayBuffer();
       const text = await extractPdfText(buffer);
+      if (!text.trim()) throw new Error('Keine extrahierbaren Textinhalte gefunden (gescannt?).');
+      return { kind, text: text.trim() };
+    }
 
-      if (!text.trim()) {
-        showError('Keine extrahierbaren Textinhalte im PDF gefunden (gescannt?).');
-        pdfBtn.textContent = '📄';
-        pdfInput.value = '';
-        return;
+    const raw = await file.text();
+    const text = kind.key === 'html' ? htmlToText(raw) : raw;
+    if (!text.trim()) throw new Error('Datei enthält keinen Text.');
+    return { kind, text: text.trim() };
+  }
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async (e) => {
+    const files = [...e.target.files];
+    fileInput.value = '';
+    if (!files.length) return;
+
+    const originalIcon = fileBtn.firstChild.nodeValue;
+    fileBtn.firstChild.nodeValue = '⏳';
+
+    for (const file of files) {
+      if (attachments.length >= FILES_MAX_COUNT) {
+        showError('Maximal ' + FILES_MAX_COUNT + ' Dateien gleichzeitig. „' + file.name + '“ wurde übersprungen.');
+        break;
+      }
+      if (file.size > FILE_MAX_BYTES) {
+        showError('„' + file.name + '“ ist zu groß (' + (file.size / 1024 / 1024).toFixed(1) +
+                  ' MB). Maximum: ' + (FILE_MAX_BYTES / 1024 / 1024) + ' MB.');
+        continue;
+      }
+      if (attachments.some(a => a.name === file.name)) {
+        addSystemBubble('„' + file.name + '“ ist bereits angehängt – übersprungen.');
+        continue;
       }
 
-      pdfContext = {
-        name: file.name,
-        text: text.trim(),
-        charCount: text.trim().length
-      };
-
-      pdfBtn.textContent = '📄';
-      pdfBtn.classList.add('has-file');
-      pdfInfoGrp.style.display = '';
-      pdfInfoEl.innerHTML = `
-        <span class="filename">${escapeHtml(pdfContext.name)}</span><br>
-        ${pdfContext.charCount.toLocaleString('de')} Zeichen<br>
-        <span class="remove-pdf" id="removePdf">✕ Entfernen</span>`;
-
-      $('removePdf')?.addEventListener('click', removePdf);
-      addSystemBubble(`PDF geladen: ${pdfContext.name} (${pdfContext.charCount.toLocaleString('de')} Zeichen)`);
-
-    } catch (err) {
-      showError('PDF konnte nicht gelesen werden: ' + err.message);
-      pdfBtn.textContent = '📄';
+      try {
+        const { kind, text } = await readFileAsText(file);
+        attachments.push({
+          id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          name: file.name,
+          kind: kind,
+          text: text,
+          chars: text.length
+        });
+        addSystemBubble(kind.label + ' geladen: ' + file.name +
+                        ' (' + fmt(text.length) + ' Zeichen ≈ ' + fmt(estTokens(text.length)) + ' Tokens)');
+      } catch (err) {
+        showError('„' + file.name + '“ konnte nicht gelesen werden: ' + err.message);
+      }
     }
-    pdfInput.value = '';
+
+    fileBtn.firstChild.nodeValue = originalIcon;
+    renderAttachments();
+    updateTokenMeter();
   });
 
-  function removePdf() {
-    pdfContext = null;
-    pdfBtn.classList.remove('has-file');
-    pdfInfoGrp.style.display = 'none';
-    pdfInfoEl.innerHTML = '';
-    addSystemBubble('PDF-Kontext entfernt.');
+  function renderAttachments() {
+    const has = attachments.length > 0;
+    fileBtn.classList.toggle('has-file', has);
+    fileCountEl.textContent = attachments.length;
+    fileInfoGrp.style.display = has ? '' : 'none';
+
+    fileListEl.innerHTML = '';
+    for (const att of attachments) {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML =
+        '<span class="kind" title="' + escapeHtml(att.kind.label) + '">' + att.kind.icon + '</span>' +
+        '<span class="meta">' +
+          '<span class="filename">' + escapeHtml(att.name) + '</span>' +
+          '<span class="size">' + fmt(att.chars) + ' Z. ≈ ' + fmt(estTokens(att.chars)) + ' Tok.</span>' +
+        '</span>';
+
+      const rm = document.createElement('button');
+      rm.className = 'remove-file';
+      rm.textContent = '✕';
+      rm.title = 'Entfernen';
+      rm.addEventListener('click', () => removeAttachment(att.id));
+      item.appendChild(rm);
+
+      fileListEl.appendChild(item);
+    }
   }
+
+  function removeAttachment(id) {
+    const att = attachments.find(a => a.id === id);
+    attachments = attachments.filter(a => a.id !== id);
+    renderAttachments();
+    updateTokenMeter();
+    if (att) addSystemBubble('Anhang entfernt: ' + att.name);
+  }
+
+  clearFilesBtn.addEventListener('click', () => {
+    if (!attachments.length) return;
+    const n = attachments.length;
+    attachments = [];
+    renderAttachments();
+    updateTokenMeter();
+    addSystemBubble(n + ' Anhang/Anhänge entfernt.');
+  });
 
   // ══════════════════════════════════════════
   //  UI-HILFSFUNKTIONEN
@@ -1121,13 +2013,19 @@ body {
     if (on) scrollToBottom();
   }
 
+  function updateModelLabels() {
+    const model = modelNameInput.value.trim() || 'deinem Modell';
+    sidebarModel.textContent = modelNameInput.value.trim() || '–';
+    const nameEl = $('chatModelName');
+    if (nameEl) nameEl.textContent = model.split('/').pop() || model;
+  }
+
   // ══════════════════════════════════════════
-  //  KONTEXT-VERWALTUNG (mit dynamischem Modell & API)
+  //  KONTEXT-VERWALTUNG
   // ══════════════════════════════════════════
 
   function buildMessages() {
-    const maxTokens = parseInt(ctxSelect.value);
-    const charLimit = maxTokens * 4;
+    const charLimit = ctxTokens * CHARS_PER_TOKEN;
 
     const sysMessages = [];
     let sysChars = 0;
@@ -1137,10 +2035,25 @@ body {
       sysChars += systemPrompt.length;
     }
 
-    if (pdfContext) {
-      const sysTxt = `Der Benutzer hat folgendes PDF-Dokument bereitgestellt ("${pdfContext.name}"):\n\n${pdfContext.text}`;
-      sysMessages.push({ role: 'system', content: sysTxt });
-      sysChars += sysTxt.length;
+    // Anhänge dürfen das Fenster nicht komplett auffressen: harte Obergrenze,
+    // ab der proportional gekürzt wird – sonst bliebe kein Platz für den Dialog.
+    if (attachments.length) {
+      const attachBudget = Math.max(0, charLimit * ATTACH_BUDGET_SHARE - sysChars);
+      const attachTotal  = attachments.reduce((s, a) => s + a.chars, 0);
+      const factor = attachTotal > attachBudget && attachTotal > 0
+        ? attachBudget / attachTotal
+        : 1;
+
+      for (const att of attachments) {
+        const allowed = Math.floor(att.chars * factor);
+        let body = factor < 1
+          ? att.text.slice(0, Math.max(0, allowed - 40)) + '\n\n[… gekürzt, Token-Limit erreicht …]'
+          : att.text;
+        const sysTxt = 'Der Benutzer hat folgendes Dokument bereitgestellt ' +
+                       '(' + att.kind.label + ', "' + att.name + '"):\n\n' + body;
+        sysMessages.push({ role: 'system', content: sysTxt });
+        sysChars += sysTxt.length;
+      }
     }
 
     const remaining = Math.max(0, charLimit - sysChars);
@@ -1156,7 +2069,7 @@ body {
   }
 
   // ══════════════════════════════════════════
-  //  STREAMING-LOGIK (mit dynamischer API)
+  //  STREAMING-LOGIK
   // ══════════════════════════════════════════
 
   let renderTimer = null;
@@ -1165,18 +2078,41 @@ body {
     if (renderTimer) return;
     renderTimer = setTimeout(() => {
       bubble.innerHTML = renderContent(rawText);
-      addCopyButtonsToMessage(bubble); // Copy-Buttons nach Render hinzufügen
+      addCopyButtonsToMessage(bubble);
       scrollToBottom();
       renderTimer = null;
     }, 80);
   }
 
+  // Echte Token-Zahlen gibt es beim Streaming nur mit stream_options.
+  // Nicht jeder OpenAI-kompatible Endpoint kennt das Feld – deshalb bei
+  // HTTP 400 einmal ohne das Feld erneut versuchen und danach schätzen.
+  async function postChat(endpoint, headers, body) {
+    let res = await fetch(endpoint, {
+      method: 'POST', headers, body: JSON.stringify(body)
+    });
+
+    if (!res.ok && res.status === 400 && body.stream_options) {
+      const fallback = { ...body };
+      delete fallback.stream_options;
+      const retry = await fetch(endpoint, {
+        method: 'POST', headers, body: JSON.stringify(fallback)
+      });
+      if (retry.ok) {
+        usageSupported = false;
+        return retry;
+      }
+      return res;
+    }
+    return res;
+  }
+
   async function send() {
-    const text = userInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
+    const text    = userInput.value.trim();
+    const apiKey  = apiKeyInput.value.trim();
     const apiBase = apiBaseSelect.value.trim();
-    const model = modelNameInput.value.trim();
-    
+    const model   = modelNameInput.value.trim();
+
     if (!text || isStreaming) return;
 
     if (!apiKey && !apiBase.includes('localhost')) {
@@ -1184,10 +2120,13 @@ body {
       apiKeyInput.focus();
       return;
     }
+    if (!model) {
+      showError('Bitte einen Modellnamen eintragen, z. B. „meta-llama/llama-3.1-8b-instruct“.');
+      modelNameInput.focus();
+      return;
+    }
 
-    // UI-Updates für gewähltes Modell
-    chatModelName.textContent = model.split('/').pop() || model;
-    sidebarModel.textContent = model;
+    updateModelLabels();
 
     addUserBubble(text);
     conversation.push({ role: 'user', content: text });
@@ -1196,32 +2135,32 @@ body {
     userInput.style.height = '42px';
     setLoading(true);
 
-    const payload = buildMessages();
-    const temp = parseFloat(tempSlider.value);
+    const payload  = buildMessages();
+    const temp     = parseFloat(tempSlider.value);
     const endpoint = `${apiBase}/chat/completions`;
 
-    // Headers vorbereiten
+    // Schätzung vorab: falls die API keine usage liefert, zählen wir selbst.
+    const estPromptTokens = estTokens(payload.reduce((s, m) => s + m.content.length, 0));
+
     const headers = { 'Content-Type': 'application/json' };
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
-      // OpenRouter-spezifische Header
       if (apiBase.includes('openrouter')) {
         headers['HTTP-Referer'] = window.location.href;
         headers['X-Title'] = 'General Chat App';
       }
     }
 
+    const body = {
+      model: model,
+      messages: payload,
+      temperature: temp,
+      stream: true
+    };
+    if (usageSupported) body.stream_options = { include_usage: true };
+
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({
-          model: model,
-          messages: payload,
-          temperature: temp,
-          stream: true
-        })
-      });
+      const res = await postChat(endpoint, headers, body);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1231,6 +2170,7 @@ body {
       setLoading(false);
       const bubble = addAssistantBubble();
       let fullText = '';
+      let usage = null;
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1252,6 +2192,7 @@ body {
 
           try {
             const parsed = JSON.parse(data);
+            if (parsed.usage) usage = parsed.usage;
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               fullText += delta;
@@ -1263,10 +2204,21 @@ body {
 
       if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
       bubble.innerHTML = renderContent(fullText);
-      addCopyButtonsToMessage(bubble); // Copy-Buttons final hinzufügen
+      addCopyButtonsToMessage(bubble);
       scrollToBottom();
 
       conversation.push({ role: 'assistant', content: fullText });
+
+      // (b) Zähler fortschreiben – echte Werte, wenn vorhanden
+      if (usage && (usage.prompt_tokens != null || usage.completion_tokens != null)) {
+        sessionIn  += usage.prompt_tokens     || 0;
+        sessionOut += usage.completion_tokens || 0;
+        usageIsExact = true;
+      } else {
+        sessionIn  += estPromptTokens;
+        sessionOut += estTokens(fullText.length);
+      }
+      updateTokenMeter();
 
     } catch (err) {
       setLoading(false);
@@ -1283,17 +2235,18 @@ body {
 
   function resetChat() {
     conversation = [];
-    pdfContext = null;
-    pdfBtn.classList.remove('has-file');
-    pdfInfoGrp.style.display = 'none';
-    pdfInfoEl.innerHTML = '';
+    attachments = [];
+    renderAttachments();
+    resetTokenCounter();
 
-    const model = modelNameInput.value.trim() || 'GPT-2';
-    messagesEl.innerHTML = `
-      <div class="empty-state" id="emptyState">
-        <div class="icon">✦</div>
-        <p>Neuer Chat mit <strong>${model.split('/').pop() || model}</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>
-      </div>`;
+    const model = modelNameInput.value.trim() || 'deinem Modell';
+    messagesEl.innerHTML =
+      '<div class="empty-state" id="emptyState">' +
+        '<div class="icon">✦</div>' +
+        '<p>Neuer Chat mit <strong id="chatModelName">' +
+          escapeHtml(model.split('/').pop() || model) +
+        '</strong><br>Gib eine Nachricht ein, um zu beginnen.</p>' +
+      '</div>';
     userInput.focus();
   }
 
@@ -1317,21 +2270,22 @@ body {
     }
   });
 
-  // Modell-Name im UI aktualisieren bei Änderung
-  modelNameInput.addEventListener('input', () => {
-    const model = modelNameInput.value.trim() || '‚';
-    sidebarModel.textContent = model;
-    const emptyState = $('emptyState');
-    if (emptyState) {
-      emptyState.querySelector('strong').textContent = model.split('/').pop() || model;
-    }
-  });
+  modelNameInput.addEventListener('input', updateModelLabels);
+
+  // Providerwechsel: stream_options-Unterstützung neu prüfen
+  apiBaseSelect.addEventListener('change', () => { usageSupported = true; });
 
   sendBtn.addEventListener('click', send);
   resetBtn.addEventListener('click', resetChat);
 
-  // Init: Modell-Namen im UI setzen
-  sidebarModel.textContent = modelNameInput.value;
+  // ══════════════════════════════════════════
+  //  INITIALISIERUNG
+  // ══════════════════════════════════════════
+
+  setCtxTokens(4000);
+  renderAttachments();
+  updateModelLabels();
+  updateTokenMeter();
 
 })();
 </script>
