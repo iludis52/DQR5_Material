@@ -40,7 +40,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 16px;
   color: #3a3a5c;
 }
 
@@ -51,7 +52,9 @@ body {
 .app {
   width: 1166px;
   max-width: 98vw;
-  height: 600px;
+  height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  min-height: 420px;
   background: #ffffff;
   border-radius: 20px;
   display: flex;
@@ -109,7 +112,8 @@ body {
 }
 
 /* Spezifische Breiten für bessere Optik */
-#apiBase { min-width: 190px; }
+#apiProvider { min-width: 155px; }
+#apiCustom { min-width: 210px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
 #apiKey { min-width: 200px; flex: 1; }
 #modelName { min-width: 180px; }
 
@@ -472,7 +476,10 @@ body {
   border: 2px solid #ffd4d4;
   font-size: 13px;
   border-radius: 12px;
+  max-width: 88%;
 }
+.msg.error ul { margin: 7px 0 0 1.1em; }
+.msg.error li { margin: 3px 0; line-height: 1.5; }
 
 /* ══════════════════════════════════════════
    MARKDOWN, KATEX & CODE-BLOCKS
@@ -1014,13 +1021,16 @@ textarea:focus-visible {
   <!-- ── Top Bar: API-Konfiguration + Systemprompt ── -->
   <div class="top-bar">
 
-    <!-- API Base URL Dropdown -->
-    <label for="apiBase">API</label>
-    <select id="apiBase" class="config-select">
-      <option value="https://openrouter.ai/api/v1">OpenRouter</option>
-      <option value="https://api.deepinfra.com/v1">DeepInfra</option>
-      <option value="http://localhost:1234/v1">Localhost</option>
-    </select>
+    <!-- API-Auswahl: feste Anbieter + konfigurierbare Optionen -->
+    <label for="apiProvider">API</label>
+    <select id="apiProvider"></select>
+    <input type="text" id="apiCustom" list="apiPresets" spellcheck="false" autocomplete="off"
+           style="display:none">
+    <datalist id="apiPresets">
+      <!-- Eigene Anbieter hier ergänzen – siehe auch PROVIDERS im Skript -->
+      <option value="https://api.together.ai/v1">Together AI</option>
+    </datalist>
+    <button class="btn-cfg" id="apiTestBtn" title="Verbindung prüfen und verfügbare Modelle abrufen">🔌 Test</button>
 
     <!-- API-Key Eingabe -->
     <label for="apiKey">Key</label>
@@ -1213,6 +1223,28 @@ textarea:focus-visible {
   // ══════════════════════════════════════════
   //  KONFIGURATION
   // ══════════════════════════════════════════
+  // ══════════════════════════════════════════
+  //  ANBIETER
+  // ══════════════════════════════════════════
+  // Zentrale Liste – hier neue Anbieter eintragen, ohne den restlichen
+  // Code anzufassen. Reihenfolge = Reihenfolge im Dropdown.
+  //   base     : vollständige Basis-URL; der Code hängt /chat/completions an
+  //   editable : Adressfeld wird eingeblendet
+  //   free     : Feld startet leer, Vorschlagsliste aktiv
+  //   needsKey : ohne API-Key wird das Senden blockiert
+  const PROVIDERS = [
+    { id: 'openrouter', label: 'OpenRouter',
+      base: 'https://openrouter.ai/api/v1', needsKey: true },
+    { id: 'deepinfra',  label: 'DeepInfra',
+      base: 'https://api.deepinfra.com/v1', needsKey: true },
+    { id: 'lmstudio',   label: 'LM Studio (lokal)',
+      base: 'http://127.0.0.1:1234/v1', needsKey: false, editable: true,
+      hint: 'Adresse aus LM Studio, Feld „Reachable at“' },
+    { id: 'custom',     label: 'Frei einstellbar …',
+      base: '', needsKey: true, editable: true, free: true,
+      hint: 'Vollständige Basis-URL, z. B. https://api.together.ai/v1' }
+  ];
+
   const FILE_MAX_BYTES  = 10 * 1024 * 1024;   // pro Datei
   const FILES_MAX_COUNT = 12;                 // gleichzeitig angehängt
   const CHARS_PER_TOKEN = 4;                  // grobe Heuristik für Schätzungen
@@ -1231,7 +1263,9 @@ textarea:focus-visible {
   const sendBtn        = $('sendBtn');
   const resetBtn       = $('resetBtn');
   const apiKeyInput    = $('apiKey');
-  const apiBaseSelect  = $('apiBase');
+  const apiProviderSelect = $('apiProvider');
+  const apiCustomInput    = $('apiCustom');
+  const apiTestBtn        = $('apiTestBtn');
   const modelNameInput = $('modelName');
   const sidebarModel   = $('sidebarModel');
   const tempSlider     = $('temperature');
@@ -1297,6 +1331,134 @@ textarea:focus-visible {
   let usageSupported = true;   // stream_options wird vom Endpoint akzeptiert
 
   const fmt = n => Math.round(n).toLocaleString('de-DE');
+
+  // ══════════════════════════════════════════
+  //  API-ADRESSE: AUSWAHL, NORMALISIERUNG, DIAGNOSE
+  // ══════════════════════════════════════════
+  // Feste Anbieter brauchen keine Eingabe – die URL steht in PROVIDERS.
+  // Nur LM Studio und „Frei einstellbar“ blenden ein Adressfeld ein.
+
+  // Eingaben werden je Option gemerkt, damit ein Wechsel hin und zurück
+  // nichts verwirft.
+  const customBases = {};
+
+  function providerById(id) {
+    return PROVIDERS.find(p => p.id === id) || PROVIDERS[0];
+  }
+
+  function activeProvider() {
+    return providerById(apiProviderSelect.value);
+  }
+
+  function normalizeApiBase(raw) {
+    let v = String(raw || '').trim();
+    if (!v) return '';
+    v = v.replace(/\s+/g, '');
+    if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
+
+    let url;
+    try {
+      url = new URL(v);
+    } catch {
+      return v.replace(/\/+$/, '');
+    }
+    // Pfad aufräumen und /v1 ergänzen, wenn nur Host:Port angegeben wurde
+    let path = url.pathname.replace(/\/+$/, '');
+    if (path === '' || path === '/') path = '/v1';
+    // Ein versehentlich mitkopiertes /chat/completions abschneiden
+    path = path.replace(/\/chat\/completions$/, '');
+    return url.origin + path;
+  }
+
+  function isLocalBase(base) {
+    let host;
+    try {
+      host = new URL(base).hostname.toLowerCase();
+    } catch {
+      return false;
+    }
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' ||
+           host === '0.0.0.0' || host.endsWith('.local') ||
+           /^192\.168\./.test(host) || /^10\./.test(host) ||
+           /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  }
+
+  function providerLabel(base) {
+    try {
+      return new URL(base).hostname.replace(/^www\./, '');
+    } catch {
+      return base || 'api';
+    }
+  }
+
+  // Die tatsächlich zu verwendende Basis-URL.
+  function currentApiBase() {
+    const p = activeProvider();
+    if (!p.editable) return p.base;
+    const norm = normalizeApiBase(apiCustomInput.value);
+    if (norm && norm !== apiCustomInput.value) apiCustomInput.value = norm;
+    if (norm) customBases[p.id] = norm;
+    return norm;
+  }
+
+  function keyRequired() {
+    const p = activeProvider();
+    if (!p.needsKey) return false;
+    // Bei freier Eingabe entscheidet die Adresse: lokale Server wollen keinen Key.
+    return !isLocalBase(currentApiBase());
+  }
+
+  function buildProviderSelect() {
+    apiProviderSelect.innerHTML = '';
+    for (const p of PROVIDERS) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.label;
+      apiProviderSelect.appendChild(opt);
+    }
+  }
+
+  // Aktualisiert nur die abhängigen Hinweise – ohne das Adressfeld zu
+  // überschreiben. Beim Tippen darf der Eingabewert nicht verloren gehen.
+  function refreshApiHints() {
+    const base = currentApiBase();
+    apiKeyInput.placeholder = keyRequired() ? 'API-Key …' : 'API-Key (nicht nötig)';
+    apiTestBtn.title = base
+      ? 'Verbindung zu ' + base + ' prüfen'
+      : 'Erst eine Adresse eintragen';
+  }
+
+  // Nur beim Wechsel der Auswahl: Feld ein-/ausblenden und aus dem
+  // gemerkten Stand neu befüllen.
+  function applyProviderChoice(resetUsage) {
+    const p = activeProvider();
+
+    if (p.editable) {
+      apiCustomInput.style.display = '';
+      apiCustomInput.placeholder = p.free ? 'https://api.anbieter.com/v1' : '127.0.0.1:1234';
+      apiCustomInput.title = p.hint || '';
+      apiCustomInput.setAttribute('list', p.free ? 'apiPresets' : '');
+      if (customBases[p.id] === undefined) customBases[p.id] = p.base;
+      apiCustomInput.value = customBases[p.id];
+    } else {
+      apiCustomInput.style.display = 'none';
+      apiCustomInput.value = '';
+    }
+
+    refreshApiHints();
+    if (resetUsage) usageSupported = true;
+  }
+
+  apiProviderSelect.addEventListener('change', () => {
+    // Anderer Anbieter = anderes Profil: Dateinamensvorschlag neu bilden
+    currentCfgName = '';
+    applyProviderChoice(true);
+  });
+  apiCustomInput.addEventListener('blur', refreshApiHints);
+  apiCustomInput.addEventListener('change', () => {
+    refreshApiHints();
+    usageSupported = true;
+  });
 
   // ══════════════════════════════════════════
   //  (a) TOKEN-LIMIT: LOGARITHMISCHER SCHIEBEREGLER
@@ -1501,8 +1663,17 @@ textarea:focus-visible {
 
   function suggestFilename() {
     const model = modelNameInput.value.trim().split('/').pop();
-    const provider = apiBaseSelect.options[apiBaseSelect.selectedIndex].text.toLowerCase();
-    return sanitizeFilename(model ? provider + '-' + model : provider + '-konfig') || 'chat-konfig';
+    const base = currentApiBase();
+    let host;
+    const p = activeProvider();
+    if (!p.editable) {
+      host = p.id;
+    } else if (isLocalBase(base)) {
+      host = 'lokal';
+    } else {
+      host = providerLabel(base).replace(/^api\./, '').split('.')[0] || 'api';
+    }
+    return sanitizeFilename(model ? host + '-' + model : host + '-konfig') || 'chat-konfig';
   }
 
   function buildConfigObject() {
@@ -1510,7 +1681,8 @@ textarea:focus-visible {
       type: CFG_TYPE,
       version: 1,
       savedAt: new Date().toISOString(),
-      apiBase: apiBaseSelect.value,
+      provider: apiProviderSelect.value,
+      apiBase:  currentApiBase(),
       model:   modelNameInput.value.trim()
     };
     if (cfgIncludeKey.checked) cfg.apiKey = apiKeyInput.value.trim();
@@ -1527,7 +1699,9 @@ textarea:focus-visible {
     const key   = apiKeyInput.value.trim();
 
     cfgSavePreview.innerHTML =
-      '<div>API: <b>' + escapeHtml(apiBaseSelect.options[apiBaseSelect.selectedIndex].text) + '</b></div>' +
+      '<div>API: <b>' + escapeHtml(activeProvider().label) + '</b>' +
+        (activeProvider().editable ? ' <span class="cfg-empty">' + escapeHtml(currentApiBase() || 'ohne Adresse') + '</span>' : '') +
+      '</div>' +
       '<div>Modell: <b>' + (model ? escapeHtml(model) : '<span class="cfg-empty">– leer –</span>') + '</b></div>' +
       '<div>Key: <b>' + (key ? maskKey(key) : '<span class="cfg-empty">– leer –</span>') + '</b></div>';
 
@@ -1651,14 +1825,20 @@ textarea:focus-visible {
     const loaded = [];
     const skipped = [];
 
-    if (cfg.apiBase) {
-      if ([...apiBaseSelect.options].some(o => o.value === cfg.apiBase)) {
-        apiBaseSelect.value = cfg.apiBase;
-        usageSupported = true;
-        loaded.push('API');
-      } else {
-        skipped.push('unbekannte API-Adresse');
-      }
+    // Anbieter: erst über die gespeicherte ID, sonst über die Adresse.
+    // So funktionieren auch ältere Dateien, die nur apiBase enthalten.
+    const base = typeof cfg.apiBase === 'string' ? normalizeApiBase(cfg.apiBase) : '';
+    let target = cfg.provider ? PROVIDERS.find(p => p.id === cfg.provider) : null;
+    if (!target && base) target = PROVIDERS.find(p => p.base && p.base === base);
+    if (!target && base) target = providerById('custom');
+
+    if (target) {
+      apiProviderSelect.value = target.id;
+      if (target.editable && base) customBases[target.id] = base;
+      applyProviderChoice(true);
+      loaded.push('API');
+    } else if (cfg.apiBase) {
+      skipped.push('unbrauchbare API-Adresse');
     }
     if (cfg.model)  { modelNameInput.value = cfg.model; loaded.push('Modell'); }
     if (cfg.apiKey) { apiKeyInput.value = cfg.apiKey;   loaded.push('Key'); }
@@ -2006,6 +2186,100 @@ textarea:focus-visible {
     scrollToBottom();
   }
 
+  // Netzwerkfehler beim fetch liefern nur "Failed to fetch" – der Browser
+  // verrät aus Sicherheitsgründen nicht, ob der Server aus ist, die Adresse
+  // falsch oder CORS blockiert. Deshalb die möglichen Ursachen benennen.
+  function showConnectionError(base, rawMessage) {
+    removeEmptyState();
+    const local = isLocalBase(base);
+    const lines = local
+      ? [
+          'Läuft der Server in LM Studio? Reiter „Developer“, Status auf „Running“, ein Modell geladen.',
+          'Ist in den Server-Einstellungen „Enable CORS“ eingeschaltet? Ohne diese Option lehnt LM Studio Anfragen aus dem Browser ab.',
+          'Stimmen Adresse und Port mit dem Feld „Reachable at“ in LM Studio überein?',
+          'Zum Gegentest ' + base + '/models direkt im Browser öffnen – erscheint dort JSON, liegt es an CORS, nicht am Server.'
+        ]
+      : [
+          'Besteht eine Internetverbindung?',
+          'Ist die API-Adresse korrekt geschrieben?',
+          'Blockiert ein Adblocker oder Firmen-Proxy die Anfrage?'
+        ];
+
+    const div = document.createElement('div');
+    div.className = 'msg error';
+    const head = document.createElement('div');
+    head.textContent = '⚠ Keine Verbindung zu ' + base + ' (' + rawMessage + '). Mögliche Ursachen:';
+    div.appendChild(head);
+    const ul = document.createElement('ul');
+    for (const l of lines) {
+      const li = document.createElement('li');
+      li.textContent = l;
+      ul.appendChild(li);
+    }
+    div.appendChild(ul);
+    messagesEl.appendChild(div);
+    scrollToBottom();
+  }
+
+  // Ein fetch-Fehler ohne HTTP-Status ist immer ein Netzwerk-/CORS-Problem.
+  function isNetworkError(err) {
+    return err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(err.message || '');
+  }
+
+  // ══════════════════════════════════════════
+  //  VERBINDUNGSTEST
+  // ══════════════════════════════════════════
+  // Fragt /models ab. Das ist der schnellste Weg, Adresse, Erreichbarkeit
+  // und CORS in einem Schritt zu prüfen – und liefert nebenbei die exakten
+  // Modellkennungen, die der Server erwartet.
+
+  async function testConnection() {
+    const base = currentApiBase();
+    if (!base) {
+      showError('Bitte zuerst eine API-Adresse eintragen, z. B. http://127.0.0.1:1234/v1');
+      apiCustomInput.focus();
+      return;
+    }
+
+    const key = apiKeyInput.value.trim();
+    const headers = {};
+    if (key) headers['Authorization'] = 'Bearer ' + key;
+
+    apiTestBtn.disabled = true;
+    const label = apiTestBtn.textContent;
+    apiTestBtn.textContent = '⏳ Test';
+
+    try {
+      const res = await fetch(base + '/models', { headers });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showError('Server antwortet, meldet aber HTTP ' + res.status + ': ' +
+                  (err.error?.message || err.message || 'keine Details'));
+        return;
+      }
+      const data = await res.json();
+      const ids = (data.data || []).map(m => m.id).filter(Boolean);
+
+      if (!ids.length) {
+        addSystemBubble('Verbindung zu ' + base + ' steht, der Server meldet aber kein geladenes Modell.');
+        return;
+      }
+      addSystemBubble('Verbindung steht. Verfügbare Modelle: ' + ids.join(', '));
+
+      if (!modelNameInput.value.trim()) {
+        modelNameInput.value = ids[0];
+        updateModelLabels();
+        addSystemBubble('Modellkennung übernommen: ' + ids[0]);
+      }
+    } catch (err) {
+      if (isNetworkError(err)) showConnectionError(base, err.message);
+      else showError('Test fehlgeschlagen: ' + err.message);
+    } finally {
+      apiTestBtn.disabled = false;
+      apiTestBtn.textContent = label;
+    }
+  }
+
   function setLoading(on) {
     isStreaming = on;
     sendBtn.disabled = on;
@@ -2110,18 +2384,24 @@ textarea:focus-visible {
   async function send() {
     const text    = userInput.value.trim();
     const apiKey  = apiKeyInput.value.trim();
-    const apiBase = apiBaseSelect.value.trim();
+    const apiBase = currentApiBase();
     const model   = modelNameInput.value.trim();
 
     if (!text || isStreaming) return;
 
-    if (!apiKey && !apiBase.includes('localhost')) {
-      showError('Bitte zuerst einen API-Key eingeben (oder Localhost wählen).');
+    if (!apiBase) {
+      showError('Bitte eine API-Adresse eintragen, z. B. http://127.0.0.1:1234/v1');
+      apiCustomInput.focus();
+      return;
+    }
+    // Lokale Server laufen üblicherweise ohne Authentifizierung.
+    if (!apiKey && keyRequired()) {
+      showError('Bitte zuerst einen API-Key für ' + activeProvider().label + ' eingeben.');
       apiKeyInput.focus();
       return;
     }
     if (!model) {
-      showError('Bitte einen Modellnamen eintragen, z. B. „meta-llama/llama-3.1-8b-instruct“.');
+      showError('Bitte einen Modellnamen eintragen – „🔌 Test“ holt die verfügbaren Kennungen vom Server.');
       modelNameInput.focus();
       return;
     }
@@ -2222,7 +2502,8 @@ textarea:focus-visible {
 
     } catch (err) {
       setLoading(false);
-      showError(err.message);
+      if (isNetworkError(err)) showConnectionError(apiBase, err.message);
+      else showError(err.message);
     }
 
     isStreaming = false;
@@ -2273,7 +2554,7 @@ textarea:focus-visible {
   modelNameInput.addEventListener('input', updateModelLabels);
 
   // Providerwechsel: stream_options-Unterstützung neu prüfen
-  apiBaseSelect.addEventListener('change', () => { usageSupported = true; });
+  apiTestBtn.addEventListener('click', testConnection);
 
   sendBtn.addEventListener('click', send);
   resetBtn.addEventListener('click', resetChat);
@@ -2282,6 +2563,8 @@ textarea:focus-visible {
   //  INITIALISIERUNG
   // ══════════════════════════════════════════
 
+  buildProviderSelect();
+  applyProviderChoice(true);
   setCtxTokens(4000);
   renderAttachments();
   updateModelLabels();
