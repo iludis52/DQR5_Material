@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pandas Interactive Trainer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        
+        .level-selector {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .level-btn {
+            padding: 10px 30px;
+            font-size: 1em;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+            color: #4a5568;
+        }
+        
+        .level-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .level-btn.active {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+            border-color: #3182ce;
+        }
+        
+        .topics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .topic-card {
+            background: linear-gradient(135deg, #f7fafc, #edf2f7);
+            border: 2px solid #cbd5e0;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .topic-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            border-color: #4299e1;
+        }
+        
+        .topic-card.completed {
+            background: linear-gradient(135deg, #c6f6d5, #9ae6b4);
+            border-color: #48bb78;
+        }
+        
+        .topic-card.completed::before {
+            content: '✓';
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #48bb78;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .topic-card h3 {
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
+        .topic-card p {
+            color: #4a5568;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .exercise-section {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .exercise-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .exercise-title {
+            font-size: 1.4em;
+            color: #2d3748;
+            font-weight: bold;
+        }
+        
+        .exercise-number {
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .data-display {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            white-space: pre;
+            overflow-x: auto;
+            border: 2px solid #4a5568;
+            font-size: 13px;
+        }
+        
+        .explanation {
+            background: linear-gradient(135deg, #fef5e7, #fdebd0);
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 8px;
+            font-size: 0.95em;
+        }
+        
+        .explanation h4 {
+            color: #92400e;
+            margin-bottom: 6px;
+            font-size: 1em;
+        }
+        
+        .explanation p {
+            color: #78350f;
+            line-height: 1.5;
+        }
+        
+        .interactive-area {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #cbd5e0;
+            margin: 15px 0;
+        }
+        
+        .question {
+            font-size: 1.05em;
+            color: #2d3748;
+            margin-bottom: 12px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #fed7e2, #fbb6ce);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #e53e3e;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .code-input {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            font-family: 'Courier New', monospace;
+            border: 2px solid #cbd5e0;
+            border-radius: 8px;
+            background: #f7fafc;
+        }
+        
+        .code-input:focus {
+            outline: none;
+            border-color: #4299e1;
+            background: white;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            font-size: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .btn-check {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+        }
+        
+        .btn-check:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 153, 225, 0.4);
+        }
+        
+        .btn-next {
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+        }
+        
+        .btn-next:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+        }
+        
+        .btn-hint {
+            background: linear-gradient(45deg, #ed8936, #dd6b20);
+            color: white;
+        }
+        
+        .feedback {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+            display: none;
+            font-size: 0.95em;
+        }
+        
+        .feedback.correct {
+            background: linear-gradient(45deg, #c6f6d5, #9ae6b4);
+            border: 2px solid #48bb78;
+            color: #22543d;
+        }
+        
+        .feedback.incorrect {
+            background: linear-gradient(45deg, #fed7d7, #feb2b2);
+            border: 2px solid #e53e3e;
+            color: #742a2a;
+        }
+        
+        .hint-box {
+            background: linear-gradient(45deg, #bee3f8, #90cdf4);
+            border: 2px solid #4299e1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+            font-size: 0.95em;
+        }
+        
+        .hint-box h4 {
+            color: #2c5282;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        
+        .hint-box p {
+            color: #2a4365;
+        }
+        
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐼 Pandas Interactive Trainer</h1>
+        <p class="subtitle">Von den Grundlagen bis zum CSV-Import - Schritt für Schritt</p>
+        
+        <div class="level-selector">
+            <button class="level-btn active" onclick="selectLevel('basic')">
+                📚 Level 1: Grundlagen
+            </button>
+            <button class="level-btn" onclick="selectLevel('advanced')">
+                🚀 Level 2: Fortgeschritten
+            </button>
+        </div>
+        
+        <div id="topicsGrid" class="topics-grid"></div>
+        
+        <div id="exerciseSection" class="exercise-section" style="display: none;">
+            <div class="exercise-header">
+                <div class="exercise-title" id="exerciseTitle"></div>
+                <div class="exercise-number" id="exerciseNumber"></div>
+            </div>
+            
+            <div id="exerciseContent"></div>
+            
+            <div class="interactive-area">
+                <div class="question" id="question"></div>
+                <div class="input-group">
+                    <input type="text" class="code-input" id="userInput" placeholder="Deine Antwort hier...">
+                    <button class="btn btn-check" onclick="checkAnswer()">Prüfen</button>
+                </div>
+                <div class="feedback" id="feedback"></div>
+                <div class="hint-box" id="hintBox"></div>
+                
+                <div class="button-row">
+                    <button class="btn btn-next" onclick="nextExercise()">Nächste Aufgabe</button>
+                    <button class="btn btn-hint" onclick="showHint()">💡 Tipp</button>
+                    <button class="btn btn-next" onclick="backToTopics()" style="background: linear-gradient(45deg, #a0aec0, #718096);">Zurück zu Themen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const curriculum = {
+            basic: {
+                name: "Level 1: Grundlagen",
+                topics: [
+                    {
+                        id: "dataframe_basics",
+                        title: "DataFrame Grundlagen",
+                        description: "Was ist ein DataFrame? Erstellen und verstehen der Struktur",
+                        exercises: [
+                            {
+                                dataDisplay: "Dictionary 'data':\n{'Name': ['Anna', 'Ben', 'Clara'],\n 'Alter': [25, 30, 22],\n 'Stadt': ['Berlin', 'Hamburg', 'München']}",
+                                explanation: "Ein DataFrame ist eine 2D-Datenstruktur mit beschrifteten Zeilen und Spalten - wie eine Tabelle in Excel. Pandas bietet eine Funktion, um aus einem Dictionary ein DataFrame zu erstellen.",
+                                question: "Schreib den Code, um aus dem Dictionary 'data' ein DataFrame zu erstellen.",
+                                answer: "pd.DataFrame(data)",
+                                alternatives: ["pandas.DataFrame(data)"],
+                                hint: "Pandas hat eine Funktion namens DataFrame(), die ein Dictionary als Eingabe nimmt."
+                            },
+                            {
+                                dataDisplay: "DataFrame 'df':\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "DataFrames haben Attribute (keine Funktionen!), die dir Informationen über ihre Struktur geben. Es gibt ein Attribut für die Dimensionen, eins für die Spaltennamen und eins für die Zeilenindizes.",
+                                question: "Welches Attribut von df zeigt die Anzahl der Zeilen und Spalten als Tupel (3, 3)?",
+                                answer: "df.shape",
+                                hint: "Das Attribut heißt wie die 'Form' oder 'Gestalt' des DataFrames. Denk an geometrische Formen."
+                            },
+                            {
+                                dataDisplay: "DataFrame 'df' mit 10 Zeilen:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München\n3  ...\n...\n9  Zara     27     Köln",
+                                explanation: "Es gibt Methoden, um nur einen Ausschnitt des DataFrames anzuzeigen. Eine Methode zeigt die ersten n Zeilen, eine andere die letzten n Zeilen.",
+                                question: "Wie zeigst du nur die ersten 3 Zeilen von df an?",
+                                answer: "df.head(3)",
+                                hint: "Die Methode heißt wie der englische Begriff für 'Kopf'. Du kannst eine Zahl als Parameter übergeben."
+                            }
+                        ]
+                    },
+                    {
+                        id: "series_basics",
+                        title: "Series - Die Spalten",
+                        description: "Einzelne Spalten als Series verstehen und nutzen",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Einzelne Spalten eines DataFrames sind Series-Objekte. Du kannst auf sie zugreifen, indem du den Spaltennamen verwendest.",
+                                question: "Wie greifst du auf die Spalte 'Name' zu, um sie als Series zu erhalten?",
+                                answer: "df['Name']",
+                                hint: "Verwende eckige Klammern und den Spaltennamen als String."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Series-Objekte haben eingebaute Methoden für mathematische Berechnungen. Es gibt Methoden für Durchschnitt, Maximum, Minimum, Summe und vieles mehr.",
+                                question: "Berechne den Durchschnitt der Spalte 'Alter'.",
+                                answer: "df['Alter'].mean()",
+                                hint: "Greife zuerst auf die Spalte zu, dann rufe die Methode für den Durchschnitt (englisch: mean) auf."
+                            }
+                        ]
+                    },
+                    {
+                        id: "selecting_data",
+                        title: "Daten auswählen: loc vs iloc",
+                        description: "Unterschied zwischen labelbasierter und positionsbasierter Auswahl",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Es gibt zwei Hauptmethoden zur Datenauswahl: eine verwendet Labels (Zeilen- und Spaltennamen), die andere verwendet Positionen (0, 1, 2, ...). Bei der labelbasierten Methode ist das Ende des Slice INKLUSIVE.",
+                                question: "Hole den Wert 'Hamburg' mit der labelbasierten Methode (Zeile 1, Spalte 'Stadt').",
+                                answer: "df.loc[1, 'Stadt']",
+                                hint: "Die Methode für Labels beginnt mit 'loc'. Syntax: df.loc[zeile, spalte]"
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n        Spalte 0  Spalte 1  Spalte 2\nZeile 0   Anna       25      Berlin\nZeile 1    Ben       30     Hamburg\nZeile 2  Clara       22     München",
+                                explanation: "Die positionsbasierte Methode arbeitet mit Zahlen (0=erste Position, 1=zweite Position, etc.). Bei dieser Methode ist das Ende des Slice EXKLUSIV - wie bei normalen Python-Listen.",
+                                question: "Hole den Wert 25 mit der positionsbasierten Methode (erste Zeile, zweite Spalte).",
+                                answer: "df.iloc[0, 1]",
+                                hint: "Die Methode für Positionen beginnt mit 'iloc'. Denk an 0-basierte Indizierung: erste Zeile = 0, zweite Spalte = 1."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt  Land\n0  Anna     25     Berlin   DE\n1   Ben     30    Hamburg   DE\n2 Clara     22    München   DE",
+                                explanation: "Du kannst mehrere Spalten gleichzeitig auswählen. Dafür benötigst du eine Liste von Spaltennamen innerhalb der eckigen Klammern.",
+                                question: "Wähle nur die Spalten 'Name' und 'Stadt' aus.",
+                                answer: "df[['Name', 'Stadt']]",
+                                alternatives: ["df.loc[:, ['Name', 'Stadt']]"],
+                                hint: "Du brauchst doppelte eckige Klammern: df[[liste_von_spalten]]. Der Doppelpunkt bedeutet 'alle Zeilen'."
+                            }
+                        ]
+                    },
+                    {
+                        id: "filtering",
+                        title: "Daten filtern",
+                        description: "Zeilen nach Bedingungen auswählen",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Du kannst Vergleichsoperatoren (<, >, ==, !=) auf Spalten anwenden. Das Ergebnis ist ein Boolean-Array, das du dann als Filter verwenden kannst.",
+                                question: "Filtere alle Zeilen, in denen das Alter größer als 23 ist.",
+                                answer: "df[df['Alter'] > 23]",
+                                hint: "Erstelle einen Vergleich für die Alter-Spalte und setze ihn in eckige Klammern um df herum."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Du kannst mehrere Bedingungen kombinieren. Für 'und' verwendest du &, für 'oder' verwendest du |. Wichtig: Jede Bedingung muss in eigenen Klammern stehen!",
+                                question: "Filtere alle Zeilen mit Alter kleiner 26 UND Stadt gleich 'Berlin'.",
+                                answer: "df[(df['Alter'] < 26) & (df['Stadt'] == 'Berlin')]",
+                                hint: "Zwei Bedingungen mit & verbinden. Format: df[(bedingung1) & (bedingung2)]. Für Gleichheit verwende ==."
+                            }
+                        ]
+                    },
+                    {
+                        id: "adding_columns",
+                        title: "Spalten hinzufügen und ändern",
+                        description: "Neue Spalten erstellen und bestehende modifizieren",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "Neue Spalten werden durch Zuweisung erstellt. Du kannst mit existierenden Spalten rechnen (+, -, *, /, etc.).",
+                                question: "Erstelle eine neue Spalte 'Alter_Plus_10', die 10 Jahre zum Alter hinzufügt.",
+                                answer: "df['Alter_Plus_10'] = df['Alter'] + 10",
+                                hint: "Weise einer neuen Spalte (links vom =) das Ergebnis einer Berechnung (rechts vom =) zu."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt  Land\n0  Anna     25     Berlin   DE\n1   Ben     30    Hamburg   DE\n2 Clara     22    München   DE",
+                                explanation: "Es gibt eine Methode, um Spalten (oder Zeilen) zu entfernen. Sie gibt einen neuen DataFrame zurück. Du musst angeben, ob du Spalten (axis=1) oder Zeilen (axis=0) löschen willst.",
+                                question: "Lösche die Spalte 'Land' aus dem DataFrame.",
+                                answer: "df.drop('Land', axis=1)",
+                                alternatives: ["df.drop(columns=['Land'])", "df.drop(['Land'], axis=1)"],
+                                hint: "Die Methode heißt 'drop'. Für Spalten musst du axis=1 angeben."
+                            }
+                        ]
+                    }
+                ]
+            },
+            advanced: {
+                name: "Level 2: Fortgeschritten",
+                topics: [
+                    {
+                        id: "reading_csv",
+                        title: "CSV-Dateien einlesen",
+                        description: "Daten aus CSV-Dateien laden und verstehen",
+                        exercises: [
+                            {
+                                dataDisplay: "Datei 'daten.csv':\nName,Alter,Stadt\nAnna,25,Berlin\nBen,30,Hamburg\nClara,22,München",
+                                explanation: "Pandas hat eine Funktion zum Einlesen von CSV-Dateien. Diese Funktion benötigt mindestens den Dateinamen als String.",
+                                question: "Lies die Datei 'daten.csv' ein und speichere sie in der Variable df.",
+                                answer: "df = pd.read_csv('daten.csv')",
+                                alternatives: ["df=pd.read_csv('daten.csv')", "df = pandas.read_csv('daten.csv')"],
+                                hint: "Die Funktion heißt read_csv() und gehört zum pandas-Modul (pd)."
+                            },
+                            {
+                                dataDisplay: "Datei 'daten.csv':\nID,Name,Alter\n1,Anna,25\n2,Ben,30\n3,Clara,22",
+                                explanation: "Beim Einlesen kannst du mit einem Parameter festlegen, welche Spalte als Index verwendet werden soll.",
+                                question: "Lies 'daten.csv' ein und verwende die Spalte 'ID' als Index.",
+                                answer: "pd.read_csv('daten.csv', index_col='ID')",
+                                alternatives: ["df = pd.read_csv('daten.csv', index_col='ID')"],
+                                hint: "Es gibt einen Parameter namens index_col, dem du den Namen der Index-Spalte übergibst."
+                            }
+                        ]
+                    },
+                    {
+                        id: "data_cleaning",
+                        title: "Daten bereinigen",
+                        description: "Fehlende Werte und Duplikate behandeln",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna   25.0     Berlin\n1   Ben    NaN    Hamburg  ← fehlt\n2 Clara   22.0        NaN  ← fehlt",
+                                explanation: "Es gibt Methoden, um fehlende Werte zu finden (gibt Boolean zurück), zu entfernen oder zu ersetzen. Die Methode zum Finden heißt wie 'is null'.",
+                                question: "Finde die Anzahl fehlender Werte pro Spalte.",
+                                answer: "df.isnull().sum()",
+                                alternatives: ["df.isna().sum()"],
+                                hint: "Kombiniere die Methode zum Finden (isnull) mit einer Methode zum Zählen (sum)."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2  Anna     25     Berlin  ← Duplikat von Zeile 0",
+                                explanation: "Es gibt eine Methode, die doppelte Zeilen entfernt und nur die erste Vorkommen behält.",
+                                question: "Entferne alle duplizierten Zeilen aus df.",
+                                answer: "df.drop_duplicates()",
+                                hint: "Die Methode kombiniert 'drop' (entfernen) mit 'duplicates' (Duplikate)."
+                            }
+                        ]
+                    },
+                    {
+                        id: "groupby",
+                        title: "Daten gruppieren",
+                        description: "GroupBy für Aggregationen nutzen",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30     Berlin\n2 Clara     22    Hamburg\n3 David     28    Hamburg",
+                                explanation: "Du kannst Daten nach den Werten einer Spalte gruppieren und dann Berechnungen auf den Gruppen durchführen. Es gibt eine Methode zum Gruppieren und verschiedene Methoden für Berechnungen (wie Durchschnitt).",
+                                question: "Berechne das durchschnittliche Alter gruppiert nach Stadt.",
+                                answer: "df.groupby('Stadt')['Alter'].mean()",
+                                alternatives: ["df.groupby('Stadt').Alter.mean()"],
+                                hint: "Erst gruppieren mit groupby('Stadt'), dann die Spalte wählen, dann die Durchschnitts-Methode aufrufen."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name      Stadt  Geschlecht\n0  Anna     Berlin      W\n1   Ben     Berlin      M\n2 Clara    Hamburg      W\n3 David    Hamburg      M",
+                                explanation: "Nach dem Gruppieren kannst du mit einer Methode zählen, wie viele Einträge in jeder Gruppe sind.",
+                                question: "Gruppiere nach 'Stadt' und zähle die Anzahl der Einträge pro Gruppe.",
+                                answer: "df.groupby('Stadt').size()",
+                                hint: "Nach groupby('Stadt') gibt es eine Methode namens size(), die zählt."
+                            }
+                        ]
+                    },
+                    {
+                        id: "merging",
+                        title: "DataFrames zusammenführen",
+                        description: "Mehrere DataFrames verbinden",
+                        exercises: [
+                            {
+                                dataDisplay: "df1:                 df2:\n  Name Alter          Name  Stadt\n0 Anna  25         0 Anna Berlin\n1  Ben  30         1  Ben Hamburg\n2 Clara 22         2 Eva  Köln",
+                                explanation: "Es gibt eine Funktion, die mehrere DataFrames vertikal (untereinander) oder horizontal (nebeneinander) zusammenfügt. Der Parameter axis bestimmt die Richtung.",
+                                question: "Füge df1 und df2 vertikal (untereinander) zusammen.",
+                                answer: "pd.concat([df1, df2])",
+                                alternatives: ["pandas.concat([df1, df2])"],
+                                hint: "Die Funktion heißt concat() und benötigt eine Liste von DataFrames. Ohne axis-Parameter ist es vertikal."
+                            },
+                            {
+                                dataDisplay: "df1:                 df2:\n  ID Name           ID  Stadt\n0  1 Anna         0  1 Berlin\n1  2  Ben         1  2 Hamburg\n2  3 Clara        2  4 Köln",
+                                explanation: "Es gibt eine Funktion, die DataFrames über gemeinsame Spalten verbindet (wie SQL JOIN). Du musst angeben, über welche Spalte verbunden werden soll.",
+                                question: "Verbinde df1 und df2 über die gemeinsame Spalte 'ID'.",
+                                answer: "pd.merge(df1, df2, on='ID')",
+                                alternatives: ["pandas.merge(df1, df2, on='ID')"],
+                                hint: "Die Funktion heißt merge(). Der Parameter on gibt die gemeinsame Spalte an."
+                            }
+                        ]
+                    },
+                    {
+                        id: "exporting",
+                        title: "Daten exportieren",
+                        description: "DataFrames speichern",
+                        exercises: [
+                            {
+                                dataDisplay: "DataFrame df soll gespeichert werden:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg\n2 Clara     22    München",
+                                explanation: "DataFrames haben Methoden zum Speichern in verschiedenen Formaten. Für CSV gibt es eine Methode, die standardmäßig den Index mitspeichert (was oft nicht gewünscht ist).",
+                                question: "Speichere df als 'ausgabe.csv' ohne den Index.",
+                                answer: "df.to_csv('ausgabe.csv', index=False)",
+                                hint: "Die Methode heißt to_csv(). Der Parameter index=False verhindert das Speichern des Index."
+                            },
+                            {
+                                dataDisplay: "DataFrame df:\n   Name  Alter      Stadt\n0  Anna     25     Berlin\n1   Ben     30    Hamburg",
+                                explanation: "Analog zu CSV gibt es auch eine Methode zum Speichern als Excel-Datei (.xlsx).",
+                                question: "Speichere df als 'bericht.xlsx' ohne Index.",
+                                answer: "df.to_excel('bericht.xlsx', index=False)",
+                                hint: "Die Methode heißt to_excel() - analog zu to_csv()."
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+        
+        let currentLevel = 'basic';
+        let currentTopic = null;
+        let currentExerciseIndex = 0;
+        let completedTopics = new Set();
+        let correctAnswersInTopic = 0;
+        
+        function selectLevel(level) {
+            currentLevel = level;
+            
+            // Update buttons
+            document.querySelectorAll('.level-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Reset and show topics
+            document.getElementById('exerciseSection').style.display = 'none';
+            renderTopics();
+        }
+        
+        function renderTopics() {
+            const grid = document.getElementById('topicsGrid');
+            grid.innerHTML = '';
+            
+            const topics = curriculum[currentLevel].topics;
+            
+            topics.forEach(topic => {
+                const card = document.createElement('div');
+                card.className = 'topic-card';
+                if (completedTopics.has(topic.id)) {
+                    card.classList.add('completed');
+                }
+                card.innerHTML = `
+                    <h3>${topic.title}</h3>
+                    <p>${topic.description}</p>
+                `;
+                card.onclick = () => startTopic(topic);
+                grid.appendChild(card);
+            });
+        }
+        
+        function startTopic(topic) {
+            currentTopic = topic;
+            currentExerciseIndex = 0;
+            correctAnswersInTopic = 0;
+            
+            document.getElementById('topicsGrid').style.display = 'none';
+            document.getElementById('exerciseSection').style.display = 'block';
+            
+            showExercise();
+        }
+        
+        function showExercise() {
+            const exercise = currentTopic.exercises[currentExerciseIndex];
+            
+            document.getElementById('exerciseTitle').textContent = currentTopic.title;
+            document.getElementById('exerciseNumber').textContent = 
+                `Aufgabe ${currentExerciseIndex + 1} / ${currentTopic.exercises.length}`;
+            
+            const content = document.getElementById('exerciseContent');
+            content.innerHTML = `
+                <div class="data-display">${exercise.dataDisplay}</div>
+                <div class="explanation">
+                    <h4>📖 Erklärung</h4>
+                    <p>${exercise.explanation}</p>
+                </div>
+            `;
+            
+            document.getElementById('question').textContent = exercise.question;
+            document.getElementById('userInput').value = '';
+            document.getElementById('feedback').style.display = 'none';
+            document.getElementById('hintBox').style.display = 'none';
+            document.getElementById('userInput').focus();
+        }
+        
+        function normalizeAnswer(answer) {
+            return answer.toLowerCase()
+                .replace(/\s+/g, '')
+                .replace(/"/g, "'");
+        }
+        
+        function checkAnswer() {
+            const exercise = currentTopic.exercises[currentExerciseIndex];
+            const userAnswer = document.getElementById('userInput').value.trim();
+            const feedback = document.getElementById('feedback');
+            
+            const normalized = normalizeAnswer(userAnswer);
+            const correctNormalized = normalizeAnswer(exercise.answer);
+            
+            const alternatives = exercise.alternatives || [];
+            const isCorrect = normalized === correctNormalized || 
+                             alternatives.some(alt => normalizeAnswer(alt) === normalized);
+            
+            if (isCorrect) {
+                correctAnswersInTopic++;
+                feedback.className = 'feedback correct';
+                feedback.textContent = `🎉 Richtig! ${exercise.answer}`;
+            } else {
+                feedback.className = 'feedback incorrect';
+                feedback.textContent = `❌ Nicht ganz. Die Antwort wäre: ${exercise.answer}`;
+            }
+            
+            feedback.style.display = 'block';
+        }
+        
+        function nextExercise() {
+            currentExerciseIndex++;
+            
+            if (currentExerciseIndex >= currentTopic.exercises.length) {
+                // Prüfe ob alle Aufgaben richtig beantwortet wurden
+                if (correctAnswersInTopic === currentTopic.exercises.length) {
+                    completedTopics.add(currentTopic.id);
+                    alert('🎊 Glückwunsch! Du hast alle Aufgaben richtig beantwortet! Dieses Thema ist abgeschlossen.');
+                } else {
+                    alert(`Du hast ${correctAnswersInTopic} von ${currentTopic.exercises.length} Aufgaben richtig beantwortet. Versuche es nochmal, um das Häkchen zu bekommen!`);
+                }
+                backToTopics();
+            } else {
+                showExercise();
+            }
+        }
+        
+        function showHint() {
+            const exercise = currentTopic.exercises[currentExerciseIndex];
+            const hintBox = document.getElementById('hintBox');
+            hintBox.innerHTML = `
+                <h4>💡 Tipp</h4>
+                <p>${exercise.hint}</p>
+            `;
+            hintBox.style.display = 'block';
+        }
+        
+        function backToTopics() {
+            document.getElementById('exerciseSection').style.display = 'none';
+            document.getElementById('topicsGrid').style.display = 'grid';
+            renderTopics();
+        }
+        
+        // Enter-Taste zum Prüfen
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+        
+        // Initiales Rendern
+        renderTopics();
+    </script>
+</body>
+</html>
