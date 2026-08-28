@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bildskalierung für Vision-Modelle</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #f6f8fa;
+    --surface:     #ffffff;
+    --surface-alt: #f6f8fa;
+    --border:      #d0d7de;
+    --border-soft: #e6eaee;
+    --accent:      #0969da;
+    --accent-dark: #0550ae;
+    --accent-soft: #ddf0ff;
+    --warn:        #9a6700;
+    --warn-soft:   #fff8c5;
+    --ok:          #1a7f37;
+    --text:        #1f2328;
+    --muted:       #656d76;
+    --sans:        Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --mono:        Consolas, "SF Mono", Menlo, monospace;
+    --radius:      6px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100dvh;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ── Kopfzeile ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 0 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-mark {
+    width: 30px; height: 30px;
+    border-radius: var(--radius);
+    background: var(--accent);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    padding: 6px;
+    flex-shrink: 0;
+  }
+  .logo-mark span { background: #fff; display: block; border-radius: 1px; }
+  .logo-mark span:nth-child(2) { opacity: 0.7; }
+  .logo-mark span:nth-child(3) { opacity: 0.45; }
+  .logo-mark span:nth-child(4) { opacity: 0.25; }
+
+  h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .subtitle { font-size: 12px; color: var(--muted); }
+  .badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+  }
+
+  /* ── Hauptbereich ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 330px;
+    gap: 18px;
+    padding: 18px 0;
+    overflow: hidden;
+  }
+
+  .stage-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  #dropzone {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    min-height: 220px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #dropzone.drag-over { border-color: var(--accent); background: var(--accent-soft); }
+  #dropzone.has-image { cursor: default; border-style: solid; border-color: var(--border-soft); }
+
+  .drop-hint {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    pointer-events: none; user-select: none; text-align: center; padding: 20px;
+  }
+  .drop-icon {
+    width: 46px; height: 46px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    position: relative;
+    margin-bottom: 4px;
+  }
+  .drop-icon::before {
+    content: '';
+    position: absolute; left: 8px; bottom: 8px;
+    width: 0; height: 0;
+    border-left: 11px solid transparent;
+    border-right: 11px solid transparent;
+    border-bottom: 14px solid var(--border);
+  }
+  .drop-icon::after {
+    content: '';
+    position: absolute; right: 9px; top: 9px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+  }
+  .drop-label { font-size: 14px; font-weight: 700; }
+  .drop-sub { font-size: 12px; color: var(--muted); }
+
+  /* Bühne mit Overlay */
+  .preview-stage { display: none; position: relative; line-height: 0; }
+  #dropzone.has-image .drop-hint { display: none; }
+  #dropzone.has-image .preview-stage { display: block; }
+
+  #preview-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100dvh - 260px);
+    width: auto; height: auto;
+  }
+  #grid-overlay {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .preview-stage:hover #grid-overlay { opacity: 1; }
+
+  .grid-badge {
+    position: absolute;
+    left: 8px; top: 8px;
+    background: rgba(31,35,40,0.88);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 5px 9px;
+    border-radius: var(--radius);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s;
+    max-width: calc(100% - 16px);
+  }
+  .grid-badge span { display: block; color: #b8c0c8; font-size: 10px; }
+  .preview-stage:hover .grid-badge { opacity: 1; }
+
+  #file-input { display: none; }
+
+  /* ── Seitenleiste ── */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .panel-head {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-alt);
+    border-radius: var(--radius) var(--radius) 0 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-head::before {
+    content: '';
+    width: 4px; height: 14px;
+    background: var(--accent);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .panel-body { padding: 10px 12px; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { font-size: 12px; color: var(--muted); }
+  .stat-val { font-family: var(--mono); font-size: 12px; text-align: right; }
+  .stat-val.accent { color: var(--accent); font-weight: 700; }
+  .stat-val.dim { color: var(--muted); }
+  .stat-val.busy { color: var(--muted); font-style: italic; }
+
+  /* Token-Leiste */
+  .token-bar-wrap { margin-top: 10px; }
+  .token-bar-label {
+    font-size: 11px; color: var(--muted);
+    margin-bottom: 4px; display: flex; justify-content: space-between;
+  }
+  .token-bar-track {
+    height: 6px; background: var(--border-soft);
+    border-radius: 3px; position: relative; overflow: hidden;
+  }
+  .token-bar-fill {
+    height: 100%; width: 0%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.15s ease, background 0.15s;
+  }
+
+  /* Regler */
+  .ctl { margin-bottom: 10px; }
+  .ctl:last-child { margin-bottom: 0; }
+  .ctl-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; margin-bottom: 5px;
+  }
+  .ctl-head b { font-weight: 700; }
+  .ctl-head .val { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none; appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]:disabled { cursor: not-allowed; opacity: 0.5; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--border);
+    cursor: pointer;
+  }
+  input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+  .preset-row { display: flex; gap: 6px; margin-top: 8px; }
+  .preset-btn {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .preset-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .preset-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Format */
+  .format-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .fmt-btn {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 7px 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .fmt-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .fmt-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+  /* Metadaten */
+  .meta-list {
+    max-height: 168px;
+    overflow-y: auto;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .meta-item {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .meta-item:last-child { border-bottom: none; }
+  .meta-key { color: var(--muted); overflow-wrap: anywhere; }
+  .meta-val { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; }
+  .meta-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+
+  .note {
+    font-size: 11px;
+    line-height: 1.45;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    color: var(--muted);
+    border-left: 3px solid var(--border);
+    margin-top: 8px;
+  }
+  .note.warn { background: var(--warn-soft); color: var(--warn); border-left-color: var(--warn); }
+
+  .check-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .check-row input { margin-top: 3px; accent-color: var(--accent); cursor: pointer; }
+  .check-row:has(input:disabled) { opacity: 0.55; cursor: not-allowed; }
+
+  /* Schaltflächen */
+  .action-btn {
+    width: 100%;
+    padding: 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.12s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
+  .btn-primary:disabled { background: var(--border-soft); color: var(--muted); cursor: not-allowed; }
+  .btn-secondary { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--muted); background: var(--surface-alt); }
+
+  /* ── Fußzeile ── */
+  footer {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+    display: inline-block; margin-right: 7px; vertical-align: middle;
+  }
+  .status-dot.active { background: var(--ok); }
+
+  /* ── Dialog ── */
+  .dialog-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(31,35,40,0.45);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 16px;
+  }
+  .dialog-backdrop.open { display: flex; }
+  .dialog {
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 32px rgba(31,35,40,0.18);
+    width: 480px; max-width: 100%;
+    max-height: 90dvh;
+    display: flex; flex-direction: column;
+  }
+  .dialog-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 15px; font-weight: 700;
+  }
+  .dialog-body { padding: 16px 18px; overflow-y: auto; }
+  .dialog-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  .preview-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .compare-item { display: flex; flex-direction: column; gap: 6px; }
+  .compare-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .compare-img {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%; aspect-ratio: 4/3;
+    object-fit: contain;
+    background: var(--surface-alt);
+  }
+  .compare-meta { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .info-cell {
+    background: var(--surface-alt);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+  }
+  .info-cell-label { font-size: 11px; color: var(--muted); }
+  .info-cell-val { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 700; margin-top: 2px; overflow-wrap: anywhere; }
+
+  .dlg-btn {
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 700;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.12s;
+  }
+  .dlg-btn:hover { background: var(--surface-alt); }
+  .dlg-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .dlg-btn.primary:hover { background: var(--accent-dark); }
+
+  @media (max-width: 860px) {
+    .shell { height: auto; min-height: 100dvh; }
+    main { grid-template-columns: 1fr; overflow: visible; }
+    .sidebar { overflow: visible; }
+    #preview-canvas { max-height: 60dvh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header>
+    <div class="logo-mark"><span></span><span></span><span></span><span></span></div>
+    <div>
+      <h1>Bildskalierung für Vision-Modelle</h1>
+      <div class="subtitle">Auflösung, Format und Metadaten vor der Übergabe an ein Vision-LLM kontrollieren</div>
+    </div>
+    <div class="badge" id="head-badge">kein Bild geladen</div>
+  </header>
+
+  <main>
+    <!-- Links: Ablagefläche und Vorschau -->
+    <div class="stage-wrap">
+      <div id="dropzone">
+        <div class="drop-hint">
+          <div class="drop-icon"></div>
+          <div class="drop-label">Bild hierher ziehen</div>
+          <div class="drop-sub">oder klicken zum Auswählen &middot; auch Einfügen aus der Zwischenablage<br>JPEG und PNG mit Metadaten, andere Formate ohne</div>
+        </div>
+        <div class="preview-stage">
+          <canvas id="preview-canvas"></canvas>
+          <canvas id="grid-overlay"></canvas>
+          <div class="grid-badge" id="grid-badge"></div>
+        </div>
+        <input type="file" id="file-input" accept="image/*">
+      </div>
+      <button class="action-btn btn-secondary" id="clear-btn" style="display:none">Bild entfernen</button>
+    </div>
+
+    <!-- Rechts: Steuerung -->
+    <div class="sidebar">
+
+      <div class="panel">
+        <div class="panel-head">Original</div>
+        <div class="panel-body">
+          <div class="stat-row">
+            <span class="stat-label">Auflösung</span>
+            <span class="stat-val dim" id="orig-res">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Seitenverhältnis</span>
+            <span class="stat-val dim" id="orig-ar">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dateigröße</span>
+            <span class="stat-val dim" id="orig-size">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dateityp</span>
+            <span class="stat-val dim" id="orig-type">&mdash;</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Ausgabe</div>
+        <div class="panel-body">
+          <div class="ctl">
+            <div class="ctl-head">
+              <b>Lange Kante</b>
+              <span class="val" id="size-val">&mdash;</span>
+            </div>
+            <input type="range" id="size-slider" min="64" max="2048" value="640" step="1" disabled
+                   aria-label="Lange Kante der Ausgabe in Pixel">
+            <div class="preset-row">
+              <button class="preset-btn" data-preset="640" disabled>640</button>
+              <button class="preset-btn" data-preset="1024" disabled>1024</button>
+              <button class="preset-btn" data-preset="max" disabled>Max</button>
+            </div>
+          </div>
+
+          <div class="stat-row">
+            <span class="stat-label">Auflösung</span>
+            <span class="stat-val accent" id="out-res">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Skalierung</span>
+            <span class="stat-val dim" id="out-scale">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Visual Tokens (geschätzt)</span>
+            <span class="stat-val accent" id="out-tokens">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dateigröße JPEG</span>
+            <span class="stat-val dim" id="size-jpeg">&mdash;</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dateigröße PNG</span>
+            <span class="stat-val dim" id="size-png">&mdash;</span>
+          </div>
+
+          <div class="token-bar-wrap">
+            <div class="token-bar-label">
+              <span>Token-Budget (Ziel <span id="token-target">400</span>)</span>
+              <span id="token-pct">&mdash;</span>
+            </div>
+            <div class="token-bar-track">
+              <div class="token-bar-fill" id="token-fill"></div>
+            </div>
+          </div>
+
+          <div class="note">Schätzung nach Fläche: rund 750&nbsp;px pro Token. Die tatsächliche Kachelung hängt vom Modell ab.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Format</div>
+        <div class="panel-body">
+          <div class="format-opts">
+            <button class="fmt-btn active" data-fmt="jpeg">JPEG</button>
+            <button class="fmt-btn" data-fmt="png">PNG</button>
+          </div>
+          <div class="ctl">
+            <div class="ctl-head">
+              <b>JPEG-Qualität</b>
+              <span class="val" id="quality-val">85&nbsp;%</span>
+            </div>
+            <input type="range" id="quality-slider" min="40" max="100" value="85"
+                   aria-label="JPEG-Qualität in Prozent">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Metadaten</div>
+        <div class="panel-body">
+          <div class="meta-list" id="meta-list">
+            <div class="meta-empty">Noch kein Bild geladen.</div>
+          </div>
+          <label class="check-row">
+            <input type="checkbox" id="keep-meta" checked disabled>
+            <span>Metadaten in die Ausgabedatei übernehmen</span>
+          </label>
+          <div class="note" id="meta-note" style="display:none"></div>
+        </div>
+      </div>
+
+      <button class="action-btn btn-primary" id="export-btn" disabled>Exportieren und speichern</button>
+
+    </div>
+  </main>
+
+  <footer>
+    <div>
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Warte auf ein Bild.</span>
+    </div>
+    <div>Zeigt beim Überfahren des Bildes das geschätzte Token-Raster.</div>
+  </footer>
+
+</div>
+
+<!-- ── Export-Vorschau ── -->
+<div class="dialog-backdrop" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+  <div class="dialog">
+    <div class="dialog-head" id="dlg-title">Export-Vorschau</div>
+    <div class="dialog-body">
+      <div class="preview-compare">
+        <div class="compare-item">
+          <div class="compare-label">Original</div>
+          <img id="dlg-orig" class="compare-img" src="" alt="Originalbild">
+          <div class="compare-meta" id="dlg-orig-res">&mdash;</div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-label">Skaliert</div>
+          <img id="dlg-scaled" class="compare-img" src="" alt="Skaliertes Bild">
+          <div class="compare-meta" id="dlg-scaled-res">&mdash;</div>
+        </div>
+      </div>
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-cell-label">Format</div>
+          <div class="info-cell-val" id="dlg-fmt">&mdash;</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Dateigröße</div>
+          <div class="info-cell-val" id="dlg-size">&mdash;</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Visual Tokens (geschätzt)</div>
+          <div class="info-cell-val" id="dlg-tokens">&mdash;</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-cell-label">Metadaten</div>
+          <div class="info-cell-val" id="dlg-meta">&mdash;</div>
+        </div>
+        <div class="info-cell" style="grid-column: 1 / -1">
+          <div class="info-cell-label">Dateiname</div>
+          <div class="info-cell-val" id="dlg-name" style="font-size:12px">&mdash;</div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="dlg-btn" id="dlg-cancel">Abbrechen</button>
+      <button class="dlg-btn primary" id="dlg-confirm">Herunterladen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Bildskalierung für Vision-Modelle
+   Einzeldatei, keine externen Abhängigkeiten. Zielbrowser: Chrome/Edge.
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── Konfiguration ─────────────────────────────────────────────────
+const OBERGRENZE   = 2048;  // maximale lange Kante der Ausgabe
+const MIN_KANTE     = 64;   // minimale lange Kante der Ausgabe
+const VORGABE_LANG  = 640;  // Startwert lange Kante
+const VORGABE_KURZ  = 480;  // Startwert kurze Kante
+const PX_PRO_TOKEN  = 750;  // Flächenschätzung: px² pro Visual Token
+const KACHEL_PX     = Math.sqrt(PX_PRO_TOKEN); // ≈ 27,4 px Kantenlänge
+const TOKEN_ZIEL    = 400;
+
+// ── Zustand ───────────────────────────────────────────────────────
+let origFile   = null;   // File
+let origImg    = null;   // HTMLImageElement
+let origBytes  = null;   // Uint8Array der Originaldatei
+let origUrl    = '';     // Object-URL des Originals
+let metadaten  = null;   // { eintraege:[], exifTiff:Uint8Array|null, pngChunks:[], hatGps:bool, quelle:'jpeg'|'png'|null }
+let ausgabeW   = 0;
+let ausgabeH   = 0;
+let gewaehltesFormat = 'jpeg';
+let exportBlob = null;
+let exportUrl  = '';
+let rechenLauf = 0;      // Zähler gegen veraltete asynchrone Ergebnisse
+
+// ── DOM ───────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+const dropzone   = $('dropzone');
+const fileInput  = $('file-input');
+const stage      = document.querySelector('.preview-stage');
+const canvasVor  = $('preview-canvas');
+const canvasGrid = $('grid-overlay');
+const gridBadge  = $('grid-badge');
+const clearBtn   = $('clear-btn');
+const exportBtn  = $('export-btn');
+const statusDot  = $('status-dot');
+const statusText = $('status-text');
+const headBadge  = $('head-badge');
+
+const origResEl  = $('orig-res');
+const origArEl   = $('orig-ar');
+const origSizeEl = $('orig-size');
+const origTypeEl = $('orig-type');
+
+const sizeSlider = $('size-slider');
+const sizeVal    = $('size-val');
+const outResEl   = $('out-res');
+const outScaleEl = $('out-scale');
+const outTokEl   = $('out-tokens');
+const sizeJpegEl = $('size-jpeg');
+const sizePngEl  = $('size-png');
+const tokenFill  = $('token-fill');
+const tokenPct   = $('token-pct');
+$('token-target').textContent = TOKEN_ZIEL;
+
+const qualSlider = $('quality-slider');
+const qualVal    = $('quality-val');
+
+const metaList   = $('meta-list');
+const keepMeta   = $('keep-meta');
+const metaNote   = $('meta-note');
+
+const dialog     = $('dialog');
+const dlgOrig    = $('dlg-orig');
+const dlgScaled  = $('dlg-scaled');
+const dlgOrigRes = $('dlg-orig-res');
+const dlgScRes   = $('dlg-scaled-res');
+const dlgFmt     = $('dlg-fmt');
+const dlgSize    = $('dlg-size');
+const dlgTokens  = $('dlg-tokens');
+const dlgMeta    = $('dlg-meta');
+const dlgName    = $('dlg-name');
+
+// ══════════════════════════════════════════════════════════════════
+// 1 · Kleine Helfer
+// ══════════════════════════════════════════════════════════════════
+function ggt(a, b) { return b ? ggt(b, a % b) : a; }
+
+function seitenverhaeltnis(w, h) {
+  const g = ggt(w, h);
+  const a = w / g, b = h / g;
+  return (a > 40 || b > 40) ? (w / h).toFixed(2) + ':1' : `${a}:${b}`;
+}
+
+function kb(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function tokenSchaetzung(w, h) {
+  return Math.round((w * h) / PX_PRO_TOKEN);
+}
+
+function setStatus(text, aktiv) {
+  statusText.textContent = text;
+  statusDot.className = 'status-dot' + (aktiv ? ' active' : '');
+}
+
+// CRC32 für PNG-Chunks
+const CRC_TABELLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABELLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function verkette(teile) {
+  const gesamt = teile.reduce((s, t) => s + t.length, 0);
+  const out = new Uint8Array(gesamt);
+  let p = 0;
+  for (const t of teile) { out.set(t, p); p += t.length; }
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 2 · EXIF lesen (TIFF-Struktur aus JPEG-APP1 oder PNG-eXIf)
+// ══════════════════════════════════════════════════════════════════
+const EXIF_TAGS = {
+  0x010E: 'Bildbeschreibung', 0x010F: 'Hersteller', 0x0110: 'Modell',
+  0x0112: 'Orientierung', 0x011A: 'X-Auflösung', 0x011B: 'Y-Auflösung',
+  0x0128: 'Auflösungseinheit', 0x0131: 'Software', 0x0132: 'Änderungsdatum',
+  0x013B: 'Urheber:in', 0x8298: 'Copyright'
+};
+const EXIF_SUB_TAGS = {
+  0x829A: 'Belichtungszeit', 0x829D: 'Blende', 0x8827: 'ISO',
+  0x9003: 'Aufnahmedatum', 0x9004: 'Digitalisierungsdatum',
+  0x9207: 'Messmethode', 0x9209: 'Blitz', 0x920A: 'Brennweite',
+  0xA002: 'Bildbreite (Exif)', 0xA003: 'Bildhöhe (Exif)',
+  0xA433: 'Objektivhersteller', 0xA434: 'Objektiv', 0xA430: 'Kamerabesitzer:in'
+};
+const GPS_TAGS = {
+  0x0001: 'GPS Breite (Ref)', 0x0002: 'GPS Breite',
+  0x0003: 'GPS Länge (Ref)',  0x0004: 'GPS Länge',
+  0x0005: 'GPS Höhe (Ref)',   0x0006: 'GPS Höhe',
+  0x001D: 'GPS Datum'
+};
+const TYP_GROESSE = { 1:1, 2:1, 3:2, 4:4, 5:8, 6:1, 7:1, 8:2, 9:4, 10:8, 11:4, 12:8 };
+
+/**
+ * Liest die TIFF-Struktur und liefert Einträge sowie den Byte-Offset
+ * des Orientierungs-Tags (für das spätere Zurücksetzen auf 1).
+ */
+function leseTiff(tiff) {
+  const dv = new DataView(tiff.buffer, tiff.byteOffset, tiff.byteLength);
+  if (tiff.length < 8) return null;
+  const marke = dv.getUint16(0, false);
+  let le;
+  if (marke === 0x4949) le = true;
+  else if (marke === 0x4D4D) le = false;
+  else return null;
+  if (dv.getUint16(2, le) !== 42) return null;
+
+  let orientOffset = -1;
+  let orientWert = 1;
+
+  function leseWert(typ, anzahl, offset) {
+    const groesse = TYP_GROESSE[typ] || 1;
+    const laenge = groesse * anzahl;
+    let datenOffset = offset;
+    if (laenge > 4) {
+      datenOffset = dv.getUint32(offset, le);
+      if (datenOffset + laenge > tiff.length) return null;
+    }
+    if (typ === 2) { // ASCII
+      let s = '';
+      for (let i = 0; i < anzahl; i++) {
+        const c = dv.getUint8(datenOffset + i);
+        if (c === 0) break;
+        s += String.fromCharCode(c);
+      }
+      return s.trim();
+    }
+    const werte = [];
+    for (let i = 0; i < anzahl && i < 16; i++) {
+      const o = datenOffset + i * groesse;
+      switch (typ) {
+        case 1: case 7: werte.push(dv.getUint8(o)); break;
+        case 3: werte.push(dv.getUint16(o, le)); break;
+        case 4: werte.push(dv.getUint32(o, le)); break;
+        case 9: werte.push(dv.getInt32(o, le)); break;
+        case 5: werte.push([dv.getUint32(o, le), dv.getUint32(o + 4, le)]); break;
+        case 10: werte.push([dv.getInt32(o, le), dv.getInt32(o + 4, le)]); break;
+        default: werte.push(dv.getUint8(o));
+      }
+    }
+    return werte;
+  }
+
+  function leseIfd(start, tabelle, sammle) {
+    if (start + 2 > tiff.length) return;
+    const anzahl = dv.getUint16(start, le);
+    if (anzahl > 512) return;
+    for (let i = 0; i < anzahl; i++) {
+      const e = start + 2 + i * 12;
+      if (e + 12 > tiff.length) return;
+      const tag    = dv.getUint16(e, le);
+      const typ    = dv.getUint16(e + 2, le);
+      const anz    = dv.getUint32(e + 4, le);
+      const wertOff = e + 8;
+      const wert   = leseWert(typ, anz, wertOff);
+      if (wert === null) continue;
+
+      if (tabelle === EXIF_TAGS && tag === 0x0112) {
+        orientOffset = wertOff;
+        orientWert = Array.isArray(wert) ? wert[0] : 1;
+      }
+      if (tag === 0x8769) { // Exif-Sub-IFD
+        const off = Array.isArray(wert) ? wert[0] : 0;
+        if (off > 0 && off < tiff.length) leseIfd(off, EXIF_SUB_TAGS, sammle);
+        continue;
+      }
+      if (tag === 0x8825) { // GPS-IFD
+        const off = Array.isArray(wert) ? wert[0] : 0;
+        if (off > 0 && off < tiff.length) leseIfd(off, GPS_TAGS, sammle);
+        continue;
+      }
+      const name = tabelle[tag];
+      if (!name) continue;
+      const text = formatiereExif(tag, tabelle, wert);
+      if (text !== '') sammle.push({ schluessel: name, wert: text, gps: tabelle === GPS_TAGS });
+    }
+  }
+
+  const eintraegeAlle = [];
+  leseIfd(dv.getUint32(4, le), EXIF_TAGS, eintraegeAlle);
+  return { eintraege: eintraegeAlle, orientOffset, orientWert, littleEndian: le };
+}
+
+const ORIENT_TEXT = {
+  1: '1 (normal)', 2: '2 (gespiegelt)', 3: '3 (180°)', 4: '4 (gespiegelt, 180°)',
+  5: '5 (gespiegelt, 90°)', 6: '6 (90° im UZS)', 7: '7 (gespiegelt, 270°)', 8: '8 (270° im UZS)'
+};
+
+function formatiereExif(tag, tabelle, wert) {
+  if (typeof wert === 'string') return wert;
+  if (!Array.isArray(wert) || wert.length === 0) return '';
+
+  const bruch = w => Array.isArray(w) && w[1] ? w[0] / w[1] : null;
+
+  if (tabelle === EXIF_TAGS && tag === 0x0112) return ORIENT_TEXT[wert[0]] || String(wert[0]);
+  if (tag === 0x829A) { // Belichtungszeit
+    const v = bruch(wert[0]);
+    if (v === null) return '';
+    return v < 1 ? `1/${Math.round(1 / v)} s` : `${v.toFixed(1)} s`;
+  }
+  if (tag === 0x829D) { const v = bruch(wert[0]); return v === null ? '' : 'f/' + v.toFixed(1); }
+  if (tag === 0x920A) { const v = bruch(wert[0]); return v === null ? '' : v.toFixed(0) + ' mm'; }
+  if (tabelle === GPS_TAGS && (tag === 0x0002 || tag === 0x0004) && wert.length >= 3) {
+    const g = bruch(wert[0]), m = bruch(wert[1]), s = bruch(wert[2]);
+    if (g === null) return '';
+    const dez = g + (m || 0) / 60 + (s || 0) / 3600;
+    return `${dez.toFixed(5)}°`;
+  }
+
+  return wert.map(w => {
+    if (Array.isArray(w)) {
+      if (!w[1]) return String(w[0]);
+      const v = w[0] / w[1];
+      return Number.isInteger(v) ? String(v) : v.toFixed(2);
+    }
+    return String(w);
+  }).join(', ');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 3 · Metadaten aus der Quelldatei ziehen
+// ══════════════════════════════════════════════════════════════════
+function istJpeg(b) { return b.length > 3 && b[0] === 0xFF && b[1] === 0xD8; }
+function istPng(b)  { return b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47; }
+
+function leseJpegMeta(bytes) {
+  let exifTiff = null;
+  let p = 2;
+  while (p + 4 <= bytes.length) {
+    if (bytes[p] !== 0xFF) { p++; continue; }
+    const marker = bytes[p + 1];
+    if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { p += 2; continue; }
+    if (marker === 0xDA || marker === 0xD9) break; // ab hier Bilddaten
+    const laenge = (bytes[p + 2] << 8) | bytes[p + 3];
+    if (laenge < 2 || p + 2 + laenge > bytes.length) break;
+    const nutz = bytes.subarray(p + 4, p + 2 + laenge);
+    if (marker === 0xE1 && nutz.length > 6 &&
+        String.fromCharCode(...nutz.subarray(0, 4)) === 'Exif') {
+      exifTiff = nutz.subarray(6);
+    }
+    p += 2 + laenge;
+  }
+
+  const eintraege = [];
+  let orientOffset = -1, orientWert = 1, le = false;
+  if (exifTiff) {
+    const gelesen = leseTiff(exifTiff);
+    if (gelesen) {
+      eintraege.push(...gelesen.eintraege);
+      orientOffset = gelesen.orientOffset;
+      orientWert = gelesen.orientWert;
+      le = gelesen.littleEndian;
+    }
+  }
+  return {
+    quelle: 'jpeg',
+    eintraege,
+    exifTiff: exifTiff ? new Uint8Array(exifTiff) : null,
+    orientOffset, orientWert, littleEndian: le,
+    pngChunks: [],
+    hatGps: eintraege.some(e => e.gps)
+  };
+}
+
+function lesePngMeta(bytes) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eintraege = [];
+  const chunks = [];   // vollständige Chunk-Bytes zum Weiterreichen
+  let exifTiff = null;
+  let p = 8;
+
+  const dec = new TextDecoder('utf-8');
+  const latin = new TextDecoder('latin1');
+
+  while (p + 8 <= bytes.length) {
+    const laenge = dv.getUint32(p);
+    const typ = String.fromCharCode(bytes[p + 4], bytes[p + 5], bytes[p + 6], bytes[p + 7]);
+    const daten = bytes.subarray(p + 8, p + 8 + laenge);
+    if (p + 12 + laenge > bytes.length) break;
+
+    if (['tEXt', 'zTXt', 'iTXt', 'pHYs', 'tIME', 'eXIf'].includes(typ)) {
+      chunks.push(bytes.subarray(p, p + 12 + laenge));
+    }
+
+    if (typ === 'tEXt') {
+      const nul = daten.indexOf(0);
+      if (nul > 0) eintraege.push({
+        schluessel: latin.decode(daten.subarray(0, nul)),
+        wert: latin.decode(daten.subarray(nul + 1)),
+        gps: false
+      });
+    } else if (typ === 'iTXt') {
+      const nul = daten.indexOf(0);
+      if (nul > 0 && daten[nul + 1] === 0) { // nur unkomprimiert auswerten
+        let q = nul + 3;
+        q = daten.indexOf(0, q) + 1;       // Sprachkennung
+        q = daten.indexOf(0, q) + 1;       // übersetzter Schlüssel
+        eintraege.push({
+          schluessel: latin.decode(daten.subarray(0, nul)),
+          wert: dec.decode(daten.subarray(q)),
+          gps: false
+        });
+      }
+    } else if (typ === 'zTXt') {
+      const nul = daten.indexOf(0);
+      if (nul > 0) eintraege.push({
+        schluessel: latin.decode(daten.subarray(0, nul)),
+        wert: '(komprimiert, wird unverändert übernommen)',
+        gps: false
+      });
+    } else if (typ === 'pHYs' && laenge >= 9) {
+      const x = dv.getUint32(p + 8), y = dv.getUint32(p + 12);
+      const einheit = bytes[p + 16] === 1 ? ' px/m' : ' px/Einheit';
+      eintraege.push({ schluessel: 'Physische Größe', wert: `${x} × ${y}${einheit}`, gps: false });
+    } else if (typ === 'tIME' && laenge >= 7) {
+      const j = dv.getUint16(p + 8);
+      const z = n => String(n).padStart(2, '0');
+      eintraege.push({
+        schluessel: 'Änderungszeit',
+        wert: `${j}-${z(bytes[p+10])}-${z(bytes[p+11])} ${z(bytes[p+12])}:${z(bytes[p+13])}:${z(bytes[p+14])}`,
+        gps: false
+      });
+    } else if (typ === 'eXIf') {
+      exifTiff = new Uint8Array(daten);
+    } else if (typ === 'IEND') {
+      break;
+    }
+    p += 12 + laenge;
+  }
+
+  let orientOffset = -1, orientWert = 1, le = false;
+  if (exifTiff) {
+    const gelesen = leseTiff(exifTiff);
+    if (gelesen) {
+      eintraege.push(...gelesen.eintraege);
+      orientOffset = gelesen.orientOffset;
+      orientWert = gelesen.orientWert;
+      le = gelesen.littleEndian;
+    }
+  }
+
+  return {
+    quelle: 'png',
+    eintraege,
+    exifTiff,
+    orientOffset, orientWert, littleEndian: le,
+    pngChunks: chunks,
+    hatGps: eintraege.some(e => e.gps)
+  };
+}
+
+/**
+ * Kopie der EXIF-Daten mit auf 1 gesetzter Orientierung.
+ * Der Browser rechnet die Drehung beim Zeichnen bereits ein; bliebe das
+ * Tag stehen, würde das Bild ein zweites Mal gedreht.
+ */
+function exifOhneDrehung(meta) {
+  if (!meta || !meta.exifTiff) return null;
+  const kopie = new Uint8Array(meta.exifTiff);
+  if (meta.orientOffset >= 0 && meta.orientOffset + 2 <= kopie.length) {
+    const dv = new DataView(kopie.buffer);
+    dv.setUint16(meta.orientOffset, 1, meta.littleEndian);
+  }
+  return kopie;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 4 · Metadaten in die Ausgabedatei schreiben
+// ══════════════════════════════════════════════════════════════════
+function jpegMitExif(jpegBytes, tiff) {
+  if (!tiff) return jpegBytes;
+  const nutzLaenge = tiff.length + 6 + 2;
+  if (nutzLaenge > 0xFFFF) return jpegBytes;   // passt nicht in ein APP1-Segment
+  const kopf = new Uint8Array(4 + 6);
+  kopf[0] = 0xFF; kopf[1] = 0xE1;
+  kopf[2] = (nutzLaenge >> 8) & 0xFF;
+  kopf[3] = nutzLaenge & 0xFF;
+  kopf.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 4); // "Exif\0\0"
+  return verkette([jpegBytes.subarray(0, 2), kopf, tiff, jpegBytes.subarray(2)]);
+}
+
+function pngChunk(typ, daten) {
+  const laenge = daten.length;
+  const out = new Uint8Array(12 + laenge);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, laenge);
+  for (let i = 0; i < 4; i++) out[4 + i] = typ.charCodeAt(i);
+  out.set(daten, 8);
+  dv.setUint32(8 + laenge, crc32(out.subarray(4, 8 + laenge)));
+  return out;
+}
+
+function pngMitChunks(pngBytes, chunks, tiff) {
+  const zusatz = [];
+  // Aus der Quelle übernommene Chunks unverändert weiterreichen,
+  // ein vorhandenes eXIf ersetzen wir durch die entdrehte Fassung.
+  for (const c of chunks) {
+    const typ = String.fromCharCode(c[4], c[5], c[6], c[7]);
+    if (typ === 'eXIf') continue;
+    zusatz.push(c);
+  }
+  if (tiff) zusatz.push(pngChunk('eXIf', tiff));
+  if (zusatz.length === 0) return pngBytes;
+
+  // IHDR liegt direkt hinter der Signatur und ist immer 13 Byte lang.
+  const einfuegePos = 8 + 12 + 13;
+  return verkette([pngBytes.subarray(0, einfuegePos), ...zusatz, pngBytes.subarray(einfuegePos)]);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 5 · Skalierung, Vorschau und Kennzahlen
+// ══════════════════════════════════════════════════════════════════
+function ausgabeGroesse(langeKante) {
+  const w = origImg.naturalWidth, h = origImg.naturalHeight;
+  const lang = Math.max(w, h);
+  const faktor = Math.min(1, langeKante / lang);
+  return {
+    w: Math.max(1, Math.round(w * faktor)),
+    h: Math.max(1, Math.round(h * faktor)),
+    faktor
+  };
+}
+
+function zeichne(canvas, w, h) {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(origImg, 0, 0, w, h);
+  return ctx;
+}
+
+function zeichneRaster() {
+  if (!origImg || !ausgabeW) return;
+  const rect = canvasVor.getBoundingClientRect();
+  if (rect.width < 2) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvasGrid.width  = Math.round(rect.width * dpr);
+  canvasGrid.height = Math.round(rect.height * dpr);
+  const ctx = canvasGrid.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  const spalten = Math.ceil(ausgabeW / KACHEL_PX);
+  const zeilen  = Math.ceil(ausgabeH / KACHEL_PX);
+  const bx = rect.width / spalten;
+  const by = rect.height / zeilen;
+
+  ctx.strokeStyle = 'rgba(9,105,218,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < spalten; i++) {
+    const x = Math.round(i * bx) + 0.5;
+    ctx.moveTo(x, 0); ctx.lineTo(x, rect.height);
+  }
+  for (let j = 1; j < zeilen; j++) {
+    const y = Math.round(j * by) + 0.5;
+    ctx.moveTo(0, y); ctx.lineTo(rect.width, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(9,105,218,0.85)';
+  ctx.strokeRect(0.5, 0.5, rect.width - 1, rect.height - 1);
+
+  gridBadge.innerHTML =
+    `${spalten} × ${zeilen} Kacheln · ~${spalten * zeilen} Tokens` +
+    `<span>geschätzte Kachelung, hängt vom Modell ab</span>`;
+}
+
+function aktualisiereKennzahlen() {
+  if (!origImg) return;
+  const langeKante = parseInt(sizeSlider.value, 10);
+  const { w, h, faktor } = ausgabeGroesse(langeKante);
+  ausgabeW = w; ausgabeH = h;
+
+  sizeVal.textContent = langeKante + ' px';
+  outResEl.textContent = `${w} × ${h} px`;
+  outScaleEl.textContent = faktor >= 1 ? '100 % (Original)' : (faktor * 100).toFixed(1) + ' %';
+
+  const tokens = tokenSchaetzung(w, h);
+  outTokEl.textContent = '~' + tokens.toLocaleString('de-DE');
+
+  const anteil = Math.min(100, (tokens / TOKEN_ZIEL) * 100);
+  tokenFill.style.width = anteil + '%';
+  tokenFill.style.background = tokens <= TOKEN_ZIEL ? 'var(--accent)' : 'var(--warn)';
+  tokenPct.textContent = Math.round((tokens / TOKEN_ZIEL) * 100) + ' %';
+
+  zeichne(canvasVor, w, h);
+  requestAnimationFrame(zeichneRaster);
+  planeGroessenberechnung();
+}
+
+// ── Dateigrößen für beide Formate ────────────────────────────────
+let groessenTimer = null;
+function planeGroessenberechnung() {
+  clearTimeout(groessenTimer);
+  sizeJpegEl.textContent = 'berechne …';
+  sizePngEl.textContent  = 'berechne …';
+  sizeJpegEl.className = 'stat-val busy';
+  sizePngEl.className  = 'stat-val busy';
+  groessenTimer = setTimeout(berechneGroessen, 220);
+}
+
+async function berechneGroessen() {
+  const lauf = ++rechenLauf;
+  try {
+    const [jpegBlob, pngBlob] = await Promise.all([baueAusgabe('jpeg'), baueAusgabe('png')]);
+    if (lauf !== rechenLauf) return;   // zwischenzeitlich neu angestoßen
+    sizeJpegEl.textContent = kb(jpegBlob.size);
+    sizePngEl.textContent  = kb(pngBlob.size);
+    markiereAktivesFormat();
+  } catch (e) {
+    if (lauf !== rechenLauf) return;
+    sizeJpegEl.textContent = 'Fehler';
+    sizePngEl.textContent  = 'Fehler';
+    sizeJpegEl.className = 'stat-val dim';
+    sizePngEl.className  = 'stat-val dim';
+  }
+}
+
+function markiereAktivesFormat() {
+  sizeJpegEl.className = gewaehltesFormat === 'jpeg' ? 'stat-val accent' : 'stat-val dim';
+  sizePngEl.className  = gewaehltesFormat === 'png'  ? 'stat-val accent' : 'stat-val dim';
+}
+
+/** Erzeugt die fertige Ausgabedatei inklusive Metadaten. */
+async function baueAusgabe(format) {
+  const canvas = document.createElement('canvas');
+  zeichne(canvas, ausgabeW, ausgabeH);
+
+  const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const guete = format === 'jpeg' ? parseInt(qualSlider.value, 10) / 100 : undefined;
+  const blob = await new Promise(res => canvas.toBlob(res, mime, guete));
+  if (!blob) throw new Error('Kodierung fehlgeschlagen');
+
+  if (!keepMeta.checked || !metadaten) return blob;
+
+  let bytes = new Uint8Array(await blob.arrayBuffer());
+  const tiff = exifOhneDrehung(metadaten);
+
+  if (format === 'jpeg') {
+    bytes = jpegMitExif(bytes, tiff);
+  } else {
+    // PNG-Textchunks nur bei PNG-Quelle, EXIF formatübergreifend als eXIf.
+    const chunks = metadaten.quelle === 'png' ? metadaten.pngChunks : [];
+    bytes = pngMitChunks(bytes, chunks, tiff);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 6 · Metadaten-Anzeige
+// ══════════════════════════════════════════════════════════════════
+function zeigeMetadaten() {
+  metaList.innerHTML = '';
+  metaNote.style.display = 'none';
+  metaNote.className = 'note';
+
+  if (!metadaten || metadaten.eintraege.length === 0) {
+    metaList.innerHTML = '<div class="meta-empty">Keine Metadaten in der Datei gefunden.</div>';
+    keepMeta.disabled = true;
+    if (metadaten && metadaten.quelle === null) {
+      metaNote.textContent = 'Metadaten werden nur aus JPEG- und PNG-Dateien gelesen.';
+      metaNote.style.display = '';
+    }
+    return;
+  }
+
+  keepMeta.disabled = false;
+  for (const e of metadaten.eintraege) {
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    const k = document.createElement('div');
+    k.className = 'meta-key';
+    k.textContent = e.schluessel;
+    const v = document.createElement('div');
+    v.className = 'meta-val';
+    v.textContent = e.wert;
+    if (e.gps) v.style.color = 'var(--warn)';
+    div.append(k, v);
+    metaList.appendChild(div);
+  }
+
+  const hinweise = [];
+  if (metadaten.hatGps) hinweise.push('Die Datei enthält GPS-Koordinaten. Beim Weitergeben des Bildes reist der Aufnahmeort mit.');
+  if (metadaten.orientWert > 1) hinweise.push('Die Drehung aus dem Orientierungs-Tag ist im Bild fest eingerechnet, das Tag wird auf „normal“ gesetzt.');
+  if (metadaten.quelle === 'png' && gewaehltesFormat === 'jpeg') hinweise.push('Beim Export als JPEG werden nur EXIF-Daten übernommen, PNG-Textfelder nicht.');
+
+  if (hinweise.length) {
+    metaNote.textContent = hinweise.join(' ');
+    metaNote.className = metadaten.hatGps ? 'note warn' : 'note';
+    metaNote.style.display = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 7 · Bild laden und zurücksetzen
+// ══════════════════════════════════════════════════════════════════
+async function ladeDatei(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    setStatus('Das ist keine Bilddatei. JPEG oder PNG wählen.', false);
+    return;
+  }
+
+  origFile = file;
+  origBytes = new Uint8Array(await file.arrayBuffer());
+
+  if (istJpeg(origBytes))      metadaten = leseJpegMeta(origBytes);
+  else if (istPng(origBytes))  metadaten = lesePngMeta(origBytes);
+  else                         metadaten = { quelle: null, eintraege: [], exifTiff: null,
+                                             orientOffset: -1, orientWert: 1, littleEndian: false,
+                                             pngChunks: [], hatGps: false };
+
+  if (origUrl) URL.revokeObjectURL(origUrl);
+  origUrl = URL.createObjectURL(file);
+
+  const img = new Image();
+  img.onload = () => {
+    origImg = img;
+    dropzone.classList.add('has-image');
+    clearBtn.style.display = '';
+    exportBtn.disabled = false;
+
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const lang = Math.max(w, h);
+
+    origResEl.textContent  = `${w} × ${h} px`;
+    origArEl.textContent   = seitenverhaeltnis(w, h);
+    origSizeEl.textContent = kb(file.size);
+    origTypeEl.textContent = (file.type.split('/')[1] || '—').toUpperCase();
+    ['orig-res','orig-ar','orig-size','orig-type'].forEach(id => $(id).className = 'stat-val');
+
+    // Slider: Obergrenze 2048, bei kleineren Bildern die Originalgröße.
+    const maximum = Math.min(lang, OBERGRENZE);
+    sizeSlider.min = Math.min(MIN_KANTE, maximum);
+    sizeSlider.max = maximum;
+
+    // Startwert: die bisherige Vorgabe 640 × 480, soweit sinnvoll.
+    const kurz = Math.min(w, h);
+    const startFaktor = Math.min(1, VORGABE_LANG / lang, VORGABE_KURZ / kurz);
+    sizeSlider.value = Math.max(parseInt(sizeSlider.min, 10), Math.round(lang * startFaktor));
+
+    sizeSlider.disabled = false;
+    document.querySelectorAll('.preset-btn').forEach(b => {
+      const p = b.dataset.preset;
+      b.disabled = p !== 'max' && parseInt(p, 10) > maximum;
+    });
+
+    headBadge.textContent = `${w} × ${h} px · ${kb(file.size)}`;
+    zeigeMetadaten();
+    aktualisiereKennzahlen();
+    setStatus(`Geladen: ${file.name}`, true);
+  };
+  img.onerror = () => setStatus('Das Bild konnte nicht dekodiert werden.', false);
+  img.src = origUrl;
+}
+
+function setzeZurueck() {
+  origFile = origImg = origBytes = metadaten = null;
+  ausgabeW = ausgabeH = 0;
+  if (origUrl) { URL.revokeObjectURL(origUrl); origUrl = ''; }
+  if (exportUrl) { URL.revokeObjectURL(exportUrl); exportUrl = ''; }
+
+  dropzone.classList.remove('has-image');
+  clearBtn.style.display = 'none';
+  exportBtn.disabled = true;
+  canvasVor.width = canvasVor.height = 1;
+  fileInput.value = '';
+
+  ['orig-res','orig-ar','orig-size','orig-type','out-res','out-scale','out-tokens','size-jpeg','size-png']
+    .forEach(id => { $(id).textContent = '—'; $(id).className = 'stat-val dim'; });
+  sizeVal.textContent = '—';
+  sizeSlider.disabled = true;
+  document.querySelectorAll('.preset-btn').forEach(b => b.disabled = true);
+  tokenFill.style.width = '0%';
+  tokenPct.textContent = '—';
+  metaList.innerHTML = '<div class="meta-empty">Noch kein Bild geladen.</div>';
+  metaNote.style.display = 'none';
+  keepMeta.disabled = true;
+  headBadge.textContent = 'kein Bild geladen';
+  setStatus('Warte auf ein Bild.', false);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 8 · Export
+// ══════════════════════════════════════════════════════════════════
+function dateiname() {
+  const endung = gewaehltesFormat === 'jpeg' ? 'jpg' : 'png';
+  const basis = origFile ? origFile.name.replace(/\.[^.]+$/, '') : 'bild';
+  return `${basis}_${ausgabeW}x${ausgabeH}.${endung}`;
+}
+
+async function oeffneDialog() {
+  if (!origImg) return;
+  setStatus('Export wird vorbereitet …', true);
+  exportBlob = await baueAusgabe(gewaehltesFormat);
+  if (exportUrl) URL.revokeObjectURL(exportUrl);
+  exportUrl = URL.createObjectURL(exportBlob);
+
+  dlgOrig.src = origUrl;
+  dlgScaled.src = exportUrl;
+  dlgOrigRes.textContent = `${origImg.naturalWidth} × ${origImg.naturalHeight} px · ${kb(origFile.size)}`;
+  dlgScRes.textContent = `${ausgabeW} × ${ausgabeH} px · ${kb(exportBlob.size)}`;
+  dlgFmt.textContent = gewaehltesFormat.toUpperCase();
+  dlgSize.textContent = kb(exportBlob.size);
+  dlgTokens.textContent = '~' + tokenSchaetzung(ausgabeW, ausgabeH).toLocaleString('de-DE');
+  dlgMeta.textContent = (!metadaten || metadaten.eintraege.length === 0)
+    ? 'keine vorhanden'
+    : (keepMeta.checked ? `${metadaten.eintraege.length} Felder übernommen` : 'verworfen');
+  dlgName.textContent = dateiname();
+
+  dialog.classList.add('open');
+  setStatus('Export-Vorschau geöffnet.', true);
+}
+
+function schliesseDialog() { dialog.classList.remove('open'); }
+
+function speichern() {
+  if (!exportBlob) return;
+  const a = document.createElement('a');
+  a.href = exportUrl;
+  a.download = dateiname();
+  a.click();
+  schliesseDialog();
+  setStatus(`Gespeichert: ${a.download}`, true);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 9 · Ereignisse
+// ══════════════════════════════════════════════════════════════════
+dropzone.addEventListener('click', () => {
+  if (!dropzone.classList.contains('has-image')) fileInput.click();
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) ladeDatei(e.target.files[0]); });
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) ladeDatei(f);
+});
+
+document.addEventListener('paste', e => {
+  const item = [...e.clipboardData.items].find(i => i.type.startsWith('image/'));
+  if (item) ladeDatei(item.getAsFile());
+});
+
+clearBtn.addEventListener('click', setzeZurueck);
+exportBtn.addEventListener('click', oeffneDialog);
+$('dlg-cancel').addEventListener('click', schliesseDialog);
+$('dlg-confirm').addEventListener('click', speichern);
+dialog.addEventListener('click', e => { if (e.target === dialog) schliesseDialog(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') schliesseDialog(); });
+
+sizeSlider.addEventListener('input', aktualisiereKennzahlen);
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = btn.dataset.preset;
+    sizeSlider.value = p === 'max' ? sizeSlider.max : Math.min(parseInt(p, 10), parseInt(sizeSlider.max, 10));
+    aktualisiereKennzahlen();
+  });
+});
+
+document.querySelectorAll('.fmt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    gewaehltesFormat = btn.dataset.fmt;
+    markiereAktivesFormat();
+    if (metadaten) zeigeMetadaten();
+  });
+});
+
+qualSlider.addEventListener('input', () => {
+  qualVal.textContent = qualSlider.value + ' %';
+  if (origImg) planeGroessenberechnung();
+});
+
+keepMeta.addEventListener('change', () => { if (origImg) planeGroessenberechnung(); });
+
+window.addEventListener('resize', () => requestAnimationFrame(zeichneRaster));
+stage.addEventListener('mouseenter', zeichneRaster);
+
+setzeZurueck();
+</script>
+</body>
+</html>
