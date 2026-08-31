@@ -1,8 +1,4 @@
 # Arbeitsverfassung
-
-**Version 1.1 · Stand: 19.08.2026**
-*Änderung gegenüber 1.0: Dateiübersicht entfernt, Abschnitt 1 und 4 neu gefasst.*
-
 > **Verwendung:** Diese Datei bei jedem Auftrag mit `@constitution.md` mitgeben.
 > Sie gilt zusammen mit `@spec.md`, `@plan.md` und `@tasks.md`.
 
@@ -69,7 +65,7 @@ Nach drei erfolglosen Korrekturversuchen an derselben Task: abbrechen und ROT me
 
 ## 6. Keine Erfindungen
 
-- Keine Bibliotheksfunktion, kein API-Aufruf, kein Parameter ohne Beleg. Existenz und Signatur vor Verwendung prüfen.
+- Keine Bibliotheksfunktion, kein API-Aufruf, kein Parameter ohne Beleg. Existenz und Signatur vor Verwendung prüfen. Existenz und Signatur sind kein Beleg für das Verhalten: Annahmen darüber, was eine Funktion tut, werden gegen die installierte Version ausgeführt und das Ergebnis dokumentiert.
 - Unsicherheit kennzeichnen statt plausibel klingend raten.
 - Keine neue Abhängigkeit ohne Freigabe. Freigegebene Abhängigkeiten stehen mit fester Version in `@plan.md`.
 
@@ -79,7 +75,7 @@ Nach drei erfolglosen Korrekturversuchen an derselben Task: abbrechen und ROT me
 
 - Bezeichner, Kommentare und Docstrings auf Deutsch. Schlüsselwörter und fremde APIs bleiben englisch.
 - Keine echten Personendaten in Beispiel-, Trainings- oder Testdaten. Herkunft verwendeter Datensätze dokumentieren.
-- Zufall reproduzierbar machen: Seed setzen und im Code sichtbar lassen.
+- Zufall reproduzierbar machen: Seed setzen und im Code sichtbar lassen. Zufall, den Nutzende erleben, ist eine Produktentscheidung und gehört in die Spezifikation — diese Regel gilt dafür nicht.
 
 ---
 
