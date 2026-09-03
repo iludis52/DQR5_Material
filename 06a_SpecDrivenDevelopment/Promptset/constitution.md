@@ -2,6 +2,8 @@
 > **Verwendung:** Diese Datei bei jedem Auftrag mit `@constitution.md` mitgeben.
 > Sie gilt zusammen mit `@spec.md`, `@plan.md` und `@tasks.md`.
 
+*Version 1.3 · 03.09.2026 · Geändert: §8 Grenzen — Kontrollpunkt-Commits im Etappenlauf.*
+
 ---
 
 ## 1. Vorrang bei Widerspruch
@@ -88,6 +90,8 @@ Ohne ausdrückliche Aufforderung nicht anfassen:
 - Dateien außerhalb des Projektordners
 
 Nicht ohne Aufforderung committen oder pushen. Keine Netzwerkzugriffe, die nicht in der Task stehen.
+
+**Ausnahme Kontrollpunkte.** Im Etappenlauf ist ein Commit je abgeschlossener Aufgabe nicht nur erlaubt, sondern verlangt: Botschaft `T<Nr> — <Titel> — <Ampel>`, keine mehreren Aufgaben in einem Commit. Er ersetzt den Rücksprungpunkt, den früher das Sitzungsende lieferte. Nicht erlaubt bleiben: Push, Rebase, Amend, Verwerfen fremder Änderungen, Anlegen oder Wechseln von Zweigen.
 
 ---
 
