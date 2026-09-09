@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz 3 – Die neun Merksätze</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; margin-bottom: 10px; }
+
+        .quiz-subtitle {
+            max-width: 800px;
+            margin: 0 auto 10px auto;
+            padding: 0 20px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .scope-note {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 12px 18px;
+            background: #fff8e1;
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #6b5424;
+            line-height: 1.5;
+        }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px;
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">Quiz 3 &ndash; Die neun Merks&auml;tze</h1>
+<p class="quiz-subtitle">
+    Datenaufteilung und Modellbewertung, angewandt &middot; KI und Maschinelles Lernen (DQR 5)
+</p>
+
+<div class="quiz-container">
+    <div class="scope-note">
+        <strong>So ist dieses Quiz gebaut:</strong> Jede Frage schildert einen kleinen Fall.
+        Gefragt ist nicht der Wortlaut eines Merksatzes, sondern seine Anwendung. In den
+        Erkl&auml;rungen steht jeweils, welcher Merksatz aus der Zusammenfassung greift.
+    </div>
+</div>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Die Abbildung zeigt drei mögliche Reihenfolgen der Arbeitsschritte. Welche ist die richtige?",
+            svgId: "svg-pipeline-reihenfolge",
+            options: [
+                "Ablauf A",
+                "Ablauf B",
+                "Ablauf C"
+            ],
+            correct: 1,
+            explanation: "Merksatz 1: Erst trennen, dann aufbereiten. Wird vor dem Split skaliert (Ablauf A), fließen Kennwerte aus den Testdaten in die Aufbereitung ein. Ablauf C skaliert nach dem Training und damit gar nicht mehr wirksam. Nur Ablauf B ist richtig: splitten, dann skalieren, dann trainieren."
+        },
+        {
+            text: "Ein StandardScaler wurde auf den Trainingsdaten gefittet. Welcher Aufruf gehört anschließend auf die Testdaten?",
+            options: [
+                "transform mit den aus dem Training gelernten Werten",
+                "fit_transform, damit die Testdaten sauber skaliert werden",
+                "fit und danach ein eigener transform-Aufruf darauf",
+                "gar kein Aufruf, die Testdaten bleiben unskaliert"
+            ],
+            correct: 0,
+            explanation: "Merksatz 2: fit nur auf Trainingsdaten, transform auf alle. Beide Mengen müssen dieselbe Transformation erhalten, sonst passen die Werte nicht zusammen – aber die Transformation selbst darf ausschließlich aus den Trainingsdaten gelernt werden. Ein zweiter fit auf den Testdaten würde neue Kennwerte lernen und die Trennung aufheben."
+        },
+        {
+            text: "Worin unterscheiden sich Validierungs- und Testmenge in ihrer Funktion?",
+            options: [
+                "Die Testmenge ist stets deutlich größer als die Validierung",
+                "Die Validierungsmenge stammt aus einer anderen Datenquelle",
+                "Validierungsdaten dienen Entscheidungen, Testdaten dem Bericht",
+                "Die Testmenge wird schon vor dem eigentlichen Training genutzt"
+            ],
+            correct: 2,
+            explanation: "Merksatz 3: Die Validierungsmenge dient Entscheidungen, die Testmenge dem Bericht. Beide bestehen aus ungesehenen Daten derselben Quelle – der Unterschied liegt nicht in den Daten, sondern darin, was mit dem Ergebnis geschieht. Über die Größe sagt das nichts aus."
+        },
+        {
+            text: "Ein Kollege wertet dreimal auf der Testmenge aus und ändert jedes Mal einen Hyperparameter. Was folgt daraus?",
+            options: [
+                "Nichts, solange die Testmenge selbst unverändert bleibt",
+                "Das Modell wird durch die Wiederholung zuverlässiger",
+                "Die Testmenge muss anschließend neu gemischt werden",
+                "Die Testmenge ist damit zur Validierungsmenge geworden"
+            ],
+            correct: 3,
+            explanation: "Merksatz 4: Die Testmenge wird genau einmal benutzt. Sobald ihr Ergebnis eine Änderung am Modell auslöst, ist sie an einer Entscheidung beteiligt und damit eine Validierungsmenge. Der berichtete Wert ist dann optimistisch verzerrt, weil von drei Varianten diejenige gewählt wurde, die auf genau dieser Menge am besten abschnitt."
+        },
+        {
+            text: "Die Abbildung zeigt zwei 5-fach kreuzvalidierte Verfahren mit demselben Mittelwert. Welche Schlussfolgerung ist richtig?",
+            svgId: "svg-cv-streuung",
+            options: [
+                "Beide sind gleichwertig, denn der Mittelwert entscheidet",
+                "Verfahren A ist vorzuziehen, sein Ergebnis ist stabiler",
+                "Verfahren B ist vorzuziehen, es erreicht den besten Fold",
+                "Ohne den Trainingsfehler lässt sich dazu nichts sagen"
+            ],
+            correct: 1,
+            explanation: "Merksatz 5: Bei Cross-Validierung immer Mittelwert und Streuung angeben. Beide Verfahren liegen bei 0,82 im Mittel. Verfahren A schwankt nur zwischen 0,80 und 0,84, Verfahren B zwischen 0,68 und 0,94. Bei B hängt das Ergebnis stark davon ab, welche Fälle im Bewertungsfold liegen – der einzelne beste Fold ist dabei kein Argument, sondern ein Symptom der Streuung."
+        },
+        {
+            text: "Ein Modell erreicht 96 Prozent Accuracy auf den Testdaten. Lässt sich daraus auf Overfitting schließen?",
+            options: [
+                "Ja, 96 Prozent sind für ein einfaches Modell zu hoch",
+                "Ja, hohe Accuracy ist immer ein Zeichen für Overfitting",
+                "Nein, Overfitting zeigt sich erst im späteren Einsatz",
+                "Nein, dafür wird zusätzlich der Trainingsfehler benötigt"
+            ],
+            correct: 3,
+            explanation: "Merksatz 6: Overfitting erkennt man nur im Vergleich zweier Fehlerwerte, nie an einem. Liegt der Trainingsfehler ebenfalls bei etwa 96 Prozent, passt das Modell. Liegt er bei 100 Prozent, während der Test bei 96 Prozent steht, beginnt Overfitting. Aus dem Testwert allein folgt keines von beiden."
+        },
+        {
+            text: "Die Abbildung zeigt zwei Aufteilungen derselben Zeitreihe. Welche ist zulässig?",
+            svgId: "svg-zeitreihe-split",
+            options: [
+                "Aufteilung A, weil sie die Daten gleichmäßig durchmischt",
+                "Beide sind zulässig, solange die Anteile gleich bleiben",
+                "Aufteilung B, weil sie die zeitliche Reihenfolge einhält",
+                "Keine von beiden, Zeitreihen werden nicht aufgeteilt"
+            ],
+            correct: 2,
+            explanation: "Merksatz 7: Bei Zeitreihen ist die Zeit die Trennlinie, nicht mischen. Bei Aufteilung A liegen die unmittelbaren zeitlichen Nachbarn eines Bewertungspunktes im Training – das Modell muss keine Struktur lernen, es genügt, zwischen den bekannten Nachbarwerten zu interpolieren. Nur Aufteilung B bildet die echte Einsatzsituation ab: aus der Vergangenheit lernen, die Zukunft vorhersagen."
+        },
+        {
+            text: "Ein Bilddatensatz soll augmentiert werden. Welches Vorgehen ist richtig?",
+            options: [
+                "Erst teilen, dann nur die Trainingsdaten augmentieren",
+                "Erst augmentieren, dann in Trainings- und Testdaten teilen",
+                "Erst teilen, dann alle drei Mengen gleichmäßig augmentieren",
+                "Augmentieren, sobald der Testfehler zu hoch ausgefallen ist"
+            ],
+            correct: 0,
+            explanation: "Merksatz 8: Augmentierung nur auf den Trainingsdaten und nur label-erhaltend. Wird vor dem Split augmentiert, landen Varianten desselben Ausgangsbildes in Trainings- und Testmenge – das Modell erkennt in der Bewertung wieder, was es schon gesehen hat. Augmentierte Validierungs- oder Testdaten wiederum messen etwas, das in der Anwendung gar nicht vorkommt."
+        },
+        {
+            text: "Ein Modell erreicht bei einer als schwierig geltenden Aufgabe 99,8 Prozent Accuracy. Was ist die erste Reaktion?",
+            options: [
+                "Das Ergebnis veröffentlichen, das Modell hat sich bewährt",
+                "Die Modellkomplexität erhöhen, um noch besser zu werden",
+                "Die Trainingsmenge verkleinern, sie ist offenbar zu groß",
+                "Die Aufteilung und die Merkmale auf Leakage überprüfen"
+            ],
+            correct: 3,
+            explanation: "Merksatz 9: Ein auffällig gutes Ergebnis ist zuerst ein Leakage-Verdacht. Jede Aufgabe hat einen irreduziblen Fehler, den auch ein perfektes Modell nicht unterschreiten kann. Wird dieser Wert scheinbar unterboten, steckt fast immer ein Fehler im Aufbau – zu prüfen sind die Reihenfolge der Arbeitsschritte und die Legitimität jedes einzelnen Merkmals."
+        },
+        {
+            text: "Fehlende Werte werden mit dem Spaltenmittelwert des gesamten Datensatzes ersetzt, erst danach wird getrennt. Welche Regel ist verletzt?",
+            options: [
+                "Die Testmenge nur einmal benutzen",
+                "Bei Zeitreihen zeitlich trennen",
+                "Erst trennen, dann aufbereiten",
+                "Nur Trainingsdaten augmentieren"
+            ],
+            correct: 2,
+            explanation: "Merksätze 1 und 2. Die Imputation lernt einen Kennwert aus den Daten, nämlich den Spaltenmittelwert. Wird er über den gesamten Datensatz gebildet, enthält er Information aus den Testdaten, und diese fließt in die Trainingsdaten ein. Richtig ist: erst trennen, dann den Mittelwert allein aus den Trainingsdaten bestimmen und auf alle Mengen anwenden."
+        },
+        {
+            text: "Ein Bilddatensatz enthält von jedem Werkstück fünf fast identische Aufnahmen. Was ist vor dem Split zu beachten?",
+            options: [
+                "Aufnahmen desselben Werkstücks dürfen nicht auf beide Seiten geraten",
+                "Die Aufnahmen sollten gleichmäßig auf beide Mengen verteilt werden",
+                "Es ist unkritisch, da jede Aufnahme ein eigenes Bild darstellt",
+                "Die Aufnahmen müssen vor dem Split zusätzlich augmentiert werden"
+            ],
+            correct: 0,
+            explanation: "Das ist der Leakage-Fall 'Duplikate über Splitgrenzen'. Fünf Aufnahmen desselben Werkstücks sind keine fünf unabhängigen Fälle. Landet eine davon im Training und eine im Test, erkennt das Modell in der Bewertung etwas wieder. Die systematische Behandlung solcher Gruppen gehört zum Ausblick und wird nicht abgefragt – die Regel selbst schon."
+        },
+        {
+            text: "Bei einer Zeitreihe mit deutlichem Aufwärtstrend wird der MinMaxScaler über die gesamte Reihe gefittet. Was ist die Folge?",
+            options: [
+                "Die Skalierung wird ungenau, das Ergebnis bleibt gültig",
+                "Das gelernte Maximum stammt zwangsläufig aus dem Testzeitraum",
+                "Das Modell trainiert langsamer, sonst ändert sich nichts",
+                "Die Trainingswerte liegen danach außerhalb von 0 und 1"
+            ],
+            correct: 1,
+            explanation: "Merksätze 1, 2 und 7 greifen hier zusammen. Der MinMaxScaler lernt Minimum und Maximum aus den Daten. Steigt die Reihe, kann das globale Maximum nur aus dem späten, also dem Testzeitraum stammen. Damit wurden die Trainingsdaten mit einem Wert normiert, der zum Trainingszeitpunkt nicht bekannt gewesen wäre – und da derselbe Scaler zur Rücktransformation dient, ist auch das berichtete Fehlermaß betroffen."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    svgContainer.innerHTML = svgSource.innerHTML;
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+
+    <div id="svg-pipeline-reihenfolge">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360">
+            <defs>
+                <marker id="pf3" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#7f8c8d"/>
+                </marker>
+            </defs>
+
+            <text x="450" y="32" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Drei m&#246;gliche Reihenfolgen</text>
+
+            <!-- Ablauf A -->
+            <text x="140" y="118" text-anchor="end" font-size="26" font-weight="bold" fill="#2c3e50" font-family="sans-serif">A</text>
+            <rect x="170" y="80" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="265" y="115" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Skalieren</text>
+            <rect x="400" y="80" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="495" y="115" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Splitten</text>
+            <rect x="630" y="80" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="725" y="115" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Trainieren</text>
+            <line x1="364" y1="108" x2="396" y2="108" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+            <line x1="594" y1="108" x2="626" y2="108" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+
+            <!-- Ablauf B -->
+            <text x="140" y="213" text-anchor="end" font-size="26" font-weight="bold" fill="#2c3e50" font-family="sans-serif">B</text>
+            <rect x="170" y="175" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="265" y="210" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Splitten</text>
+            <rect x="400" y="175" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="495" y="210" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Skalieren</text>
+            <rect x="630" y="175" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="725" y="210" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Trainieren</text>
+            <line x1="364" y1="203" x2="396" y2="203" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+            <line x1="594" y1="203" x2="626" y2="203" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+
+            <!-- Ablauf C -->
+            <text x="140" y="308" text-anchor="end" font-size="26" font-weight="bold" fill="#2c3e50" font-family="sans-serif">C</text>
+            <rect x="170" y="270" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="265" y="305" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Splitten</text>
+            <rect x="400" y="270" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="495" y="305" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Trainieren</text>
+            <rect x="630" y="270" width="190" height="56" rx="8" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="725" y="305" text-anchor="middle" font-size="19" fill="#2c3e50" font-family="sans-serif">Skalieren</text>
+            <line x1="364" y1="298" x2="396" y2="298" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+            <line x1="594" y1="298" x2="626" y2="298" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pf3)"/>
+        </svg>
+    </div>
+
+    <div id="svg-cv-streuung">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Zwei Verfahren, derselbe Mittelwert</text>
+
+            <!-- Panel A: Achsen -->
+            <line x1="90" y1="70" x2="90" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="90" y1="330" x2="410" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <text x="82" y="264" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,70</text>
+            <text x="82" y="192" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,80</text>
+            <text x="82" y="121" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,90</text>
+            <!-- Panel A: Balken 0,80 0,83 0,82 0,84 0,81 -->
+            <rect x="100" y="187" width="50" height="143" fill="#3498db"/>
+            <rect x="162" y="166" width="50" height="164" fill="#3498db"/>
+            <rect x="224" y="173" width="50" height="157" fill="#3498db"/>
+            <rect x="286" y="159" width="50" height="171" fill="#3498db"/>
+            <rect x="348" y="180" width="50" height="150" fill="#3498db"/>
+            <line x1="90" y1="173" x2="410" y2="173" stroke="#c0392b" stroke-width="3" stroke-dasharray="10,6"/>
+            <text x="250" y="360" text-anchor="middle" font-size="19" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Verfahren A</text>
+            <text x="250" y="384" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,80 &#183; 0,83 &#183; 0,82 &#183; 0,84 &#183; 0,81</text>
+
+            <!-- Panel B: Achsen -->
+            <line x1="500" y1="70" x2="500" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="500" y1="330" x2="820" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <text x="492" y="264" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,70</text>
+            <text x="492" y="192" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,80</text>
+            <text x="492" y="121" text-anchor="end" font-size="14" fill="#7f8c8d" font-family="sans-serif">0,90</text>
+            <!-- Panel B: Balken 0,68 0,94 0,72 0,90 0,86 -->
+            <rect x="510" y="273" width="50" height="57" fill="#e67e22"/>
+            <rect x="572" y="87" width="50" height="243" fill="#e67e22"/>
+            <rect x="634" y="244" width="50" height="86" fill="#e67e22"/>
+            <rect x="696" y="116" width="50" height="214" fill="#e67e22"/>
+            <rect x="758" y="144" width="50" height="186" fill="#e67e22"/>
+            <line x1="500" y1="173" x2="820" y2="173" stroke="#c0392b" stroke-width="3" stroke-dasharray="10,6"/>
+            <text x="660" y="360" text-anchor="middle" font-size="19" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Verfahren B</text>
+            <text x="660" y="384" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,68 &#183; 0,94 &#183; 0,72 &#183; 0,90 &#183; 0,86</text>
+
+            <text x="838" y="167" text-anchor="end" font-size="14" font-weight="bold" fill="#c0392b" font-family="sans-serif">Mittelwert 0,82</text>
+        </svg>
+    </div>
+
+    <div id="svg-zeitreihe-split">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400">
+            <defs>
+                <marker id="pfz" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#7f8c8d"/>
+                </marker>
+            </defs>
+
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Zwei Aufteilungen derselben Zeitreihe</text>
+
+            <!-- Aufteilung A: zufaellig -->
+            <text x="60" y="88" font-size="19" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Aufteilung A</text>
+            <rect x="60" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="100" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="140" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="180" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="220" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="260" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="300" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="340" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="380" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="420" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="460" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="500" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="540" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="580" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="620" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="660" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="700" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="740" y="100" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="780" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="820" y="100" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+
+            <!-- Aufteilung B: chronologisch -->
+            <text x="60" y="218" font-size="19" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Aufteilung B</text>
+            <rect x="60" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="100" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="140" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="180" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="220" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="260" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="300" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="340" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="380" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="420" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="460" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="500" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="540" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="580" y="230" width="36" height="40" rx="3" fill="#d6eaf8" stroke="#3498db" stroke-width="2"/>
+            <rect x="620" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="660" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="700" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="740" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="780" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+            <rect x="820" y="230" width="36" height="40" rx="3" fill="#fdebd0" stroke="#e67e22" stroke-width="2"/>
+
+            <!-- Zeitachse -->
+            <line x1="60" y1="300" x2="856" y2="300" stroke="#7f8c8d" stroke-width="2.5" marker-end="url(#pfz)"/>
+            <text x="450" y="326" text-anchor="middle" font-size="16" fill="#7f8c8d" font-family="sans-serif">Zeit</text>
+
+            <!-- Legende -->
+            <rect x="255" y="356" width="26" height="20" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <text x="291" y="372" font-size="16" fill="#2c3e50" font-family="sans-serif">Training</text>
+            <rect x="500" y="356" width="26" height="20" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <text x="536" y="372" font-size="16" fill="#2c3e50" font-family="sans-serif">Test</text>
+        </svg>
+    </div>
+
+</div>
+
+</body>
+</html>

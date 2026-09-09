@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz 1 – Cross-Validierung</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; margin-bottom: 10px; }
+
+        .quiz-subtitle {
+            max-width: 800px;
+            margin: 0 auto 10px auto;
+            padding: 0 20px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .scope-note {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 12px 18px;
+            background: #fff8e1;
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #6b5424;
+            line-height: 1.5;
+        }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px;
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">Quiz 1 &ndash; Cross-Validierung</h1>
+<p class="quiz-subtitle">
+    Modellbewertung &amp; Evaluation &middot; KI und Maschinelles Lernen (DQR 5)
+</p>
+
+<div class="quiz-container">
+    <div class="scope-note">
+        <strong>Hinweis zum Pr&uuml;fungsrahmen:</strong> Pr&uuml;fungsrelevant sind die
+        n-fache Cross-Validierung und die Schwankung zwischen den Folds. Der Grenzfall
+        <em>Leave-One-Out</em> (Fragen 8&nbsp;bis&nbsp;12) wird <strong>nicht abgefragt</strong>.
+        Er ist hier aufgenommen, weil sich an ihm am deutlichsten zeigt, was der Parameter
+        <em>k</em> eigentlich steuert.
+    </div>
+</div>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Die Abbildung zeigt eine 5-fache Cross-Validierung. Wie oft wird ein einzelner Datensatz zur Bewertung herangezogen?",
+            svgId: "svg-kfold-schema",
+            options: [
+                "Genau einmal",
+                "Genau viermal",
+                "Genau fünfmal",
+                "Das hängt vom Zufall der Aufteilung ab"
+            ],
+            correct: 0,
+            explanation: "Jeder Datensatz liegt in genau einem Fold. Da jeder Fold genau einmal die Rolle der Bewertungsmenge übernimmt, wird jeder Datensatz genau einmal bewertet – und in den übrigen vier Durchläufen zum Training benutzt."
+        },
+        {
+            text: "Wie viele Modelle werden bei einer 5-fachen Cross-Validierung insgesamt trainiert?",
+            svgId: "svg-kfold-schema",
+            options: [
+                "Ein Modell, das fünfmal bewertet wird",
+                "Vier Modelle",
+                "Fünf Modelle",
+                "25 Modelle"
+            ],
+            correct: 2,
+            explanation: "Jeder Durchlauf trainiert ein eigenes Modell von Grund auf. Bei fünf Durchläufen entstehen fünf Modelle – und keines davon ist das Endprodukt. Das endgültige Modell wird anschließend auf allen Entwicklungsdaten neu trainiert. Die Cross-Validierung bewertet deshalb ein Verfahren, nicht ein einzelnes Modell."
+        },
+        {
+            text: "Ein Datensatz umfasst 1000 Fälle und wird 5-fach kreuzvalidiert. Wie viele Fälle enthält die Trainingsmenge eines einzelnen Durchlaufs?",
+            options: [
+                "200 Fälle",
+                "500 Fälle",
+                "800 Fälle",
+                "1000 Fälle"
+            ],
+            correct: 2,
+            explanation: "Jeder Fold enthält 1000 / 5 = 200 Fälle. Ein Fold wird zurückgehalten, die übrigen vier bilden die Trainingsmenge: 4 · 200 = 800 Fälle. Allgemein trainiert man bei k Folds auf (k−1)/k der Daten, hier also auf 80 Prozent."
+        },
+        {
+            text: "Welche Rolle hat der in einem Durchlauf zurückgehaltene Fold?",
+            options: [
+                "Er ist eine Testmenge, sein Ergebnis darf als Schlussbewertung berichtet werden",
+                "Er ist eine Validierungsmenge",
+                "Er ist eine zweite Trainingsmenge",
+                "Er hat keine feste Bezeichnung, das ist reine Auslegungssache"
+            ],
+            correct: 1,
+            explanation: "Der zurückgehaltene Fold ist eine Validierungsmenge. Wird die Cross-Validierung benutzt, um zwischen Modellen oder Hyperparametern zu entscheiden, ist ihr Ergebnis eine Entscheidungsgrundlage und damit etwas zu optimistisch. Sauber ist deshalb: zuerst die Testmenge abtrennen, danach auf der Entwicklungsmenge kreuzvalidieren."
+        },
+        {
+            text: "Die Abbildung zeigt die Accuracy-Werte der fünf Folds. Welche Aussage trifft zu?",
+            svgId: "svg-fold-streuung",
+            options: [
+                "Der Mittelwert liegt bei 0,82; die Streuung ist gering, das Ergebnis ist stabil",
+                "Der Mittelwert liegt bei 0,82; die Spannweite von 17 Prozentpunkten ist ein Warnsignal",
+                "Das Ergebnis liegt bei 0,88, weil der beste Fold zählt",
+                "Aus Fold-Ergebnissen lässt sich kein Mittelwert bilden"
+            ],
+            correct: 1,
+            explanation: "Mittelwert: (0,82 + 0,85 + 0,71 + 0,88 + 0,84) / 5 = 4,10 / 5 = 0,82. Die Werte reichen aber von 0,71 bis 0,88. Eine Spannweite von 17 Prozentpunkten bedeutet, dass das Ergebnis stark davon abhängt, welche Fälle im Bewertungsfold liegen. Ein Mittelwert allein sagt zu wenig – erst Mittelwert und Streuung ergeben ein Bild."
+        },
+        {
+            text: "Die Fold-Ergebnisse schwanken stark. Welche Ursache ist am wahrscheinlichsten?",
+            options: [
+                "Der Datensatz ist zu klein oder sehr heterogen",
+                "Die Lernrate wurde zu hoch gewählt",
+                "Es wurden zu wenige Epochen trainiert",
+                "Die Zielvariable wurde falsch skaliert"
+            ],
+            correct: 0,
+            explanation: "Hohe Streuung zwischen den Folds heißt: Das Ergebnis hängt davon ab, welche Fälle zufällig im Bewertungsfold gelandet sind. Typische Ursachen sind zu wenige Daten, sehr heterogene Daten oder seltene Klassen, die ungleich über die Folds verteilt sind. Die anderen genannten Punkte würden alle Folds gleichmäßig betreffen und keine Schwankung zwischen ihnen erzeugen."
+        },
+        {
+            text: "Warum lohnt sich Cross-Validierung besonders bei kleinen Datensätzen?",
+            options: [
+                "Weil sie das Modell genauer macht",
+                "Weil jeder Datenpunkt sowohl zum Trainieren als auch zum Bewerten dient und das Ergebnis nicht an einer einzelnen zufälligen Aufteilung hängt",
+                "Weil sie Data Leakage verhindert",
+                "Weil sie den Rechenaufwand senkt"
+            ],
+            correct: 1,
+            explanation: "Bei einem einzelnen Split wird ein Teil der ohnehin knappen Daten nie zum Training benutzt, und das Ergebnis hängt davon ab, welche Fälle zufällig in der Bewertungsmenge landen. Die Cross-Validierung behebt beides. Sie macht das Modell nicht besser – sie schätzt seine Güte zuverlässiger."
+        },
+        {
+            text: "Die Abbildung zeigt einen Grenzfall der Cross-Validierung bei acht Datensätzen. Wie groß wurde k hier gewählt?",
+            svgId: "svg-loocv-schema",
+            options: [
+                "k = 2",
+                "k = 4",
+                "k = 7",
+                "k = 8"
+            ],
+            correct: 3,
+            explanation: "Es gibt acht Durchläufe, und in jedem wird genau ein Datensatz zurückgehalten. Also k = 8 = n. Dieser Grenzfall heißt Leave-One-Out: k wird so groß gewählt wie die Anzahl der Datensätze. Hinweis: Der Begriff selbst ist nicht prüfungsrelevant – er zeigt hier nur, was passiert, wenn man k bis an den Rand treibt."
+        },
+        {
+            text: "Wie viele Trainingsläufe erfordert Leave-One-Out bei 500 Datensätzen?",
+            options: [
+                "10 Trainingsläufe",
+                "250 Trainingsläufe",
+                "499 Trainingsläufe",
+                "500 Trainingsläufe"
+            ],
+            correct: 3,
+            explanation: "Bei k = n wird für jeden einzelnen Datensatz ein eigenes Modell trainiert: 500 Datensätze, 500 Trainingsläufe. Trainiert wird dabei jeweils auf 499 Fällen. Die 499 ist also die Größe der Trainingsmenge, nicht die Anzahl der Durchläufe."
+        },
+        {
+            text: "Bei Leave-One-Out enthält die Bewertungsmenge eines Durchlaufs genau einen Datensatz. Was folgt daraus für das Einzelergebnis eines Durchlaufs bei einer Klassifikation?",
+            options: [
+                "Es kann nur 0 oder 1 betragen, also richtig oder falsch",
+                "Es liegt immer zwischen 0,4 und 0,6",
+                "Es lässt sich nicht bestimmen",
+                "Es entspricht immer dem Gesamtergebnis"
+            ],
+            correct: 0,
+            explanation: "Eine Accuracy über genau einen Fall kann nur richtig (1) oder falsch (0) sein. Erst der Mittelwert über alle n Durchläufe ergibt eine sinnvolle Kennzahl – bei 500 Datensätzen also der Anteil der richtig klassifizierten Fälle. Eine Streuung zwischen den Folds lässt sich hier nicht mehr sinnvoll deuten, weil jeder Einzelwert nur zwei Zustände annehmen kann."
+        },
+        {
+            text: "Was ist der wesentliche Nachteil von Leave-One-Out?",
+            options: [
+                "Es nutzt zu wenige Daten zum Training",
+                "Der Rechenaufwand ist maximal, weil n vollständige Trainingsläufe nötig sind",
+                "Es führt zwangsläufig zu Data Leakage",
+                "Das Ergebnis hängt stark vom Zufall der Aufteilung ab"
+            ],
+            correct: 1,
+            explanation: "Leave-One-Out ist die rechenaufwendigste Variante der Cross-Validierung überhaupt: ein Modell pro Datensatz. Die anderen Antworten treffen gerade nicht zu – die Trainingsmenge ist mit n−1 Fällen sogar maximal groß, und weil es nur eine mögliche Aufteilung gibt, ist das Verfahren vollständig reproduzierbar und nicht zufallsabhängig."
+        },
+        {
+            text: "Ein CNN benötigt etwa vier Stunden pro Trainingslauf. Der Bilddatensatz umfasst 5000 Bilder. Was folgt daraus für die Wahl des Verfahrens?",
+            options: [
+                "Leave-One-Out ist hier die beste Wahl, weil die Schätzung am genauesten ist",
+                "Leave-One-Out ist praktisch ausgeschlossen; bei dieser Datenmenge genügt ohnehin eine feste Aufteilung in Trainings-, Validierungs- und Testdaten",
+                "Man sollte k = 500 wählen als Kompromiss",
+                "Cross-Validierung ist bei neuronalen Netzen grundsätzlich verboten"
+            ],
+            correct: 1,
+            explanation: "5000 Trainingsläufe zu je vier Stunden wären rund 20 000 Stunden, also über zwei Jahre Rechenzeit. Hinzu kommt: Bei 5000 Bildern enthält eine Validierungsmenge von 15 Prozent bereits 750 Fälle – die Schätzung ist auch ohne Mittelung stabil genug. Deshalb wird bei neuronalen Netzen üblicherweise in drei feste Mengen geteilt. Verboten ist Cross-Validierung dort nicht, sie lohnt sich nur selten."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    svgContainer.innerHTML = svgSource.innerHTML;
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+
+    <div id="svg-kfold-schema">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">5-fache Cross-Validierung</text>
+            <text x="450" y="56" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">Die Datenmenge ist in 5 gleich gro&#223;e Folds zerlegt</text>
+
+            <!-- Durchlauf 1 -->
+            <text x="190" y="110" text-anchor="end" font-size="17" fill="#2c3e50" font-family="sans-serif">Durchlauf 1</text>
+            <rect x="200" y="80" width="120" height="46" rx="6" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+            <rect x="330" y="80" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="460" y="80" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="590" y="80" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="720" y="80" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+
+            <!-- Durchlauf 2 -->
+            <text x="190" y="172" text-anchor="end" font-size="17" fill="#2c3e50" font-family="sans-serif">Durchlauf 2</text>
+            <rect x="200" y="142" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="330" y="142" width="120" height="46" rx="6" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+            <rect x="460" y="142" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="590" y="142" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="720" y="142" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+
+            <!-- Durchlauf 3 -->
+            <text x="190" y="234" text-anchor="end" font-size="17" fill="#2c3e50" font-family="sans-serif">Durchlauf 3</text>
+            <rect x="200" y="204" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="330" y="204" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="460" y="204" width="120" height="46" rx="6" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+            <rect x="590" y="204" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="720" y="204" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+
+            <!-- Durchlauf 4 -->
+            <text x="190" y="296" text-anchor="end" font-size="17" fill="#2c3e50" font-family="sans-serif">Durchlauf 4</text>
+            <rect x="200" y="266" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="330" y="266" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="460" y="266" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="590" y="266" width="120" height="46" rx="6" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+            <rect x="720" y="266" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+
+            <!-- Durchlauf 5 -->
+            <text x="190" y="358" text-anchor="end" font-size="17" fill="#2c3e50" font-family="sans-serif">Durchlauf 5</text>
+            <rect x="200" y="328" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="330" y="328" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="460" y="328" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="590" y="328" width="120" height="46" rx="6" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <rect x="720" y="328" width="120" height="46" rx="6" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+
+            <!-- Legende -->
+            <rect x="255" y="396" width="26" height="20" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="291" y="412" font-size="16" fill="#2c3e50" font-family="sans-serif">Training</text>
+            <rect x="500" y="396" width="26" height="20" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="3"/>
+            <text x="536" y="412" font-size="16" fill="#2c3e50" font-family="sans-serif">Bewertung</text>
+        </svg>
+    </div>
+
+    <div id="svg-loocv-schema">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Ein Grenzfall der Cross-Validierung</text>
+            <text x="450" y="54" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">Datenmenge mit n = 8 Datens&#228;tzen</text>
+
+            <text x="220" y="97" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 1</text>
+            <rect x="230" y="78" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="300" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="78" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="133" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 2</text>
+            <rect x="230" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="114" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="370" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="114" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="169" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 3</text>
+            <rect x="230" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="150" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="440" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="150" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="205" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 4</text>
+            <rect x="230" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="186" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="510" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="186" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="241" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 5</text>
+            <rect x="230" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="222" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="580" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="222" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="277" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 6</text>
+            <rect x="230" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="258" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="650" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="258" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="313" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 7</text>
+            <rect x="230" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="294" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <rect x="720" y="294" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+
+            <text x="220" y="349" text-anchor="end" font-size="15" fill="#2c3e50" font-family="sans-serif">Durchlauf 8</text>
+            <rect x="230" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="300" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="370" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="440" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="510" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="580" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="650" y="330" width="62" height="28" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <rect x="720" y="330" width="62" height="28" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+
+            <!-- Legende -->
+            <rect x="255" y="382" width="26" height="20" rx="4" fill="#d6eaf8" stroke="#3498db" stroke-width="2.5"/>
+            <text x="291" y="398" font-size="16" fill="#2c3e50" font-family="sans-serif">Training</text>
+            <rect x="500" y="382" width="26" height="20" rx="4" fill="#fdebd0" stroke="#e67e22" stroke-width="2.5"/>
+            <text x="536" y="398" font-size="16" fill="#2c3e50" font-family="sans-serif">Bewertung</text>
+            <text x="450" y="424" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">Ein K&#228;stchen entspricht genau einem Datensatz</text>
+        </svg>
+    </div>
+
+    <div id="svg-fold-streuung">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Accuracy der f&#252;nf Folds</text>
+
+            <!-- Gitterlinien und y-Achsenbeschriftung -->
+            <line x1="110" y1="370" x2="850" y2="370" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="110" y1="290" x2="850" y2="290" stroke="#ecf0f1" stroke-width="2"/>
+            <line x1="110" y1="210" x2="850" y2="210" stroke="#ecf0f1" stroke-width="2"/>
+            <line x1="110" y1="130" x2="850" y2="130" stroke="#ecf0f1" stroke-width="2"/>
+            <line x1="110" y1="70" x2="110" y2="370" stroke="#bdc3c7" stroke-width="2"/>
+            <text x="100" y="376" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,60</text>
+            <text x="100" y="296" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,70</text>
+            <text x="100" y="216" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,80</text>
+            <text x="100" y="136" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">0,90</text>
+
+            <!-- Balken -->
+            <rect x="150" y="194" width="100" height="176" rx="4" fill="#3498db"/>
+            <text x="200" y="184" text-anchor="middle" font-size="17" font-weight="bold" fill="#2c3e50" font-family="sans-serif">0,82</text>
+            <text x="200" y="392" text-anchor="middle" font-size="15" fill="#2c3e50" font-family="sans-serif">Fold 1</text>
+
+            <rect x="285" y="170" width="100" height="200" rx="4" fill="#3498db"/>
+            <text x="335" y="160" text-anchor="middle" font-size="17" font-weight="bold" fill="#2c3e50" font-family="sans-serif">0,85</text>
+            <text x="335" y="392" text-anchor="middle" font-size="15" fill="#2c3e50" font-family="sans-serif">Fold 2</text>
+
+            <rect x="420" y="282" width="100" height="88" rx="4" fill="#e67e22"/>
+            <text x="470" y="272" text-anchor="middle" font-size="17" font-weight="bold" fill="#2c3e50" font-family="sans-serif">0,71</text>
+            <text x="470" y="392" text-anchor="middle" font-size="15" fill="#2c3e50" font-family="sans-serif">Fold 3</text>
+
+            <rect x="555" y="146" width="100" height="224" rx="4" fill="#3498db"/>
+            <text x="605" y="136" text-anchor="middle" font-size="17" font-weight="bold" fill="#2c3e50" font-family="sans-serif">0,88</text>
+            <text x="605" y="392" text-anchor="middle" font-size="15" fill="#2c3e50" font-family="sans-serif">Fold 4</text>
+
+            <rect x="690" y="178" width="100" height="192" rx="4" fill="#3498db"/>
+            <text x="740" y="168" text-anchor="middle" font-size="17" font-weight="bold" fill="#2c3e50" font-family="sans-serif">0,84</text>
+            <text x="740" y="392" text-anchor="middle" font-size="15" fill="#2c3e50" font-family="sans-serif">Fold 5</text>
+
+            <!-- Mittelwertlinie -->
+            <line x1="110" y1="194" x2="850" y2="194" stroke="#c0392b" stroke-width="3" stroke-dasharray="12,7"/>
+            <text x="850" y="186" text-anchor="end" font-size="15" font-weight="bold" fill="#c0392b" font-family="sans-serif">Mittelwert</text>
+
+            <text x="450" y="422" text-anchor="middle" font-size="15" fill="#7f8c8d" font-family="sans-serif">Accuracy je Fold einer 5-fachen Cross-Validierung</text>
+        </svg>
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz 2 – Training neuronaler Netze</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; margin-bottom: 10px; }
+
+        .quiz-subtitle {
+            max-width: 800px;
+            margin: 0 auto 10px auto;
+            padding: 0 20px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .scope-note {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 12px 18px;
+            background: #fff8e1;
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #6b5424;
+            line-height: 1.5;
+        }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px;
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">Quiz 2 &ndash; Training neuronaler Netze</h1>
+<p class="quiz-subtitle">
+    Trainingsschleife, Lernrate, Batchgr&ouml;&szlig;e und Kurvenanalyse &middot; KI und Maschinelles Lernen (DQR 5)
+</p>
+
+<div class="quiz-container">
+    <div class="scope-note">
+        <strong>Hinweis:</strong> Alle Fragen liegen im Pr&uuml;fungsrahmen. Gefragt ist das
+        <em>Einsatzprofil</em> der Optimizer, nicht ihr Update-Formalismus &ndash; Sie m&uuml;ssen
+        also wissen, <em>wann</em> man SGD oder Adam w&auml;hlt, nicht wie sie intern rechnen.
+    </div>
+</div>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Die Abbildung zeigt die Trainingsschleife. Welcher Schritt gehört an die mit '?' markierte Stelle?",
+            svgId: "svg-trainingsschleife",
+            options: [
+                "Gradienten zurücksetzen",
+                "Die Lernrate neu berechnen",
+                "Das Modell zwischenspeichern",
+                "Die Trainingsdaten neu mischen"
+            ],
+            correct: 0,
+            explanation: "Die vollständige Schleife lautet: Gradienten zurücksetzen → Forward Pass → Loss berechnen → Backward Pass → Parameter-Update. In PyTorch entspricht das den Aufrufen optimizer.zero_grad(), net(X), criterion(...), loss.backward() und optimizer.step()."
+        },
+        {
+            text: "Warum müssen die Gradienten in jedem Durchlauf zurückgesetzt werden?",
+            options: [
+                "Weil die Lernrate sonst mit jedem Schritt größer wird",
+                "Weil sich das Modell sonst nicht mehr speichern lässt",
+                "Weil PyTorch neue Gradienten zu den vorhandenen addiert",
+                "Weil die Verlustfunktion sonst negative Werte annimmt"
+            ],
+            correct: 2,
+            explanation: "Beim Aufruf von loss.backward() werden die neu berechneten Gradienten zu dem addiert, was im .grad-Attribut der Parameter bereits steht – sie ersetzen den alten Wert nicht. Ohne zero_grad() summieren sich also die Gradienten aller bisherigen Batches auf, und das Parameter-Update erfolgt in eine falsche Richtung."
+        },
+        {
+            text: "Was bezeichnet eine Epoche?",
+            options: [
+                "Einen einzelnen Parameter-Update-Schritt der Gewichte",
+                "Die Verarbeitung eines einzelnen Batches im Netz",
+                "Die Zeit bis zum Erreichen des minimalen Verlusts",
+                "Einen vollständigen Durchlauf durch alle Trainingsdaten"
+            ],
+            correct: 3,
+            explanation: "Eine Epoche ist ein vollständiger Durchlauf durch die gesamte Trainingsmenge. Sie besteht aus so vielen Batches, wie die Trainingsmenge bei der gewählten Batchgröße hergibt – und aus ebenso vielen Parameter-Updates."
+        },
+        {
+            text: "Die Trainingsmenge umfasst 4000 Beispiele, die Batchgröße beträgt 32. Wie viele Parameter-Updates finden in einer Epoche statt?",
+            options: [
+                "32 Updates",
+                "125 Updates",
+                "1 Update",
+                "4000 Updates"
+            ],
+            correct: 1,
+            explanation: "4000 / 32 = 125 Batches, und pro Batch erfolgt genau ein Parameter-Update. Über 10 Epochen wären es entsprechend 1250 Updates. Merke: Die Batchgröße bestimmt, wie oft die Gewichte pro Epoche angepasst werden."
+        },
+        {
+            text: "Die Trainingsmenge umfasst 1000 Beispiele, batch_size = 64. Wie viele Batches ergibt eine Epoche?",
+            options: [
+                "15 Batches, die restlichen 40 Beispiele entfallen",
+                "64 Batches, denn die Batchgröße gibt ihre Anzahl an",
+                "Das lässt sich ohne die Anzahl der Epochen nicht sagen",
+                "16 Batches, der letzte enthält nur 40 Beispiele"
+            ],
+            correct: 3,
+            explanation: "1000 / 64 = 15,625. Es entstehen 15 volle Batches à 64 Beispiele (zusammen 960) und ein letzter, unvollständiger Batch mit den restlichen 40 Beispielen – zusammen 16 Batches. Der DataLoader verwirft den Rest standardmäßig nicht."
+        },
+        {
+            text: "Die Abbildung zeigt drei Verlustkurven aus Trainingsläufen mit unterschiedlicher Lernrate. Welche gehört zu einer zu hoch gewählten Lernrate?",
+            svgId: "svg-lernraten",
+            options: [
+                "Kurve A",
+                "Kurve B",
+                "Kurve C"
+            ],
+            correct: 0,
+            explanation: "Kurve A springt hin und her und wird dabei nicht kleiner: Die Schritte sind so groß, dass das Minimum wiederholt übersprungen wird. Kurve B zeigt den gewünschten Verlauf. Kurve C sinkt so langsam, dass die Lernrate offensichtlich zu klein gewählt wurde."
+        },
+        {
+            text: "Was ist die typische Folge einer zu niedrig gewählten Lernrate?",
+            options: [
+                "Der Verlust nimmt negative Werte an und wird unbrauchbar",
+                "Das Training konvergiert langsam und braucht viele Epochen",
+                "Das Modell überanpasst sich schon nach wenigen Epochen stark",
+                "Die Gradienten werden nicht berechnet und das Training bricht ab"
+            ],
+            correct: 1,
+            explanation: "Bei zu kleiner Lernrate sind die Schritte so klein, dass das Minimum in vertretbarer Zeit nicht erreicht wird. Das Training bricht nicht ab, es dauert nur unverhältnismäßig lange – und wird oft vorzeitig beendet, bevor das Netz sein Potenzial ausgeschöpft hat."
+        },
+        {
+            text: "Die Abbildung zeigt Trainings- und Validierungsverlust über die Epochen. An welcher der markierten Stellen sollte das Training abgebrochen werden?",
+            svgId: "svg-overfitting-kurven",
+            options: [
+                "Bei A",
+                "Bei B",
+                "Bei C",
+                "Bei D"
+            ],
+            correct: 1,
+            explanation: "B liegt im Minimum des Validierungsverlusts. Davor lernt das Netz noch nutzbare Struktur, danach sinkt nur noch der Trainingsverlust, während der Validierungsverlust wieder steigt – ab hier beginnt Overfitting. Genau diesen Punkt sucht Early Stopping, und die Gewichte dieser Epoche werden als bestes Modell behalten."
+        },
+        {
+            text: "Im DataLoader wird für die Trainingsdaten shuffle = True gesetzt. Wozu dient das?",
+            options: [
+                "Es vergrößert die Trainingsmenge um zusätzliche Beispiele",
+                "Es verhindert, dass die Reihenfolge der Daten das Lernen prägt",
+                "Es ersetzt die Aufteilung in Trainings-, Validierungs- und Testdaten",
+                "Es beschleunigt die Berechnung der Gradienten im Backward Pass"
+            ],
+            correct: 1,
+            explanation: "Liegt ein Datensatz nach der Zielvariablen sortiert vor, enthielte ohne Mischen jeder Batch nur eine einzige Klasse – die Updates zögen das Netz dann abwechselnd in verschiedene Richtungen. Nicht verwechseln: Bei Zeitreihen muss die Aufteilung in Trainings- und Testdaten chronologisch erfolgen. Das Mischen der bereits gebildeten Trainingsfenster innerhalb der Trainingsmenge ist davon unberührt."
+        },
+        {
+            text: "Ein Netz soll Bilder in zehn Klassen einteilen. Welche Verlustfunktion ist angemessen?",
+            options: [
+                "MSE, der mittlere quadratische Fehler",
+                "Binary Cross Entropy (BCE)",
+                "Accuracy, die Trefferquote",
+                "CrossEntropy (Kreuzentropie)"
+            ],
+            correct: 3,
+            explanation: "CrossEntropy ist die Verlustfunktion für Klassifikation mit mehreren Klassen. Binary Cross Entropy ist der Sonderfall für genau zwei Klassen bzw. für eine Ja/Nein-Entscheidung – bei zehn Klassen also nicht passend. MSE gehört zur Regression. Accuracy ist überhaupt keine Verlustfunktion, sondern ein Bewertungsmaß: Sie ist nicht differenzierbar und liefert deshalb keine Gradienten."
+        },
+        {
+            text: "Sie stehen vor der Wahl zwischen SGD und Adam. Welche Aussage beschreibt das Einsatzprofil zutreffend?",
+            options: [
+                "Adam stellt die Schrittweite selbst nach und ist robuster",
+                "SGD ist stets schneller und liefert die besseren Ergebnisse",
+                "Adam benötigt im Gegensatz zu SGD gar keine Lernrate",
+                "Die Wahl des Optimizers hat auf das Ergebnis keinen Einfluss"
+            ],
+            correct: 0,
+            explanation: "Adam stellt die Schrittweite für jeden Parameter automatisch nach und konvergiert dadurch meist schnell, ohne dass die Lernrate lange gesucht werden muss – deshalb die übliche erste Wahl. SGD reagiert empfindlicher auf die Lernrate, wird bei sorgfältiger Abstimmung aber weiterhin erfolgreich eingesetzt. Auch Adam braucht eine Lernrate, ist gegenüber ihrer Wahl nur toleranter."
+        },
+        {
+            text: "Vor der Auswertung auf den Validierungsdaten wird net.eval() aufgerufen. Was bewirkt das?",
+            options: [
+                "Es schaltet die Berechnung der Gradienten vollständig ab",
+                "Es setzt die Gewichte auf den besten bisherigen Stand zurück",
+                "Es versetzt Schichten wie Dropout in den Auswertungsmodus",
+                "Es lädt automatisch die Validierungsdaten in den Speicher"
+            ],
+            correct: 2,
+            explanation: "net.train() und net.eval() steuern ausschließlich das Verhalten von Schichten, die sich zwischen Training und Auswertung unterscheiden. Dropout etwa deaktiviert im Auswertungsmodus seine zufällige Ausblendung, sodass alle Neuronen aktiv bleiben und die Ausgabe reproduzierbar wird. Die Gradientenberechnung wird dadurch nicht abgeschaltet – dafür ist torch.no_grad() zuständig, das üblicherweise zusätzlich verwendet wird."
+        },
+        {
+            text: "Nach dem Training wird das Modell mit torch.save(net.state_dict(), ...) gespeichert. Was enthält diese Datei?",
+            options: [
+                "Die gelernten Parameter, also Gewichte und Bias-Werte",
+                "Den vollständigen Programmcode der Netzarchitektur",
+                "Die Trainingsdaten in ihrer verarbeiteten Form",
+                "Die Verlustkurve und die Accuracy des Trainings"
+            ],
+            correct: 0,
+            explanation: "Das state_dict enthält die gelernten Parameter, nicht die Architektur. Beim Laden muss das Netz deshalb zuerst im Code aufgebaut und dann mit load_state_dict() befüllt werden – die Struktur muss dabei zur gespeicherten passen. Anschließend ist net.eval() aufzurufen, bevor Vorhersagen gemacht werden."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    svgContainer.innerHTML = svgSource.innerHTML;
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+
+    <div id="svg-trainingsschleife">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340">
+            <defs>
+                <marker id="pfeil" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#7f8c8d"/>
+                </marker>
+            </defs>
+
+            <text x="450" y="34" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Die Trainingsschleife</text>
+
+            <!-- Schritt 1: unbekannt -->
+            <rect x="50" y="90" width="140" height="80" rx="10" fill="#fdebd0" stroke="#e67e22" stroke-width="4" stroke-dasharray="10,6"/>
+            <text x="120" y="145" text-anchor="middle" font-size="44" font-weight="bold" fill="#e67e22" font-family="sans-serif">?</text>
+
+            <!-- Schritt 2 -->
+            <rect x="215" y="90" width="140" height="80" rx="10" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="285" y="126" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Forward</text>
+            <text x="285" y="150" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Pass</text>
+
+            <!-- Schritt 3 -->
+            <rect x="380" y="90" width="140" height="80" rx="10" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="450" y="126" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Loss</text>
+            <text x="450" y="150" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">berechnen</text>
+
+            <!-- Schritt 4 -->
+            <rect x="545" y="90" width="140" height="80" rx="10" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="615" y="126" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Backward</text>
+            <text x="615" y="150" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Pass</text>
+
+            <!-- Schritt 5 -->
+            <rect x="710" y="90" width="140" height="80" rx="10" fill="#d6eaf8" stroke="#3498db" stroke-width="3"/>
+            <text x="780" y="126" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Parameter-</text>
+            <text x="780" y="150" text-anchor="middle" font-size="18" fill="#2c3e50" font-family="sans-serif">Update</text>
+
+            <!-- Pfeile zwischen den Schritten -->
+            <line x1="192" y1="130" x2="211" y2="130" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pfeil)"/>
+            <line x1="357" y1="130" x2="376" y2="130" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pfeil)"/>
+            <line x1="522" y1="130" x2="541" y2="130" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pfeil)"/>
+            <line x1="687" y1="130" x2="706" y2="130" stroke="#7f8c8d" stroke-width="3" marker-end="url(#pfeil)"/>
+
+            <!-- Rueckfuehrung -->
+            <path d="M780,170 L780,240 L120,240 L120,174" fill="none" stroke="#7f8c8d" stroke-width="3" stroke-dasharray="9,6" marker-end="url(#pfeil)"/>
+            <text x="450" y="266" text-anchor="middle" font-size="17" fill="#7f8c8d" font-family="sans-serif">n&#228;chster Batch</text>
+
+            <text x="450" y="308" text-anchor="middle" font-size="16" fill="#7f8c8d" font-family="sans-serif">Ein vollst&#228;ndiger Durchlauf durch alle Batches ergibt eine Epoche.</text>
+        </svg>
+    </div>
+
+    <div id="svg-lernraten">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Drei Trainingsl&#228;ufe mit unterschiedlicher Lernrate</text>
+
+            <!-- Kurve A -->
+            <line x1="70" y1="70" x2="70" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="70" y1="250" x2="270" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <polyline points="70,200 95,120 120,215 145,105 170,230 195,90 220,240 245,80 270,246" fill="none" stroke="#c0392b" stroke-width="3.5"/>
+            <text x="170" y="292" text-anchor="middle" font-size="22" font-weight="bold" fill="#2c3e50" font-family="sans-serif">A</text>
+
+            <!-- Kurve B -->
+            <line x1="370" y1="70" x2="370" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="370" y1="250" x2="570" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <polyline points="370,90 395,132 420,163 445,185 470,201 495,212 520,219 545,224 570,227" fill="none" stroke="#27ae60" stroke-width="3.5"/>
+            <text x="470" y="292" text-anchor="middle" font-size="22" font-weight="bold" fill="#2c3e50" font-family="sans-serif">B</text>
+
+            <!-- Kurve C -->
+            <line x1="670" y1="70" x2="670" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="670" y1="250" x2="870" y2="250" stroke="#bdc3c7" stroke-width="2"/>
+            <polyline points="670,90 695,96 720,102 745,108 770,114 795,120 820,126 845,132 870,138" fill="none" stroke="#8e44ad" stroke-width="3.5"/>
+            <text x="770" y="292" text-anchor="middle" font-size="22" font-weight="bold" fill="#2c3e50" font-family="sans-serif">C</text>
+
+            <text x="450" y="326" text-anchor="middle" font-size="16" fill="#7f8c8d" font-family="sans-serif">waagerecht: Epoche &#183; senkrecht: Trainingsverlust</text>
+        </svg>
+    </div>
+
+    <div id="svg-overfitting-kurven">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400">
+            <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#2c3e50" font-family="sans-serif">Verlustkurven &#252;ber die Epochen</text>
+
+            <!-- Achsen -->
+            <line x1="100" y1="60" x2="100" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <line x1="100" y1="330" x2="850" y2="330" stroke="#bdc3c7" stroke-width="2"/>
+            <text x="88" y="70" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">Verlust</text>
+            <text x="850" y="356" text-anchor="end" font-size="15" fill="#7f8c8d" font-family="sans-serif">Epoche</text>
+
+            <!-- Trainingsverlust: faellt durchgehend -->
+            <polyline points="100,90 180,148 260,192 340,222 420,248 500,268 580,283 660,294 740,302 830,308" fill="none" stroke="#3498db" stroke-width="3.5"/>
+
+            <!-- Validierungsverlust: faellt bis B, danach wieder steigend -->
+            <polyline points="100,82 180,140 260,190 340,218 420,212 500,199 580,184 660,167 740,152 830,138" fill="none" stroke="#c0392b" stroke-width="3.5"/>
+
+            <!-- Markierungen -->
+            <line x1="180" y1="60" x2="180" y2="330" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6,6"/>
+            <text x="180" y="352" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50" font-family="sans-serif">A</text>
+            <line x1="340" y1="60" x2="340" y2="330" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6,6"/>
+            <text x="340" y="352" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50" font-family="sans-serif">B</text>
+            <line x1="580" y1="60" x2="580" y2="330" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6,6"/>
+            <text x="580" y="352" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50" font-family="sans-serif">C</text>
+            <line x1="830" y1="60" x2="830" y2="330" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6,6"/>
+            <text x="830" y="352" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50" font-family="sans-serif">D</text>
+
+            <!-- Legende -->
+            <line x1="255" y1="382" x2="305" y2="382" stroke="#3498db" stroke-width="4"/>
+            <text x="315" y="388" font-size="16" fill="#2c3e50" font-family="sans-serif">Training</text>
+            <line x1="500" y1="382" x2="550" y2="382" stroke="#c0392b" stroke-width="4"/>
+            <text x="560" y="388" font-size="16" fill="#2c3e50" font-family="sans-serif">Validierung</text>
+        </svg>
+    </div>
+
+</div>
+
+</body>
+</html>
