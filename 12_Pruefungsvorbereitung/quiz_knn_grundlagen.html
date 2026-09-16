@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: kNN-Grundlagen</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+
+        .intro {
+            max-width: 760px;
+            margin: 0 auto 10px;
+            padding: 0 20px;
+            color: #51606f;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        .formula {
+            font-family: "Cambria Math", "Times New Roman", serif;
+            font-size: 1.05em;
+        }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px; /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">kNN-Grundlagen</h1>
+<p class="intro">Teste dein Wissen zum Prinzip der <strong>k nächsten Nachbarn</strong>. Am Ende folgt ein kurzer Ausblick auf drei typische Anwendungen. Bei einer falschen Antwort darfst du es noch einmal versuchen.</p>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Wofür steht das k in kNN?",
+            svgId: "svg-knn-principle",
+            options: [
+                "Für die Anzahl der betrachteten nächsten Nachbarn",
+                "Für die Anzahl aller Features",
+                "Für die Anzahl der möglichen Klassen"
+            ],
+            correct: 0,
+            explanation: "k legt fest, wie viele nahe gelegene Trainingsbeispiele für die Entscheidung betrachtet werden. Bei k = 3 sind es die drei nächsten Nachbarn."
+        },
+        {
+            text: "Bei einer Klassifikation mit k = 3 haben die nächsten Nachbarn die Klassen Blau, Blau und Orange. Welche Klasse erhält der neue Punkt?",
+            svgId: "svg-majority-vote",
+            options: [
+                "Blau",
+                "Orange",
+                "Beide Klassen gleichzeitig"
+            ],
+            correct: 0,
+            explanation: "Blau gewinnt die Mehrheitsentscheidung mit zwei von drei Stimmen. Das ist das Grundprinzip der kNN-Klassifikation."
+        },
+        {
+            text: "Welche Aufgabe gehört zur Vorhersage mit kNN?",
+            options: [
+                "Abstände zum neuen Punkt berechnen, die k nächsten Beispiele auswählen und deren Labels auswerten",
+                "Zuerst eine Gerade durch alle Daten legen",
+                "Alle Trainingsbeispiele nach jeder Vorhersage löschen"
+            ],
+            correct: 0,
+            explanation: "kNN sucht für jeden neuen Punkt passende Nachbarn. Deren bekannte Labels bilden die Grundlage der Vorhersage."
+        },
+        {
+            text: "Wie groß ist die euklidische Distanz zwischen A = (1, 2) und B = (4, 6)?",
+            svgId: "svg-distance-triangle",
+            options: [
+                "5",
+                "7",
+                "25"
+            ],
+            correct: 0,
+            explanation: "d = √((4 − 1)² + (6 − 2)²) = √(3² + 4²) = √25 = 5."
+        },
+        {
+            text: "Warum ist ein ungerades k bei einer Aufgabe mit zwei Klassen oft praktisch?",
+            options: [
+                "Es verringert die Gefahr eines Gleichstands bei der Abstimmung",
+                "Es macht die Distanzberechnung überflüssig",
+                "Es sorgt immer für eine fehlerfreie Vorhersage"
+            ],
+            correct: 0,
+            explanation: "Bei zwei Klassen kann ein ungerades k einen einfachen Gleichstand vermeiden. Das beste k hängt trotzdem von den Daten ab."
+        },
+        {
+            text: "Warum sollten numerische Features vor einer kNN-Suche häufig skaliert werden?",
+            svgId: "svg-feature-scale",
+            options: [
+                "Damit ein Feature mit großen Zahlenwerten die Distanz nicht unbeabsichtigt dominiert",
+                "Damit k immer gleich 1 gesetzt werden kann",
+                "Damit aus jeder Zahl automatisch eine Klasse wird"
+            ],
+            correct: 0,
+            explanation: "kNN arbeitet mit Distanzen. Ohne Skalierung könnte etwa ein Einkommen in Euro viel stärker wirken als ein Alter in Jahren."
+        },
+        {
+            text: "Was ist der grundlegende Unterschied zwischen kNN-Klassifikation und kNN-Regression?",
+            options: [
+                "Klassifikation sagt eine Kategorie voraus; Regression sagt einen Zahlenwert voraus",
+                "Regression benötigt keine Nachbarn",
+                "Klassifikation funktioniert nur mit genau zwei Features"
+            ],
+            correct: 0,
+            explanation: "Bei der Klassifikation stimmen Klassenlabels ab. Bei der Regression wird beispielsweise der Mittelwert der Zahlenwerte der Nachbarn verwendet."
+        },
+        {
+            text: "Warum kann die Vorhersage bei sehr vielen gespeicherten Beispielen aufwendig werden?",
+            options: [
+                "Weil für einen neuen Punkt viele Distanzen berechnet und verglichen werden müssen",
+                "Weil kNN vor jeder Vorhersage alle Labels neu erfinden muss",
+                "Weil kNN grundsätzlich nur zehn Beispiele speichern darf"
+            ],
+            correct: 0,
+            explanation: "Der einfache kNN-Algorithmus speichert seine Beispiele und erledigt einen großen Teil der Arbeit erst bei der Vorhersage."
+        },
+        {
+            text: "Welches Beispiel beschreibt Similarity Search mit kNN am besten?",
+            svgId: "svg-applications",
+            options: [
+                "Zu einem Wortvektor werden die k ähnlichsten Vektoren gesucht",
+                "Ein neuronales Netz wird vollständig neu trainiert",
+                "Eine Tabelle wird alphabetisch nach Wörtern sortiert"
+            ],
+            correct: 0,
+            explanation: "Similarity Search sucht die nächsten Punkte in einem Vektorraum. Bei großen Datenbeständen wird die Suche häufig beschleunigt oder angenähert."
+        },
+        {
+            text: "Wie kann kNN bei der Anomalieerkennung helfen?",
+            options: [
+                "Ein Punkt kann auffällig sein, wenn selbst seine nächsten bekannten Normalpunkte weit entfernt liegen",
+                "Jeder Punkt mit einem negativen Wert ist automatisch eine Anomalie",
+                "kNN ersetzt alle Messwerte durch deren Mittelwert"
+            ],
+            correct: 0,
+            explanation: "Ein ungewöhnlich großer Abstand zur normalen Nachbarschaft kann auf eine Anomalie hinweisen. Die genaue Schwelle muss passend zur Aufgabe gewählt werden."
+        },
+        {
+            text: "Was geschieht bei einem vortrainierten neuronalen Netz mit nachgeschaltetem kNN?",
+            options: [
+                "Das Netz erzeugt Merkmalsvektoren; kNN vergleicht sie mit gespeicherten, beschrifteten Beispielen",
+                "kNN ersetzt alle Schichten des neuronalen Netzes",
+                "Die Rohdaten werden ohne Merkmale zufällig einer Klasse zugeteilt"
+            ],
+            correct: 0,
+            explanation: "Das vortrainierte Netz dient als Merkmalsextraktor. Neue beschriftete Beispiele können als Vektoren gespeichert werden, ohne das gesamte Netz neu zu trainieren."
+        },
+        {
+            text: "Welche Zusammenfassung der drei Anwendungsgebiete ist richtig?",
+            svgId: "svg-applications",
+            options: [
+                "Similarity Search findet ähnliche Vektoren; Anomaly Detection sucht ungewöhnliche Abstände; Encoder + kNN nutzt gelernte Merkmale",
+                "Alle drei Anwendungen bestehen ausschließlich aus MinMax-Skalierung",
+                "In allen drei Anwendungen muss k immer genau 3 sein"
+            ],
+            correct: 0,
+            explanation: "In allen drei Fällen wird eine Nachbarschaft genutzt – aber mit unterschiedlichem Ziel: Suchen, Auffälligkeit bewerten oder eine Klasse aus gelernten Merkmalen ableiten."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- NEU: SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                    svgContainer.innerHTML = svgSource.innerHTML; 
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+    
+    <div id="svg-three-scalers">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Drei Karten für StandardScaler, MinMaxScaler und RobustScaler">
+            <rect x="20" y="25" width="260" height="190" rx="18" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+            <rect x="320" y="25" width="260" height="190" rx="18" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+            <rect x="620" y="25" width="260" height="190" rx="18" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <text x="150" y="76" font-size="25" font-weight="bold">StandardScaler</text>
+                <text x="150" y="126" font-size="22">Mittelwert μ</text><text x="150" y="161" font-size="22">Standardabweichung σ</text>
+                <text x="450" y="76" font-size="25" font-weight="bold">MinMaxScaler</text>
+                <text x="450" y="126" font-size="22">Minimum</text><text x="450" y="161" font-size="22">Maximum</text>
+                <text x="750" y="76" font-size="25" font-weight="bold">RobustScaler</text>
+                <text x="750" y="126" font-size="22">Median</text><text x="750" y="161" font-size="22">IQR</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-standard-numberline">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Zahlengerade mit Mittelwert 50 und Wert 70">
+            <line x1="100" y1="135" x2="800" y2="135" stroke="#526577" stroke-width="5"/>
+            <g stroke="#526577" stroke-width="3" font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <line x1="250" y1="112" x2="250" y2="158"/><line x1="450" y1="100" x2="450" y2="165"/><line x1="650" y1="112" x2="650" y2="158"/>
+                <text x="250" y="195" font-size="22">40</text><text x="450" y="202" font-size="24" font-weight="bold">μ = 50</text><text x="650" y="195" font-size="22">60</text>
+            </g>
+            <circle cx="800" cy="135" r="14" fill="#dc3545"/><text x="800" y="82" font-size="27" font-family="sans-serif" text-anchor="middle" fill="#b02a37" font-weight="bold">x = 70</text>
+            <text x="450" y="40" font-size="25" font-family="sans-serif" text-anchor="middle" fill="#263746">Jeder Schritt entspricht σ = 10</text>
+        </svg>
+    </div>
+
+    <div id="svg-minmax">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Abbildung eines ursprünglichen Wertebereichs auf den Bereich null bis eins">
+            <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3498db"/></marker></defs>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <text x="210" y="45" font-size="24" font-weight="bold">Original</text><text x="690" y="45" font-size="24" font-weight="bold">Skaliert</text>
+                <line x1="80" y1="130" x2="340" y2="130" stroke="#526577" stroke-width="6"/><circle cx="80" cy="130" r="10" fill="#526577"/><circle cx="340" cy="130" r="10" fill="#526577"/>
+                <text x="80" y="175" font-size="22">xmin</text><text x="340" y="175" font-size="22">xmax</text>
+                <line x1="560" y1="130" x2="820" y2="130" stroke="#28a745" stroke-width="6"/><circle cx="560" cy="130" r="10" fill="#28a745"/><circle cx="820" cy="130" r="10" fill="#28a745"/>
+                <text x="560" y="175" font-size="22">0</text><text x="820" y="175" font-size="22">1</text>
+                <line x1="380" y1="130" x2="515" y2="130" stroke="#3498db" stroke-width="5" marker-end="url(#arrow)"/>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-robust-boxplot">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" role="img" aria-label="Boxplot mit Quartilen, Median und einem Ausreißer">
+            <line x1="110" y1="135" x2="760" y2="135" stroke="#526577" stroke-width="4"/>
+            <line x1="110" y1="105" x2="110" y2="165" stroke="#526577" stroke-width="4"/>
+            <rect x="275" y="75" width="310" height="120" fill="#fff4df" stroke="#e39a21" stroke-width="4"/>
+            <line x1="440" y1="75" x2="440" y2="195" stroke="#dc3545" stroke-width="6"/>
+            <circle cx="810" cy="135" r="12" fill="#dc3545"/>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746" font-size="22">
+                <text x="275" y="230">Q1</text><text x="440" y="230" font-weight="bold">Median</text><text x="585" y="230">Q3</text><text x="810" y="95" fill="#b02a37">Ausreißer</text>
+                <text x="430" y="38" font-size="24" font-weight="bold">IQR = Q3 − Q1</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-knn-distance">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-label="Vergleich einer unskalierten und skalierten kNN-Darstellung">
+            <g font-family="sans-serif" fill="#263746">
+                <text x="225" y="35" font-size="23" text-anchor="middle" font-weight="bold">Ohne Skalierung</text><text x="675" y="35" font-size="23" text-anchor="middle" font-weight="bold">Nach Skalierung</text>
+                <line x1="65" y1="270" x2="390" y2="270" stroke="#526577" stroke-width="4"/><line x1="65" y1="270" x2="65" y2="70" stroke="#526577" stroke-width="4"/>
+                <line x1="515" y1="270" x2="840" y2="270" stroke="#526577" stroke-width="4"/><line x1="515" y1="270" x2="515" y2="70" stroke="#526577" stroke-width="4"/>
+                <text x="225" y="310" font-size="20" text-anchor="middle">Einkommen (großer Bereich)</text><text x="675" y="310" font-size="20" text-anchor="middle">Einkommen (skaliert)</text>
+                <text x="32" y="170" font-size="18" text-anchor="middle" transform="rotate(-90 32 170)">Alter</text><text x="482" y="170" font-size="18" text-anchor="middle" transform="rotate(-90 482 170)">Alter (skaliert)</text>
+            </g>
+            <g fill="#3498db"><circle cx="110" cy="140" r="12"/><circle cx="335" cy="145" r="12"/><circle cx="180" cy="220" r="12"/><circle cx="585" cy="115" r="12"/><circle cx="755" cy="145" r="12"/><circle cx="625" cy="225" r="12"/></g>
+            <g fill="#dc3545"><path d="M270 190 l8 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2z"/><path d="M710 180 l8 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2z"/></g>
+        </svg>
+    </div>
+
+    <div id="svg-summary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" role="img" aria-label="Formelübersicht der drei Scaler">
+            <g font-family="sans-serif" fill="#263746">
+                <rect x="25" y="30" width="265" height="205" rx="15" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+                <rect x="318" y="30" width="265" height="205" rx="15" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+                <rect x="610" y="30" width="265" height="205" rx="15" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+                <text x="157" y="78" font-size="24" text-anchor="middle" font-weight="bold">Standard</text><text x="157" y="140" font-size="25" text-anchor="middle">(x − μ) / σ</text><text x="157" y="188" font-size="19" text-anchor="middle">z-Score</text>
+                <text x="450" y="78" font-size="24" text-anchor="middle" font-weight="bold">MinMax</text><text x="450" y="130" font-size="21" text-anchor="middle">x − xmin</text><line x1="375" y1="142" x2="525" y2="142" stroke="#263746" stroke-width="2"/><text x="450" y="176" font-size="21" text-anchor="middle">xmax − xmin</text>
+                <text x="742" y="78" font-size="24" text-anchor="middle" font-weight="bold">Robust</text><text x="742" y="130" font-size="20" text-anchor="middle">x − Median</text><line x1="670" y1="142" x2="814" y2="142" stroke="#263746" stroke-width="2"/><text x="742" y="176" font-size="21" text-anchor="middle">IQR</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-knn-principle">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" role="img" aria-label="kNN-Ablauf vom neuen Punkt über die nächsten Nachbarn zur Entscheidung">
+            <defs><marker id="knn-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#526577"/></marker></defs>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <rect x="35" y="65" width="200" height="145" rx="18" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+                <rect x="350" y="65" width="200" height="145" rx="18" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+                <rect x="665" y="65" width="200" height="145" rx="18" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+                <text x="135" y="115" font-size="24" font-weight="bold">Neuer Punkt</text><circle cx="135" cy="162" r="15" fill="#dc3545"/>
+                <text x="450" y="108" font-size="24" font-weight="bold">k Nachbarn</text><circle cx="408" cy="160" r="13" fill="#3498db"/><circle cx="450" cy="160" r="13" fill="#3498db"/><circle cx="492" cy="160" r="13" fill="#e39a21"/>
+                <text x="765" y="115" font-size="24" font-weight="bold">Entscheidung</text><text x="765" y="170" font-size="28" fill="#24733a">Mehrheit</text>
+                <line x1="250" y1="138" x2="325" y2="138" stroke="#526577" stroke-width="5" marker-end="url(#knn-arrow)"/>
+                <line x1="565" y1="138" x2="640" y2="138" stroke="#526577" stroke-width="5" marker-end="url(#knn-arrow)"/>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-majority-vote">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-label="Ein neuer Punkt und seine drei nächsten Nachbarn, davon zwei blau und einer orange">
+            <circle cx="450" cy="165" r="105" fill="none" stroke="#7f8c8d" stroke-width="3" stroke-dasharray="9 8"/>
+            <circle cx="450" cy="165" r="18" fill="#ffffff" stroke="#263746" stroke-width="5"/>
+            <circle cx="390" cy="110" r="18" fill="#3498db"/><circle cx="515" cy="125" r="18" fill="#3498db"/><circle cx="430" cy="235" r="18" fill="#e39a21"/>
+            <circle cx="710" cy="95" r="18" fill="#e39a21"/><circle cx="210" cy="250" r="18" fill="#3498db"/>
+            <g font-family="sans-serif" fill="#263746" text-anchor="middle">
+                <text x="450" y="42" font-size="25" font-weight="bold">k = 3: Die drei Punkte im Kreis stimmen ab</text>
+                <text x="450" y="171" font-size="16" font-weight="bold">?</text><text x="450" y="306" font-size="22">2 × Blau, 1 × Orange</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-distance-triangle">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" role="img" aria-label="Rechtwinkliges Dreieck zwischen den Punkten A und B mit Seitenlängen drei und vier">
+            <line x1="120" y1="280" x2="790" y2="280" stroke="#526577" stroke-width="4"/><line x1="120" y1="280" x2="120" y2="45" stroke="#526577" stroke-width="4"/>
+            <line x1="285" y1="235" x2="650" y2="235" stroke="#3498db" stroke-width="6"/><line x1="650" y1="235" x2="650" y2="75" stroke="#28a745" stroke-width="6"/><line x1="285" y1="235" x2="650" y2="75" stroke="#dc3545" stroke-width="6"/>
+            <circle cx="285" cy="235" r="13" fill="#263746"/><circle cx="650" cy="75" r="13" fill="#263746"/>
+            <g font-family="sans-serif" fill="#263746" font-size="22">
+                <text x="245" y="265">A(1, 2)</text><text x="668" y="66">B(4, 6)</text><text x="465" y="266" fill="#246da0">Δx = 3</text><text x="670" y="165" fill="#24733a">Δy = 4</text><text x="435" y="130" fill="#b02a37" font-weight="bold">Distanz d = ?</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-feature-scale">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" role="img" aria-label="Vergleich der Zahlenbereiche von Alter und Einkommen vor und nach der Skalierung">
+            <g font-family="sans-serif" fill="#263746">
+                <text x="225" y="42" font-size="24" text-anchor="middle" font-weight="bold">Vorher</text><text x="675" y="42" font-size="24" text-anchor="middle" font-weight="bold">Nachher</text>
+                <text x="55" y="100" font-size="21">Alter</text><rect x="125" y="75" width="105" height="35" rx="7" fill="#3498db"/><text x="245" y="100" font-size="19">18–80</text>
+                <text x="30" y="175" font-size="21">Einkommen</text><rect x="125" y="150" width="285" height="35" rx="7" fill="#e39a21"/><text x="245" y="225" font-size="19">20.000–200.000</text>
+                <text x="520" y="100" font-size="21">Alter</text><rect x="630" y="75" width="205" height="35" rx="7" fill="#3498db"/><text x="730" y="135" font-size="19" text-anchor="middle">vergleichbarer Bereich</text>
+                <text x="495" y="205" font-size="21">Einkommen</text><rect x="630" y="180" width="205" height="35" rx="7" fill="#e39a21"/>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-applications">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" role="img" aria-label="Drei kNN-Anwendungen: Similarity Search, Anomaly Detection und vortrainierter Encoder plus kNN">
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <rect x="20" y="30" width="270" height="225" rx="18" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+                <rect x="315" y="30" width="270" height="225" rx="18" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+                <rect x="610" y="30" width="270" height="225" rx="18" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+                <text x="155" y="72" font-size="23" font-weight="bold">Similarity Search</text><circle cx="115" cy="140" r="15" fill="#dc3545"/><circle cx="170" cy="120" r="13" fill="#3498db"/><circle cx="200" cy="160" r="13" fill="#3498db"/><text x="155" y="220" font-size="19">Ähnliche Vektoren</text>
+                <text x="450" y="72" font-size="23" font-weight="bold">Anomaly Detection</text><circle cx="410" cy="145" r="13" fill="#3498db"/><circle cx="450" cy="125" r="13" fill="#3498db"/><circle cx="475" cy="165" r="13" fill="#3498db"/><circle cx="540" cy="205" r="15" fill="#dc3545"/><text x="450" y="235" font-size="19">Weit entfernt?</text>
+                <text x="745" y="65" font-size="21" font-weight="bold">Encoder + kNN</text><rect x="650" y="100" width="90" height="55" rx="8" fill="#ffffff" stroke="#28a745" stroke-width="3"/><text x="695" y="135" font-size="18">Encoder</text><line x1="750" y1="128" x2="795" y2="128" stroke="#526577" stroke-width="4"/><circle cx="820" cy="128" r="14" fill="#3498db"/><text x="745" y="220" font-size="19">Merkmale vergleichen</text>
+            </g>
+        </svg>
+    </div>
+
+    </div>
+
+</body>
+</html>

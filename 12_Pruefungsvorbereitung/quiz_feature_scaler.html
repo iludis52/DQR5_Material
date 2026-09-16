@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Feature-Skalierung für kNN</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+
+        .intro {
+            max-width: 760px;
+            margin: 0 auto 10px;
+            padding: 0 20px;
+            color: #51606f;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        .formula {
+            font-family: "Cambria Math", "Times New Roman", serif;
+            font-size: 1.05em;
+        }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px; /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">Feature-Skalierung für kNN</h1>
+<p class="intro">Teste dein Wissen zu <strong>StandardScaler</strong>, <strong>MinMaxScaler</strong> und <strong>RobustScaler</strong>. Bei einer falschen Antwort darfst du es noch einmal versuchen.</p>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Welcher Scaler erzeugt den klassischen z-Score?",
+            svgId: "svg-three-scalers",
+            options: [
+                "StandardScaler",
+                "MinMaxScaler",
+                "RobustScaler"
+            ],
+            correct: 0,
+            explanation: "Der StandardScaler berechnet z = (x − μ) / σ. Danach hat das Feature auf den Trainingsdaten ungefähr den Mittelwert 0 und die Standardabweichung 1."
+        },
+        {
+            text: "Ein Feature hat den Mittelwert μ = 50 und die Standardabweichung σ = 10. Welchen z-Score erhält x = 70?",
+            svgId: "svg-standard-numberline",
+            options: [
+                "0,5",
+                "2",
+                "7"
+            ],
+            correct: 1,
+            explanation: "z = (70 − 50) / 10 = 2. Der Wert liegt zwei Standardabweichungen über dem Mittelwert."
+        },
+        {
+            text: "Welche Formel beschreibt den MinMaxScaler für den Zielbereich [0, 1]?",
+            svgId: "svg-minmax",
+            options: [
+                "x' = (x − xmin) / (xmax − xmin)",
+                "x' = (x − Mittelwert) / Standardabweichung",
+                "x' = (x − Median) / IQR"
+            ],
+            correct: 0,
+            explanation: "Beim MinMaxScaler wird das Minimum abgezogen und anschließend durch die Spannweite xmax − xmin geteilt."
+        },
+        {
+            text: "Die Trainingswerte liegen zwischen 10 und 50. Welchen Wert erhält x = 30 nach einer MinMax-Skalierung auf [0, 1]?",
+            options: [
+                "0,25",
+                "0,5",
+                "0,75"
+            ],
+            correct: 1,
+            explanation: "x' = (30 − 10) / (50 − 10) = 20 / 40 = 0,5. Der Wert 30 liegt genau in der Mitte des Bereichs."
+        },
+        {
+            text: "Welche Größen verwendet der RobustScaler normalerweise?",
+            svgId: "svg-robust-boxplot",
+            options: [
+                "Mittelwert und Standardabweichung",
+                "Minimum und Maximum",
+                "Median und Interquartilsabstand (IQR)"
+            ],
+            correct: 2,
+            explanation: "Der RobustScaler verwendet x' = (x − Median) / IQR mit IQR = Q3 − Q1. Median und Quartile reagieren weniger stark auf einzelne Ausreißer."
+        },
+        {
+            text: "Ein Einkommens-Feature enthält wenige extreme Millioneneinkommen. Welcher der drei Scaler ist meist der sinnvollste erste Versuch?",
+            options: [
+                "RobustScaler",
+                "MinMaxScaler",
+                "Kein Scaler, weil kNN Ausreißer automatisch ignoriert"
+            ],
+            correct: 0,
+            explanation: "Der RobustScaler wird von extremen Werten weniger beeinflusst. Er entfernt die Ausreißer jedoch nicht; er macht nur die Skalierung robuster."
+        },
+        {
+            text: "Warum ist Feature-Skalierung bei kNN besonders wichtig?",
+            svgId: "svg-knn-distance",
+            options: [
+                "Weil kNN Distanzen berechnet und Features mit großen Zahlenbereichen diese dominieren können",
+                "Weil kNN ausschließlich Werte zwischen 0 und 1 akzeptiert",
+                "Weil Skalierung automatisch irrelevante Features entfernt"
+            ],
+            correct: 0,
+            explanation: "kNN entscheidet über Abstände. Ohne Skalierung kann zum Beispiel Einkommen die Distanz fast allein bestimmen, während das Alter kaum noch zählt."
+        },
+        {
+            text: "Wann werden Mittelwert, Standardabweichung, Quartile oder Min/Max für den Scaler bestimmt?",
+            options: [
+                "Getrennt auf Trainings- und Testdaten",
+                "Nur auf den Trainingsdaten; dieselben Werte werden danach auf Test- und neue Daten angewendet",
+                "Auf dem vollständigen Datensatz vor der Aufteilung"
+            ],
+            correct: 1,
+            explanation: "Der Scaler wird nur auf den Trainingsdaten angepasst. Sonst fließen Informationen aus den Testdaten in das Training ein – das wäre Data Leakage."
+        },
+        {
+            text: "Ein MinMaxScaler wurde mit xmin = 0 und xmax = 100 angepasst. Ein neuer Wert beträgt 120. Was passiert ohne Begrenzung (Clipping)?",
+            options: [
+                "Der neue Wert wird zu 1,2",
+                "Der neue Wert wird automatisch zu 1",
+                "Der Scaler erzeugt immer einen Fehler"
+            ],
+            correct: 0,
+            explanation: "x' = (120 − 0) / (100 − 0) = 1,2. Nur die beim Anpassen beobachteten Trainingswerte liegen garantiert im Bereich [0, 1]."
+        },
+        {
+            text: "Welche Zuordnung ist vollständig richtig?",
+            svgId: "svg-summary",
+            options: [
+                "Standard → Median/IQR; MinMax → μ/σ; Robust → Minimum/Maximum",
+                "Standard → μ/σ; MinMax → Minimum/Maximum; Robust → Median/IQR",
+                "Standard → Minimum/Maximum; MinMax → Median/IQR; Robust → μ/σ"
+            ],
+            correct: 1,
+            explanation: "StandardScaler: Mittelwert und Standardabweichung. MinMaxScaler: Minimum und Maximum. RobustScaler: Median und Interquartilsabstand."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- NEU: SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                    svgContainer.innerHTML = svgSource.innerHTML; 
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+    
+    <div id="svg-three-scalers">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Drei Karten für StandardScaler, MinMaxScaler und RobustScaler">
+            <rect x="20" y="25" width="260" height="190" rx="18" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+            <rect x="320" y="25" width="260" height="190" rx="18" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+            <rect x="620" y="25" width="260" height="190" rx="18" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <text x="150" y="76" font-size="25" font-weight="bold">StandardScaler</text>
+                <text x="150" y="126" font-size="22">Mittelwert μ</text><text x="150" y="161" font-size="22">Standardabweichung σ</text>
+                <text x="450" y="76" font-size="25" font-weight="bold">MinMaxScaler</text>
+                <text x="450" y="126" font-size="22">Minimum</text><text x="450" y="161" font-size="22">Maximum</text>
+                <text x="750" y="76" font-size="25" font-weight="bold">RobustScaler</text>
+                <text x="750" y="126" font-size="22">Median</text><text x="750" y="161" font-size="22">IQR</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-standard-numberline">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Zahlengerade mit Mittelwert 50 und Wert 70">
+            <line x1="100" y1="135" x2="800" y2="135" stroke="#526577" stroke-width="5"/>
+            <g stroke="#526577" stroke-width="3" font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <line x1="250" y1="112" x2="250" y2="158"/><line x1="450" y1="100" x2="450" y2="165"/><line x1="650" y1="112" x2="650" y2="158"/>
+                <text x="250" y="195" font-size="22">40</text><text x="450" y="202" font-size="24" font-weight="bold">μ = 50</text><text x="650" y="195" font-size="22">60</text>
+            </g>
+            <circle cx="800" cy="135" r="14" fill="#dc3545"/><text x="800" y="82" font-size="27" font-family="sans-serif" text-anchor="middle" fill="#b02a37" font-weight="bold">x = 70</text>
+            <text x="450" y="40" font-size="25" font-family="sans-serif" text-anchor="middle" fill="#263746">Jeder Schritt entspricht σ = 10</text>
+        </svg>
+    </div>
+
+    <div id="svg-minmax">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 250" role="img" aria-label="Abbildung eines ursprünglichen Wertebereichs auf den Bereich null bis eins">
+            <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3498db"/></marker></defs>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746">
+                <text x="210" y="45" font-size="24" font-weight="bold">Original</text><text x="690" y="45" font-size="24" font-weight="bold">Skaliert</text>
+                <line x1="80" y1="130" x2="340" y2="130" stroke="#526577" stroke-width="6"/><circle cx="80" cy="130" r="10" fill="#526577"/><circle cx="340" cy="130" r="10" fill="#526577"/>
+                <text x="80" y="175" font-size="22">xmin</text><text x="340" y="175" font-size="22">xmax</text>
+                <line x1="560" y1="130" x2="820" y2="130" stroke="#28a745" stroke-width="6"/><circle cx="560" cy="130" r="10" fill="#28a745"/><circle cx="820" cy="130" r="10" fill="#28a745"/>
+                <text x="560" y="175" font-size="22">0</text><text x="820" y="175" font-size="22">1</text>
+                <line x1="380" y1="130" x2="515" y2="130" stroke="#3498db" stroke-width="5" marker-end="url(#arrow)"/>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-robust-boxplot">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" role="img" aria-label="Boxplot mit Quartilen, Median und einem Ausreißer">
+            <line x1="110" y1="135" x2="760" y2="135" stroke="#526577" stroke-width="4"/>
+            <line x1="110" y1="105" x2="110" y2="165" stroke="#526577" stroke-width="4"/>
+            <rect x="275" y="75" width="310" height="120" fill="#fff4df" stroke="#e39a21" stroke-width="4"/>
+            <line x1="440" y1="75" x2="440" y2="195" stroke="#dc3545" stroke-width="6"/>
+            <circle cx="810" cy="135" r="12" fill="#dc3545"/>
+            <g font-family="sans-serif" text-anchor="middle" fill="#263746" font-size="22">
+                <text x="275" y="230">Q1</text><text x="440" y="230" font-weight="bold">Median</text><text x="585" y="230">Q3</text><text x="810" y="95" fill="#b02a37">Ausreißer</text>
+                <text x="430" y="38" font-size="24" font-weight="bold">IQR = Q3 − Q1</text>
+            </g>
+        </svg>
+    </div>
+
+    <div id="svg-knn-distance">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" role="img" aria-label="Vergleich einer unskalierten und skalierten kNN-Darstellung">
+            <g font-family="sans-serif" fill="#263746">
+                <text x="225" y="35" font-size="23" text-anchor="middle" font-weight="bold">Ohne Skalierung</text><text x="675" y="35" font-size="23" text-anchor="middle" font-weight="bold">Nach Skalierung</text>
+                <line x1="65" y1="270" x2="390" y2="270" stroke="#526577" stroke-width="4"/><line x1="65" y1="270" x2="65" y2="70" stroke="#526577" stroke-width="4"/>
+                <line x1="515" y1="270" x2="840" y2="270" stroke="#526577" stroke-width="4"/><line x1="515" y1="270" x2="515" y2="70" stroke="#526577" stroke-width="4"/>
+                <text x="225" y="310" font-size="20" text-anchor="middle">Einkommen (großer Bereich)</text><text x="675" y="310" font-size="20" text-anchor="middle">Einkommen (skaliert)</text>
+                <text x="32" y="170" font-size="18" text-anchor="middle" transform="rotate(-90 32 170)">Alter</text><text x="482" y="170" font-size="18" text-anchor="middle" transform="rotate(-90 482 170)">Alter (skaliert)</text>
+            </g>
+            <g fill="#3498db"><circle cx="110" cy="140" r="12"/><circle cx="335" cy="145" r="12"/><circle cx="180" cy="220" r="12"/><circle cx="585" cy="115" r="12"/><circle cx="755" cy="145" r="12"/><circle cx="625" cy="225" r="12"/></g>
+            <g fill="#dc3545"><path d="M270 190 l8 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2z"/><path d="M710 180 l8 18 20 2-15 13 5 20-18-10-18 10 5-20-15-13 20-2z"/></g>
+        </svg>
+    </div>
+
+    <div id="svg-summary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 280" role="img" aria-label="Formelübersicht der drei Scaler">
+            <g font-family="sans-serif" fill="#263746">
+                <rect x="25" y="30" width="265" height="205" rx="15" fill="#e8f4fd" stroke="#3498db" stroke-width="3"/>
+                <rect x="318" y="30" width="265" height="205" rx="15" fill="#eaf8ee" stroke="#28a745" stroke-width="3"/>
+                <rect x="610" y="30" width="265" height="205" rx="15" fill="#fff4df" stroke="#e39a21" stroke-width="3"/>
+                <text x="157" y="78" font-size="24" text-anchor="middle" font-weight="bold">Standard</text><text x="157" y="140" font-size="25" text-anchor="middle">(x − μ) / σ</text><text x="157" y="188" font-size="19" text-anchor="middle">z-Score</text>
+                <text x="450" y="78" font-size="24" text-anchor="middle" font-weight="bold">MinMax</text><text x="450" y="130" font-size="21" text-anchor="middle">x − xmin</text><line x1="375" y1="142" x2="525" y2="142" stroke="#263746" stroke-width="2"/><text x="450" y="176" font-size="21" text-anchor="middle">xmax − xmin</text>
+                <text x="742" y="78" font-size="24" text-anchor="middle" font-weight="bold">Robust</text><text x="742" y="130" font-size="20" text-anchor="middle">x − Median</text><line x1="670" y1="142" x2="814" y2="142" stroke="#263746" stroke-width="2"/><text x="742" y="176" font-size="21" text-anchor="middle">IQR</text>
+            </g>
+        </svg>
+    </div>
+
+    </div>
+
+</body>
+</html>
