@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Batch Normalization</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px; /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">Batch Normalization &ndash; Quiz</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    // Konfiguration der Fragen. Optional: 'svgId' hinzufügen, um ein Bild zu laden.
+    const questions = [
+        {
+            text: "Die Abbildung zeigt die Ausgaben einer versteckten Schicht für einen Mini-Batch. In welcher Richtung berechnet Batch Normalization μ und σ²?",
+            svgId: "svg-batch-matrix",
+            options: [
+                "Diagonal: je Neuron über das ihm zugeordnete Sample.",
+                "Spaltenweise: je Neuron über alle Samples des Batches.",
+                "Zeilenweise: je Sample über alle Neuronen der Schicht.",
+                "Über die ganze Matrix: ein Wertepaar für die Schicht.",
+            ],
+            correct: 1,
+            explanation: "Normalisiert wird entlang der Batch-Dimension. Jedes Neuron wird mit der Statistik verrechnet, wie dasselbe Neuron auf die übrigen Samples des Batches reagiert hat. Die zeilenweise Variante gibt es auch — das ist Layer Normalization, wie sie in Transformern verwendet wird."
+        },
+        {
+            text: "Berechnen Sie aus der Abbildung μ und σ² für Neuron 2. Verwenden Sie die Varianz so, wie PyTorch sie zum Normalisieren einsetzt.",
+            svgId: "svg-batch-matrix",
+            options: [
+                "μ = 1,0 und σ² = 2,7",
+                "μ = 0,5 und σ² = 2,0",
+                "μ = 1,5 und σ² = 2,5",
+                "μ = 1,0 und σ² = 2,0",
+            ],
+            correct: 3,
+            explanation: "Die Spalte enthält −1, 1, 3, 1 — also μ = 4/4 = 1,0. Für die Varianz: (4 + 0 + 4 + 0) / 4 = 2,0. Zum Normalisieren teilt PyTorch durch m (biased). Der Wert 2,7 entstünde bei Division durch m−1 — diese unbiased Variante benutzt PyTorch nur für das Update von running_var."
+        },
+        {
+            text: "Welchen Zweck haben die lernbaren Parameter γ und β in einer BatchNorm-Schicht?",
+            options: [
+                "Sie erlauben dem Netz, die Normalisierung bei Bedarf zurückzunehmen.",
+                "Sie halten Mittelwert und Streuung dauerhaft bei exakt 0 und 1 fest.",
+                "Sie ersetzen die Gewichte der vorangehenden Linear-Schicht vollständig.",
+                "Sie glätten die Statistik über mehrere aufeinanderfolgende Mini-Batches.",
+            ],
+            correct: 0,
+            explanation: "Reines Normalisieren würde Ausdrucksstärke kosten: Eine Sigmoid- oder Tanh-Funktion arbeitet um 0 herum nahezu linear. Mit y = γ·ẑ + β kann das Netz Skala und Lage selbst wählen — es lernt sie, statt sie zufällig zu erben."
+        },
+        {
+            text: "Warum benutzt BatchNorm bei der Inferenz nicht die Statistik des aktuellen Batches?",
+            svgId: "svg-train-eval",
+            options: [
+                "Sonst würde die Berechnung der Statistik die Inferenz verlangsamen.",
+                "Sonst müsste man die Trainingsdaten beim Ausliefern mitliefern.",
+                "Sonst hinge die Vorhersage davon ab, welche Samples daneben liegen.",
+                "Sonst wären die gelernten Parameter γ und β nicht mehr verfügbar.",
+            ],
+            correct: 2,
+            explanation: "Ein einzelnes Bild hat keinen Batch, und die Vorhersage darf nicht davon abhängen, welche anderen Bilder zufällig danebenliegen. Deshalb führt die Schicht während des Trainings gleitende Mittelwerte mit und benutzt diese festen Werte im Eval-Modus. Genau dafür ist net.eval() nicht optional."
+        },
+        {
+            text: "Vor einer BatchNorm-Schicht setzt man nn.Linear meist auf bias=False. Welche Aufgabe übernimmt dafür der lernbare Parameter β?",
+            options: [
+                "β legt die Lernrate dieser Schicht fest und steuert das Training.",
+                "β speichert den Mittelwert des Batches und ersetzt running_mean.",
+                "β begrenzt die Ausgabe nach oben und verhindert zu große Werte.",
+                "β verschiebt die normalisierten Werte und dient als neuer Bias.",
+            ],
+            correct: 3,
+            explanation: "Eine BatchNorm-Schicht hat zwei lernbare Parameter je Neuron: γ skaliert die normalisierten Werte (macht sie breiter oder schmaler), β verschiebt sie nach oben oder unten. Beide werden wie normale Gewichte per Gradientenabstieg gelernt. Der Bias der Linear-Schicht wäre daneben wirkungslos, denn BatchNorm zieht im nächsten Schritt ohnehin den Mittelwert wieder ab — genau um diesen Betrag hatte der Bias verschoben. Seine Aufgabe übernimmt also β."
+        },
+        {
+            text: "Im Trainingsmodus bricht nn.BatchNorm1d bei einem Batch mit nur einem Sample ab. Warum?",
+            options: [
+                "Die Matrixmultiplikation der Linear-Schicht liefert dann keine Ausgabe.",
+                "Aus einem einzigen Wert je Neuron lässt sich keine Varianz schätzen.",
+                "Der Momentum-Term für die laufende Statistik ist dann nicht definiert.",
+                "Die Parameter γ und β erhalten dann keinen auswertbaren Gradienten.",
+            ],
+            correct: 1,
+            explanation: "σ² wäre 0 beziehungsweise undefiniert. In der Praxis tritt der Fall auf, wenn am Ende einer Epoche ein Rest-Batch der Größe 1 übrig bleibt — etwa bei 96 Samples und BATCH_SIZE = 19. Abhilfe: drop_last=True im DataLoader."
+        },
+        {
+            text: "An welcher der markierten Stellen wird BatchNorm klassisch eingebaut?",
+            svgId: "svg-platzierung",
+            options: [
+                "An Stelle ③ — unmittelbar hinter der Ausgabeschicht des Netzes.",
+                "An allen drei Stellen zugleich, sonst bleibt die Wirkung aus.",
+                "An Stelle ① — zwischen Linear-Schicht und Aktivierungsfunktion.",
+                "An Stelle ② — zwischen Aktivierungsfunktion und nächster Schicht.",
+            ],
+            correct: 2,
+            explanation: "Ioffe und Szegedy setzen BN im Originalpaper zwischen die lineare Operation und die Nichtlinearität. Hinter der Ausgabeschicht wäre es schädlich: Die Skala der Logits soll das Netz frei bestimmen können, sie geht direkt in die CrossEntropyLoss ein."
+        },
+        {
+            text: "Was bewirkt eine BatchNorm-Schicht unmittelbar mit den Werten, die bei ihr ankommen?",
+            options: [
+                "Jedes Neuron erhält über den Batch Mittelwert 0 und Streuung 1.",
+                "Jedes Neuron erhält über den Batch stets denselben festen Wert.",
+                "Alle negativen Werte werden auf 0 gesetzt, positive bleiben stehen.",
+                "Alle Werte werden starr in den Bereich zwischen 0 und 1 gestaucht.",
+            ],
+            correct: 0,
+            explanation: "Das ist die Z-Transformation aus der Statistik, angewandt je Neuron über den Batch. Die dritte Option beschreibt ReLU, die vierte den MinMaxScaler — beides sind andere Werkzeuge. Anschließend darf das Netz über γ und β nachjustieren."
+        },
+        {
+            text: "Welcher Vorteil wird Batch Normalization in der Praxis zugeschrieben?",
+            options: [
+                "Man kann die Zahl der Schichten senken, BatchNorm fasst sie zusammen.",
+                "Man kann höhere Lernraten fahren und das Netz konvergiert schneller.",
+                "Man kann auf einen Teil der Trainingsdaten verzichten und spart Zeit.",
+                "Man kann die Aktivierungsfunktionen weglassen, BatchNorm ersetzt sie.",
+            ],
+            correct: 1,
+            explanation: "Höhere Lernraten, schnellere Konvergenz und mehr Robustheit gegenüber der Initialisierung. Dazu kommt eine leichte Regularisierung: μ und σ² schwanken von Batch zu Batch, das wirkt wie schwaches Rauschen. Ersetzen tut BatchNorm dagegen nichts — Aktivierungsfunktionen und Schichten bleiben nötig."
+        },
+        {
+            text: "Ein tiefes Netz mit Tanh-Aktivierung lernt ohne BatchNorm gar nichts. Was ist typischerweise passiert?",
+            options: [
+                "Die Gewichte wurden auf exakt null gesetzt, das Netz bleibt symmetrisch.",
+                "Der Batch wurde zu groß gewählt, die Statistik wird damit unbrauchbar.",
+                "Die Aktivierungen sind gesättigt, ihre Ableitung liegt dort nahe null.",
+                "Die Aktivierungen sind alle negativ, die Tanh-Kurve bleibt ungenutzt.",
+            ],
+            correct: 2,
+            explanation: "Im flachen Bereich der Tanh-Kurve (|a| nahe 1) ist die Ableitung praktisch null — der Gradient kommt in den vorderen Schichten nicht mehr an. Genau dagegen hilft BatchNorm: Es holt die Werte zurück in den steilen Bereich um die Null."
+        },
+        {
+            text: "Im Iris-Notebook brachte BatchNorm bei einer versteckten Schicht mit 5 Neuronen nichts, bei 16 Schichten dagegen viel. Was ist der Grund?",
+            options: [
+                "Erst ab etwa zehn Schichten ist die BatchNorm in PyTorch überhaupt aktiv.",
+                "Kleine Schichten haben zu wenige Neuronen für eine stabile Statistik.",
+                "Der StandardScaler blockiert die BatchNorm-Schicht in flachen Netzen.",
+                "Erst mit der Tiefe driftet die Verteilung von Schicht zu Schicht weg.",
+            ],
+            correct: 3,
+            explanation: "Bei einer einzigen versteckten Schicht sind die Eingaben durch den Scaler bereits standardisiert — es gibt nichts zu korrigieren. Die richtige Lektion lautet nicht 'BatchNorm macht Modelle besser', sondern: BatchNorm macht Tiefe überhaupt erst trainierbar."
+        },
+        {
+            text: "Mit welcher Zeile schaltet man ein PyTorch-Modell vor der Vorhersage richtig um?",
+            options: [
+                "net.eval() — BatchNorm rechnet danach mit der gespeicherten Statistik.",
+                "net.train() — BatchNorm rechnet danach mit festen, gelernten Werten.",
+                "torch.no_grad() — dieser Block stellt die BatchNorm-Schicht mit um.",
+                "optimizer.zero_grad() — damit endet die Trainingsphase des Modells.",
+            ],
+            correct: 0,
+            explanation: "net.eval() schaltet den Modus um. Achtung bei torch.no_grad(): Das spart nur die Gradientenberechnung und ändert am Verhalten von BatchNorm nichts. Beide werden üblicherweise zusammen verwendet — aber nur net.eval() sorgt dafür, dass running_mean und running_var zum Einsatz kommen."
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- NEU: SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                    svgContainer.innerHTML = svgSource.innerHTML; 
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+
+    <div id="svg-batch-matrix">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" font-family="sans-serif">
+            <text x="380" y="34" text-anchor="middle" font-size="21" fill="#2c3e50">
+                Ausgaben einer versteckten Schicht, Mini-Batch mit m = 4
+            </text>
+
+            <text x="260" y="88" text-anchor="middle" font-size="19" fill="#7f8c8d">Neuron 1</text>
+            <text x="420" y="88" text-anchor="middle" font-size="19" fill="#7f8c8d">Neuron 2</text>
+            <text x="580" y="88" text-anchor="middle" font-size="19" fill="#7f8c8d">Neuron 3</text>
+
+            <text x="165" y="148" text-anchor="end" font-size="19" fill="#7f8c8d">Sample 1</text>
+            <text x="165" y="208" text-anchor="end" font-size="19" fill="#7f8c8d">Sample 2</text>
+            <text x="165" y="268" text-anchor="end" font-size="19" fill="#7f8c8d">Sample 3</text>
+            <text x="165" y="328" text-anchor="end" font-size="19" fill="#7f8c8d">Sample 4</text>
+
+            <rect x="180" y="110" width="480" height="240" fill="#ffffff" stroke="#2c3e50" stroke-width="2.5"/>
+            <line x1="340" y1="110" x2="340" y2="350" stroke="#d0d7de" stroke-width="1.5"/>
+            <line x1="500" y1="110" x2="500" y2="350" stroke="#d0d7de" stroke-width="1.5"/>
+            <line x1="180" y1="170" x2="660" y2="170" stroke="#d0d7de" stroke-width="1.5"/>
+            <line x1="180" y1="230" x2="660" y2="230" stroke="#d0d7de" stroke-width="1.5"/>
+            <line x1="180" y1="290" x2="660" y2="290" stroke="#d0d7de" stroke-width="1.5"/>
+
+            <text x="260" y="148" text-anchor="middle" font-size="24" fill="#2c3e50">2</text>
+            <text x="420" y="148" text-anchor="middle" font-size="24" fill="#2c3e50">−1</text>
+            <text x="580" y="148" text-anchor="middle" font-size="24" fill="#2c3e50">5</text>
+
+            <text x="260" y="208" text-anchor="middle" font-size="24" fill="#2c3e50">4</text>
+            <text x="420" y="208" text-anchor="middle" font-size="24" fill="#2c3e50">1</text>
+            <text x="580" y="208" text-anchor="middle" font-size="24" fill="#2c3e50">3</text>
+
+            <text x="260" y="268" text-anchor="middle" font-size="24" fill="#2c3e50">0</text>
+            <text x="420" y="268" text-anchor="middle" font-size="24" fill="#2c3e50">3</text>
+            <text x="580" y="268" text-anchor="middle" font-size="24" fill="#2c3e50">7</text>
+
+            <text x="260" y="328" text-anchor="middle" font-size="24" fill="#2c3e50">6</text>
+            <text x="420" y="328" text-anchor="middle" font-size="24" fill="#2c3e50">1</text>
+            <text x="580" y="328" text-anchor="middle" font-size="24" fill="#2c3e50">5</text>
+
+            <text x="380" y="382" text-anchor="middle" font-size="17" fill="#7f8c8d">
+                Werte nach Wx + b, vor der Aktivierungsfunktion
+            </text>
+        </svg>
+    </div>
+
+    <div id="svg-train-eval">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 360" font-family="sans-serif">
+            <rect x="40" y="60" width="330" height="200" rx="12"
+                  fill="#eaf4fb" stroke="#3498db" stroke-width="2.5"/>
+            <text x="205" y="102" text-anchor="middle" font-size="23" fill="#1b4f72">net.train()</text>
+            <line x1="80" y1="120" x2="330" y2="120" stroke="#3498db" stroke-width="1.5"/>
+            <text x="205" y="158" text-anchor="middle" font-size="19" fill="#2c3e50">μ und σ² kommen aus</text>
+            <text x="205" y="186" text-anchor="middle" font-size="19" fill="#2c3e50">dem aktuellen Batch</text>
+            <text x="205" y="228" text-anchor="middle" font-size="17" fill="#7f8c8d">wird in jedem Schritt neu berechnet</text>
+
+            <rect x="490" y="60" width="330" height="200" rx="12"
+                  fill="#eefaf1" stroke="#28a745" stroke-width="2.5"/>
+            <text x="655" y="102" text-anchor="middle" font-size="23" fill="#14532d">net.eval()</text>
+            <line x1="530" y1="120" x2="780" y2="120" stroke="#28a745" stroke-width="1.5"/>
+            <text x="655" y="158" text-anchor="middle" font-size="19" fill="#2c3e50">running_mean und</text>
+            <text x="655" y="186" text-anchor="middle" font-size="19" fill="#2c3e50">running_var, fest</text>
+            <text x="655" y="228" text-anchor="middle" font-size="17" fill="#7f8c8d">unabhängig vom übrigen Batch</text>
+
+            <line x1="375" y1="160" x2="475" y2="160" stroke="#7f8c8d" stroke-width="3"/>
+            <polygon points="488,160 472,152 472,168" fill="#7f8c8d"/>
+            <text x="430" y="132" text-anchor="middle" font-size="16" fill="#7f8c8d">gleitender</text>
+            <text x="430" y="200" text-anchor="middle" font-size="16" fill="#7f8c8d">Mittelwert</text>
+
+            <text x="430" y="318" text-anchor="middle" font-size="17" fill="#7f8c8d">
+                Beide Modi rechnen mit denselben gelernten Parametern γ und β
+            </text>
+        </svg>
+    </div>
+
+    <div id="svg-platzierung">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" font-family="sans-serif">
+            <text x="450" y="38" text-anchor="middle" font-size="21" fill="#2c3e50">
+                Eine versteckte Schicht und der Übergang zur Ausgabe
+            </text>
+
+            <rect x="30" y="90" width="150" height="76" rx="10" fill="#ffffff" stroke="#2c3e50" stroke-width="2.5"/>
+            <text x="105" y="136" text-anchor="middle" font-size="21" fill="#2c3e50">Linear</text>
+
+            <line x1="185" y1="128" x2="212" y2="128" stroke="#7f8c8d" stroke-width="3"/>
+            <circle cx="246" cy="128" r="24" fill="#fdf3e3" stroke="#e67e22" stroke-width="2.5"/>
+            <text x="246" y="137" text-anchor="middle" font-size="23" fill="#b9591a">①</text>
+            <line x1="280" y1="128" x2="307" y2="128" stroke="#7f8c8d" stroke-width="3"/>
+
+            <rect x="312" y="90" width="132" height="76" rx="10" fill="#ffffff" stroke="#2c3e50" stroke-width="2.5"/>
+            <text x="378" y="136" text-anchor="middle" font-size="21" fill="#2c3e50">ReLU</text>
+
+            <line x1="449" y1="128" x2="476" y2="128" stroke="#7f8c8d" stroke-width="3"/>
+            <circle cx="510" cy="128" r="24" fill="#fdf3e3" stroke="#e67e22" stroke-width="2.5"/>
+            <text x="510" y="137" text-anchor="middle" font-size="23" fill="#b9591a">②</text>
+            <line x1="544" y1="128" x2="571" y2="128" stroke="#7f8c8d" stroke-width="3"/>
+
+            <rect x="576" y="90" width="176" height="76" rx="10" fill="#ffffff" stroke="#2c3e50" stroke-width="2.5"/>
+            <text x="664" y="124" text-anchor="middle" font-size="19" fill="#2c3e50">Linear</text>
+            <text x="664" y="150" text-anchor="middle" font-size="17" fill="#7f8c8d">(Ausgabe)</text>
+
+            <line x1="757" y1="128" x2="784" y2="128" stroke="#7f8c8d" stroke-width="3"/>
+            <circle cx="818" cy="128" r="24" fill="#fdf3e3" stroke="#e67e22" stroke-width="2.5"/>
+            <text x="818" y="137" text-anchor="middle" font-size="23" fill="#b9591a">③</text>
+
+            <text x="450" y="242" text-anchor="middle" font-size="17" fill="#7f8c8d">
+                Hinter Stelle ③ folgt unmittelbar die CrossEntropyLoss
+            </text>
+        </svg>
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: Decision Trees, Ensemblemethoden und Hyperparameter-Tuning</title>
+    <style>
+        :root {
+            --ink: #26364a;
+            --muted: #667789;
+            --paper: #ffffff;
+            --page: #f4f6fa;
+            --line: #dce3ea;
+            --blue: #2563a6;
+            --blue-soft: #eaf3fb;
+            --green: #218838;
+            --green-soft: #dff3e4;
+            --red: #c83b49;
+            --red-soft: #fbe6e8;
+            --amber: #9a6400;
+            --amber-soft: #fff4d6;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--page);
+            margin: 0;
+            color: var(--ink);
+            line-height: 1.5;
+        }
+
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.97);
+            padding: 14px 20px;
+            box-shadow: 0 2px 12px rgba(30, 50, 70, 0.12);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            backdrop-filter: blur(8px);
+        }
+
+        .status-info {
+            max-width: 860px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .mistakes { color: var(--red); }
+
+        .progress-container {
+            max-width: 860px;
+            width: 100%;
+            margin: 0 auto;
+            background: #e5e9ee;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 11px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #36a852, var(--green));
+            width: 0%;
+            transition: width 0.35s ease;
+        }
+
+        header {
+            max-width: 860px;
+            margin: 42px auto 26px;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--ink);
+            margin: 0 0 10px;
+            font-size: clamp(1.8rem, 4vw, 2.65rem);
+            line-height: 1.15;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin: 0 auto;
+            max-width: 720px;
+            font-size: 1.02rem;
+        }
+
+        .quiz-container {
+            max-width: 860px;
+            margin: 0 auto 44px;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .quiz-card {
+            background: var(--paper);
+            padding: clamp(1.25rem, 3vw, 2rem);
+            border-radius: 14px;
+            box-shadow: 0 5px 18px rgba(36, 54, 74, 0.07);
+            border: 1px solid rgba(220, 227, 234, 0.8);
+        }
+
+        .quiz-card.completed {
+            border-color: #acd9b7;
+        }
+
+        .question-title {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            font-weight: 700;
+        }
+
+        .question-text {
+            font-size: 1.17rem;
+            color: var(--ink);
+            margin-bottom: 18px;
+            font-weight: 650;
+        }
+
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 22px;
+            padding: 14px;
+            background: #fbfcfe;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 300px;
+        }
+
+        .hint-row {
+            margin: 0 0 16px;
+        }
+
+        .hint-button {
+            width: auto;
+            color: var(--amber);
+            background: var(--amber-soft);
+            border-color: #f0d48a;
+            font-size: 0.92rem;
+            padding: 8px 12px;
+        }
+
+        .hint-panel {
+            display: none;
+            margin-top: 10px;
+            padding: 12px 14px;
+            border-left: 4px solid #d89a1d;
+            background: #fff9ea;
+            color: #654b18;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.94rem;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            font: inherit;
+            padding: 12px 15px;
+            border: 2px solid var(--line);
+            background: var(--paper);
+            color: var(--ink);
+            border-radius: 9px;
+            cursor: pointer;
+            transition: background 0.18s, border-color 0.18s, transform 0.18s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background: #f0f7ff;
+            border-color: #6ba4d7;
+            transform: translateY(-1px);
+        }
+
+        button:focus-visible {
+            outline: 3px solid rgba(37, 99, 166, 0.3);
+            outline-offset: 2px;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.82;
+        }
+
+        button.correct {
+            background: var(--green-soft) !important;
+            border-color: var(--green) !important;
+            color: #145523;
+        }
+
+        button.wrong {
+            background: var(--red-soft) !important;
+            border-color: var(--red) !important;
+            color: #7d202b;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 14px 15px;
+            border-radius: 9px;
+            display: none;
+            font-size: 0.95rem;
+        }
+
+        .feedback.correct-feedback {
+            background: var(--green-soft);
+            color: #145523;
+            border: 1px solid #acd9b7;
+        }
+
+        .feedback.wrong-feedback {
+            background: var(--red-soft);
+            color: #7d202b;
+            border: 1px solid #efb6bc;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: var(--blue-soft);
+            border: 2px solid var(--blue);
+            padding: 2rem;
+            border-radius: 14px;
+            margin-bottom: 40px;
+        }
+
+        .final-result h2 { margin-top: 0; }
+
+        .restart-button {
+            background: var(--blue);
+            color: white;
+            border: none;
+            text-align: center;
+            margin-top: 12px;
+            padding: 12px 20px;
+        }
+
+        @media (max-width: 560px) {
+            .status-info { font-size: 0.9rem; }
+            .quiz-container { padding: 0 12px; }
+            header { padding: 0 15px; margin-top: 30px; }
+            .quiz-card { padding: 1.15rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0 %</span></span>
+        <span class="mistakes">Fehlversuche: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container" role="progressbar" aria-label="Quizfortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<header>
+    <h1 id="quiz-main-title">Decision Trees &amp; Ensemblemethoden</h1>
+    <p class="subtitle">20 Fragen zu Bagging, Random Forest, Boosting, Pruning, Cross-Validation und Hyperparameter-Tuning. Falsche Antworten dürfen erneut versucht werden.</p>
+</header>
+
+<main class="quiz-container" id="quiz-container"></main>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result" aria-live="polite">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle 20 Fragen gelöst und dabei <strong id="final-mistakes">0</strong> Fehlversuche gemacht.</p>
+        <button class="restart-button" onclick="location.reload()">Quiz neu starten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+            text: "Welche Größe wird bei einem Decision Tree während eines normalen Trainingslaufs als Modellparameter gelernt?",
+            options: [
+                "Das gewählte Split-Feature und der zugehörige Schwellenwert",
+                "Die vorgegebene Baumtiefe und die minimale Blattgröße",
+                "Die festgelegte Anzahl der Bäume und Bootstrap-Stichproben",
+                "Die gewählte Bewertungsmetrik und die Anzahl der CV-Folds"
+            ],
+            correct: 0,
+            hint: "Unterscheide zwischen der konkreten Struktur des fertigen Baums und Vorgaben an seinen Lernalgorithmus.",
+            feedback: [
+                "Feature und Schwellenwert eines Splits werden aus den Trainingsdaten bestimmt und gehören zur gelernten Baumstruktur.",
+                "Baumtiefe und minimale Blattgröße steuern das Lernen vorab und sind deshalb Hyperparameter.",
+                "Die Zahl der Bäume und die Stichprobenkonfiguration werden für Ensembleverfahren vorgegeben und sind Hyperparameter.",
+                "Metrik und Fold-Zahl steuern die Bewertung des Trainingsprozesses, nicht die gelernte Struktur eines einzelnen Baums."
+            ]
+        },
+        {
+            text: "Welche der folgenden Einstellungen ist ein Hyperparameter eines Decision Trees?",
+            options: [
+                "Die an einem Knoten gelernte Auswahl des Split-Features",
+                "Die vor dem Training festgelegte maximale Baumtiefe",
+                "Der aus den Daten gelernte Schwellenwert eines Knotens",
+                "Die aus den Klassenhäufigkeiten bestimmte Blattvorhersage"
+            ],
+            correct: 1,
+            hint: "Gesucht ist eine Vorgabe an den Lernprozess, nicht ein Ergebnis dieses Prozesses.",
+            feedback: [
+                "Das verwendete Split-Feature wird beim Fitten aus den Daten gelernt und ist ein Modellparameter.",
+                "Die maximale Tiefe begrenzt den Lernalgorithmus und muss gesetzt, als Default übernommen oder gesucht werden.",
+                "Der konkrete Schwellenwert entsteht beim Training und gehört zu den Modellparametern des fertigen Baums.",
+                "Die Blattvorhersage wird aus den Trainingsbeobachtungen im Blatt gelernt und ist kein Hyperparameter."
+            ]
+        },
+        {
+            text: "Wie entsteht beim klassischen Bagging eine Bootstrap-Stichprobe aus n Trainingsbeobachtungen?",
+            options: [
+                "Man wählt n Beobachtungen ohne Zurücklegen aus dem Datensatz aus",
+                "Man wählt weniger als n Beobachtungen einmalig und sortiert sie neu",
+                "Man zieht typischerweise n-mal mit Zurücklegen aus dem Datensatz",
+                "Man teilt n Beobachtungen ohne Überschneidung in gleich große Folds"
+            ],
+            correct: 2,
+            hint: "Eine Beobachtung darf in derselben Stichprobe mehrfach vorkommen, eine andere gar nicht.",
+            feedback: [
+                "Eine Ziehung ohne Zurücklegen würde bei n Ziehungen wieder den vollständigen Datensatz ergeben und keine Bootstrap-Stichprobe erzeugen.",
+                "Eine kleinere, nur neu sortierte Teilmenge erfüllt das charakteristische Ziehen mit Zurücklegen nicht.",
+                "Beim Bootstrap wird typischerweise n-mal mit Zurücklegen gezogen, sodass Wiederholungen und Auslassungen entstehen.",
+                "Nicht überlappende Folds gehören zur Cross-Validation und nicht zur Erzeugung einer Bootstrap-Stichprobe."
+            ]
+        },
+        {
+            text: "Bei einer Bagging-Klassifikation stimmen 38 Bäume für „kauft“ und 12 für „kauft nicht“. Was ist die Ensemble-Vorhersage?",
+            options: [
+                "Die Klasse „kauft nicht“, weil die Minderheit stärker gewichtet wird",
+                "Keine Klasse, weil beide Ergebnisse zunächst gemittelt werden müssen",
+                "Eine Zufallsklasse, weil Bootstrap-Bäume nicht abgestimmt werden dürfen",
+                "Die Klasse „kauft“, weil sie die Mehrheit der Baumstimmen erhält"
+            ],
+            correct: 3,
+            hint: "Bei der Klassifikation wird typischerweise abgestimmt; bei der Regression wird gemittelt.",
+            feedback: [
+                "Beim klassischen Mehrheitsentscheid erhält die Minderheitsklasse keine zusätzliche Gewichtung.",
+                "Das arithmetische Mitteln ist typisch für Regression; Klassenstimmen werden hier per Mehrheit zusammengeführt.",
+                "Bootstrap-Bäume werden gerade deshalb zu einem Ensemble kombiniert, damit ihre Stimmen aggregiert werden können.",
+                "38 von 50 Stimmen bilden die Mehrheit, daher lautet die gemeinsame Klassenvorhersage „kauft“."
+            ]
+        },
+        {
+            text: "Welches Hauptproblem eines einzelnen tiefen Decision Trees soll Bagging typischerweise reduzieren?",
+            options: [
+                "Die hohe Varianz gegenüber kleinen Änderungen der Trainingsdaten",
+                "Die fehlende Möglichkeit, numerische Schwellenwerte zu bestimmen",
+                "Die grundsätzlich zu geringe Zahl möglicher Entscheidungsregeln",
+                "Die Unfähigkeit, Vorhersagen für neue Beobachtungen auszugeben"
+            ],
+            correct: 0,
+            hint: "Ein tiefer Baum kann bei leicht veränderten Daten eine deutlich andere Struktur erhalten.",
+            feedback: [
+                "Durch das Aggregieren unterschiedlich trainierter Bäume gleichen sich zufällige Schwankungen teilweise aus und die Varianz sinkt.",
+                "Decision Trees können numerische Schwellenwerte bereits beim normalen Training aus den Daten bestimmen.",
+                "Tiefe Bäume besitzen viele mögliche Regeln; ihre Flexibilität ist eher Teil des Varianzproblems.",
+                "Ein trainierter Decision Tree kann neue Beobachtungen vorhersagen; Bagging soll diese Vorhersagen stabiler machen."
+            ]
+        },
+        {
+            text: "Welche Aussage zur Feature-Auswahl beim klassischen Bagging mit Decision Trees ist korrekt?",
+            options: [
+                "Jeder Baum erhält dauerhaft nur ein einziges zufälliges Feature",
+                "Bei jedem Split dürfen grundsätzlich alle Features geprüft werden",
+                "Nach jedem Split werden alle bisher verwendeten Features entfernt",
+                "Für jeden Baum wird zwingend dieselbe kleine Feature-Menge gewählt"
+            ],
+            correct: 1,
+            hint: "Beim klassischen Bagging entsteht die Zufälligkeit durch die Beobachtungen, nicht durch die Merkmale.",
+            feedback: [
+                "Ein einzelnes dauerhaftes Feature wäre eine besondere Merkmalsbeschränkung und kein Kennzeichen des klassischen Bagging.",
+                "Klassisches Bagging randomisiert die Datenzeilen; die Trees dürfen bei ihren Splits grundsätzlich alle Features betrachten.",
+                "Bereits verwendete Features müssen beim Bagging nicht aus dem weiteren Lernprozess entfernt werden.",
+                "Eine feste kleine Feature-Menge pro Baum beschreibt eher eine Random-Subspace-Variante als klassisches Bagging."
+            ]
+        },
+        {
+            text: "Welche Beschreibung trifft den Random Forest im Vergleich zum klassischen Bagging am besten?",
+            svgId: "svg-random-forest",
+            options: [
+                "Er ersetzt Bootstrap-Stichproben vollständig durch eine einzige Datenaufteilung",
+                "Er trainiert alle Bäume nacheinander zur Korrektur früherer Fehler",
+                "Er ergänzt Bagging typischerweise um zufällige Features je Split",
+                "Er beschneidet jeden Baum ausschließlich anhand des Testdatensatzes"
+            ],
+            correct: 2,
+            hint: "Beim Random Forest werden sowohl Datenzeilen als auch Merkmalskandidaten randomisiert.",
+            feedback: [
+                "Random Forests verwenden typischerweise weiterhin Bootstrap-Stichproben für die einzelnen Bäume.",
+                "Das sequenzielle Korrigieren früherer Fehler ist die Grundidee des Boosting, nicht des Random Forest.",
+                "Random Forest verbindet Bagging mit einer meist bei jedem Split neu gezogenen Teilmenge möglicher Features.",
+                "Der Testdatensatz bleibt bis zur Schlussbewertung unangetastet und dient nicht zum Beschneiden jedes Baums."
+            ]
+        },
+        {
+            text: "Warum ist Feature Subsampling bei einem Random Forest nützlich?",
+            options: [
+                "Es sorgt dafür, dass jeder Baum exakt dieselben Splits verwendet",
+                "Es ersetzt die Aggregation durch die Vorhersage eines einzelnen Baums",
+                "Es garantiert unabhängig von den Daten einen vollständig fehlerfreien Wald",
+                "Es macht die Bäume verschiedener und reduziert ihre gegenseitige Korrelation"
+            ],
+            correct: 3,
+            hint: "Denke an ein dominantes Feature, das sonst von fast allen Bäumen zuerst gewählt würde.",
+            feedback: [
+                "Identische Splits würden die Bäume ähnlicher machen und den Nutzen der Ensemble-Aggregation verringern.",
+                "Random Forests kombinieren weiterhin die Vorhersagen vieler Bäume und ersetzen sie nicht durch einen Einzelbaum.",
+                "Feature Subsampling verbessert häufig die Robustheit, kann aber keine Fehlerfreiheit für beliebige Daten garantieren.",
+                "Zufällige Feature-Kandidaten verhindern, dass dominante Merkmale überall gleich wirken, und verringern so die Korrelation der Bäume."
+            ]
+        },
+        {
+            text: "Was kennzeichnet Boosting im Unterschied zu Bagging?",
+            svgId: "svg-bagging-boosting",
+            options: [
+                "Neue Bäume werden nacheinander trainiert und verbessern das bisherige Ensemble",
+                "Alle Bäume werden unabhängig auf identischen Daten parallel trainiert",
+                "Nur ein einzelner tiefer Baum wird ohne weitere Modelle nachträglich beschnitten",
+                "Die Hyperparameter werden ohne Suchraum automatisch vollständig optimiert"
+            ],
+            correct: 0,
+            hint: "Beim Boosting beeinflusst das bisherige Ensemble, was der nächste Baum lernen soll.",
+            feedback: [
+                "Boosting ist sequenziell: Spätere Modelle konzentrieren sich auf die noch verbleibenden Fehler oder Verbesserungen.",
+                "Unabhängig trainierbare Bäume sind typisch für Bagging; Boosting-Schritte bauen aufeinander auf.",
+                "Das nachträgliche Vereinfachen eines einzelnen Baums beschreibt Post-Pruning und kein Ensembleverfahren.",
+                "Auch Boosting benötigt gesetzte Defaults oder eine ausdrücklich eingerichtete Hyperparametersuche."
+            ]
+        },
+        {
+            text: "Welche Gegenüberstellung von Bagging und Boosting ist fachlich korrekt?",
+            options: [
+                "Bagging ist immer sequenziell; Boosting ist grundsätzlich vollständig parallel",
+                "Bagging erlaubt Parallelität; Boosting ist wegen der Abhängigkeiten sequenziell",
+                "Bagging nutzt nur flache Bäume; Boosting nutzt zwingend vollständig tiefe Bäume",
+                "Bagging reduziert nur Bias; Boosting beeinflusst ausschließlich die Rechenzeit"
+            ],
+            correct: 1,
+            hint: "Frage dich, ob ein Baum die Ergebnisse der vorherigen Bäume kennen muss.",
+            feedback: [
+                "Die Reihenfolge ist vertauscht: Bagging-Bäume sind unabhängig, während Boosting-Schritte aufeinander aufbauen.",
+                "Bagging-Bäume können unabhängig parallel trainiert werden; beim Boosting benötigt jeder Schritt den bisherigen Ensemblezustand.",
+                "Häufig werden beim Bagging tiefe und beim Boosting flache Bäume verwendet, aber die behauptete zwingende Regel stimmt nicht.",
+                "Bagging zielt vor allem auf Varianzreduktion; Boosting reduziert häufig Bias und kann ebenfalls Varianz beeinflussen."
+            ]
+        },
+        {
+            text: "Welche Maßnahme ist ein Beispiel für Pre-Pruning?",
+            options: [
+                "Einen vollständig gewachsenen Teilbaum nachträglich durch ein Blatt ersetzen",
+                "Mehrere tiefe Bäume durch Mehrheitsentscheidung zu einem Ensemble verbinden",
+                "Das Wachstum mit einer vorgegebenen maximalen Baumtiefe begrenzen",
+                "Die beste Baumtiefe einmalig auf dem finalen Testdatensatz auswählen"
+            ],
+            correct: 2,
+            hint: "Beim Pre-Pruning entsteht ein zu komplexer Ast gar nicht erst.",
+            feedback: [
+                "Das nachträgliche Ersetzen eines Teilbaums ist Post-Pruning und findet erst nach seinem Wachstum statt.",
+                "Die Mehrheitsentscheidung vieler Bäume beschreibt Bagging und vereinfacht keinen einzelnen Baum während des Wachstums.",
+                "Eine maximale Tiefe stoppt das Wachstum früh und ist damit ein typischer Pre-Pruning-Hyperparameter.",
+                "Der Testdatensatz darf nicht zur Hyperparameterauswahl verwendet werden und Pre-Pruning beschreibt dies ebenfalls nicht."
+            ]
+        },
+        {
+            text: "Welche Regel beschreibt Reduced Error Pruning am treffendsten?",
+            svgId: "svg-pruning",
+            options: [
+                "Ein Teilbaum bleibt immer erhalten, sobald er den Trainingsfehler minimal senkt",
+                "Ein Teilbaum wird nur aufgrund seiner Anzahl an Features vollständig neu trainiert",
+                "Ein Teilbaum wird entfernt, sobald sein Trainingsfehler exakt null erreicht",
+                "Ein Teilbaum wird entfernt, wenn die Validierungsleistung dadurch nicht schlechter wird"
+            ],
+            correct: 3,
+            hint: "Entscheidend ist nicht allein die Anpassung an Trainingsdaten, sondern die Leistung auf separaten Daten.",
+            feedback: [
+                "Der Trainingsfehler bevorzugt komplexe Bäume und ist allein kein verlässliches Kriterium für Reduced Error Pruning.",
+                "Die Zahl der Features definiert dieses Verfahren nicht; geprüft wird die Auswirkung einer Entfernung auf Validierungsdaten.",
+                "Ein Trainingsfehler von null spricht eher für starke Anpassung und ist keine automatische Aufforderung zum Entfernen genau dieses Teilbaums.",
+                "Beim Reduced Error Pruning wird probeweise vereinfacht und die Änderung anhand separater Validierungsdaten beurteilt."
+            ]
+        },
+        {
+            text: "Welche Wirkung hat ein größeres α beim Cost-Complexity Pruning typischerweise?",
+            options: [
+                "Zusätzliche Blätter werden stärker bestraft und der Baum wird kleiner",
+                "Zusätzliche Blätter werden belohnt und der Baum wächst unbegrenzt weiter",
+                "Bootstrap-Stichproben werden größer und enthalten weniger Wiederholungen",
+                "Die Zahl der Cross-Validation-Folds wird automatisch entsprechend erhöht"
+            ],
+            correct: 0,
+            hint: "In Rα(T) = R(T) + α · |T| multipliziert α die Komplexitätsstrafe.",
+            feedback: [
+                "Ein größeres α erhöht den Preis zusätzlicher Blätter, sodass einfachere beziehungsweise stärker geprunte Bäume bevorzugt werden.",
+                "Die Komplexität wird durch ein größeres α stärker bestraft und nicht belohnt.",
+                "α steuert beim Cost-Complexity Pruning die Baumkomplexität und nicht die Erzeugung von Bootstrap-Stichproben.",
+                "Die Fold-Zahl wird separat für die Cross-Validation festgelegt und folgt nicht automatisch aus dem Pruning-Parameter."
+            ]
+        },
+        {
+            text: "Welche Zuordnung der Datenrollen ist korrekt?",
+            svgId: "svg-data-roles",
+            options: [
+                "Training bewertet final, Validierung lernt Splits, Test wählt Hyperparameter",
+                "Training lernt Parameter, Validierung wählt Einstellungen, Test bewertet final",
+                "Training wählt nur Folds, Validierung erzeugt Labels, Test lernt alle Splits",
+                "Training und Test wählen gemeinsam Hyperparameter, Validierung bleibt ungenutzt"
+            ],
+            correct: 1,
+            hint: "Merksatz: Training lernt, Validierung wählt, Testen beurteilt abschließend.",
+            feedback: [
+                "Die Rollen sind vertauscht: Splits entstehen im Training, Hyperparameter werden validiert und der Test bewertet abschließend.",
+                "Trainingsdaten bestimmen Modellparameter, Validierungsdaten unterstützen die Auswahl, und Testdaten bleiben bis zum Ende unangetastet.",
+                "Labels sind bereits Bestandteil überwachter Daten; die beschriebenen Lern- und Bewertungsrollen stimmen nicht.",
+                "Der Testdatensatz darf nicht gemeinsam mit dem Training zur Hyperparameterauswahl verwendet werden."
+            ]
+        },
+        {
+            text: "Was geschieht bei einer k-fold Cross-Validation?",
+            svgId: "svg-kfold",
+            options: [
+                "Jeder Fold wird gleichzeitig ausschließlich als Trainings- und Testdatensatz genutzt",
+                "Nur der erste Fold wird validiert, während alle übrigen dauerhaft unbenutzt bleiben",
+                "Jeder Fold dient einmal zur Validierung, die übrigen k−1 Folds zum Training",
+                "Alle Folds werden zusammengeführt, bevor ein einziger Trainingslauf begonnen wird"
+            ],
+            correct: 2,
+            hint: "Nach k Durchläufen soll jeder Fold genau einmal die Rolle des Validierungs-Folds übernommen haben.",
+            feedback: [
+                "Ein Fold besitzt in einem Durchlauf eine eindeutige Rolle; die abschließende Testmenge liegt zudem außerhalb dieser inneren CV.",
+                "k-fold Cross-Validation rotiert den Validierungs-Fold, statt nur den ersten Fold zu verwenden.",
+                "In jedem der k Durchläufe wird auf k−1 Folds trainiert und auf dem jeweils verbleibenden Fold validiert.",
+                "Das Zusammenführen aller Folds vor nur einem Lauf würde die wiederholte Validierung gerade aufheben."
+            ]
+        },
+        {
+            text: "Was bewirkt 5-fold Cross-Validation für ein fest vorgegebenes Modell mit max_depth = 5?",
+            options: [
+                "Sie sucht selbstständig zusätzlich alle Baumtiefen zwischen 1 und 20",
+                "Sie ersetzt die Baumtiefe automatisch durch den häufigsten Split-Wert",
+                "Sie optimiert sämtliche Hyperparameter ohne definierten Suchraum und ohne Metrik",
+                "Sie bewertet fünf Trainingsläufe mit derselben festgelegten Baumtiefe 5"
+            ],
+            correct: 3,
+            hint: "Cross-Validation bewertet zunächst nur das, was ihr als Konfiguration übergeben wurde.",
+            feedback: [
+                "Andere Baumtiefen werden nur geprüft, wenn eine zusätzliche Suchschleife diese Kandidaten ausdrücklich vorgibt.",
+                "Die maximale Tiefe ist eine Vorgabe an den Baum und wird nicht aus der Häufigkeit gelernter Schwellenwerte ersetzt.",
+                "Ohne Suchraum und Bewertungsmetrik entsteht keine automatische vollständige Hyperparameteroptimierung.",
+                "Die fünf Folds liefern fünf Bewertungen derselben Konfiguration mit max_depth = 5, die anschließend gemittelt werden können."
+            ]
+        },
+        {
+            text: "Eine Grid Search testet 4 Werte für max_depth und 3 Werte für min_samples_leaf mit 5-fold CV. Wie viele Vergleichs-Trainingsläufe entstehen?",
+            svgId: "svg-gridsearch",
+            options: [
+                "60 Trainingsläufe, weil 4 · 3 · 5 Kombinationen und Folds ergeben",
+                "20 Trainingsläufe, weil nur Tiefenwerte mit den fünf Folds multipliziert werden",
+                "15 Trainingsläufe, weil nur Blattgrößenwerte mit den fünf Folds multipliziert werden",
+                "12 Trainingsläufe, weil die Cross-Validation keine weiteren Fits benötigt"
+            ],
+            correct: 0,
+            hint: "Berechne zuerst die Zahl der Hyperparameterkombinationen und multipliziere dann mit der Zahl der Folds.",
+            feedback: [
+                "Vier Tiefen mal drei Blattgrößen ergeben zwölf Kombinationen; jede wird in fünf Folds trainiert, also 12 · 5 = 60.",
+                "Diese Rechnung berücksichtigt nur die vier Tiefen und lässt die drei möglichen Blattgrößen aus.",
+                "Diese Rechnung berücksichtigt nur die drei Blattgrößen und lässt die vier möglichen Tiefen aus.",
+                "Zwölf ist nur die Zahl der Kombinationen; jede Kombination erfordert bei 5-fold CV fünf Trainingsläufe."
+            ]
+        },
+        {
+            text: "Wodurch unterscheidet sich Random Search von Grid Search?",
+            options: [
+                "Random Search trainiert nie Modelle, sondern schätzt Ergebnisse nur theoretisch",
+                "Random Search zieht Konfigurationen zufällig aus einem vorgegebenen Suchraum",
+                "Random Search verwendet zwingend den Testdatensatz für jede Auswahlentscheidung",
+                "Random Search lernt ausschließlich Modellparameter und prüft keine Hyperparameter"
+            ],
+            correct: 1,
+            hint: "Grid Search prüft systematisch ein Gitter; die Alternative untersucht nur gezogene Punkte daraus oder aus Verteilungen.",
+            feedback: [
+                "Auch Random Search trainiert und validiert Modelle; nur die Auswahl der untersuchten Konfigurationen ist zufällig.",
+                "Random Search zieht eine begrenzte Zahl von Konfigurationen und kann dadurch große Suchräume effizienter erkunden.",
+                "Der Testdatensatz muss auch bei Random Search bis zur endgültigen Bewertung unangetastet bleiben.",
+                "Random Search dient gerade dem Vergleich von Hyperparameterkonfigurationen und nicht dem direkten Lernen der Tree-Splits."
+            ]
+        },
+        {
+            text: "Welche Aussage über einen normalen fit()-Aufruf und GridSearchCV ist korrekt?",
+            options: [
+                "Jeder normale fit()-Aufruf testet automatisch sämtliche sinnvollen Hyperparameterwerte",
+                "Ein Bibliotheks-Default ist stets das datenabhängig gefundene Optimum der aktuellen Stichprobe",
+                "GridSearchCV sucht ausdrücklich und trainiert standardmäßig die beste Konfiguration erneut",
+                "GridSearchCV verändert nur Modellparameter und verwendet grundsätzlich keine Validierungs-Folds"
+            ],
+            correct: 2,
+            hint: "In scikit-learn heißt das erneute Training mit der ausgewählten Konfiguration „refit“.",
+            feedback: [
+                "Ein normaler Fit verwendet gesetzte oder voreingestellte Hyperparameter und lernt innerhalb dieser Vorgaben die Modellparameter.",
+                "Defaults werden von der Bibliothek vorgegeben und sind nicht automatisch an den aktuellen Datensatz angepasst.",
+                "GridSearchCV vergleicht die angegebenen Kandidaten per CV und führt standardmäßig einen Refit mit der besten Konfiguration durch.",
+                "GridSearchCV benötigt Validierungs-Folds zum Vergleich der Hyperparameter und lernt dabei in jedem Fit auch Modellparameter."
+            ]
+        },
+        {
+            text: "Welche Aussage beschreibt eine mögliche Ausnahme von der Regel, dass fit() keine Hyperparameter sucht?",
+            options: [
+                "Jeder DecisionTreeClassifier führt ohne Konfiguration automatisch eine vollständige Grid Search aus",
+                "Jeder Random Forest bestimmt ohne Vorgaben garantiert die optimale Anzahl seiner Bäume",
+                "Jedes Bagging-Modell wählt seine Bewertungsmetrik selbst auf dem finalen Testdatensatz",
+                "Spezielle CV-Klassen oder aktiviertes Early Stopping enthalten datenabhängige Auswahlmechanismen"
+            ],
+            correct: 3,
+            hint: "Denke an Klassen wie LassoCV sowie an das Stoppen von Boosting, wenn die Validierungsleistung stagniert.",
+            feedback: [
+                "Ein gewöhnlicher DecisionTreeClassifier verwendet seine gesetzten oder voreingestellten Hyperparameter ohne vollständige Grid Search.",
+                "Die voreingestellte Zahl der Bäume ist ein Default und keine Garantie eines datenabhängig gefundenen Optimums.",
+                "Der finale Testdatensatz darf nicht zur laufenden Modell- oder Metrikauswahl verwendet werden.",
+                "Explizite Klassen mit interner Cross-Validation und konfiguriertes Early Stopping bauen Validierungsentscheidungen in das Fit-Verfahren ein."
+            ]
+        }
+    ];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+    const letters = ["A", "B", "C", "D"];
+
+    function initQuiz() {
+        const container = document.getElementById("quiz-container");
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement("section");
+            card.className = "quiz-card";
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement("div");
+            title.className = "question-title";
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement("div");
+            text.className = "question-text";
+            text.id = `question-text-${qIndex}`;
+            text.textContent = q.text;
+
+            card.setAttribute("aria-labelledby", text.id);
+            card.appendChild(title);
+            card.appendChild(text);
+
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement("div");
+                    svgContainer.className = "question-svg-container";
+                    svgContainer.innerHTML = svgSource.innerHTML;
+                    card.appendChild(svgContainer);
+                }
+            }
+
+            const hintRow = document.createElement("div");
+            hintRow.className = "hint-row";
+
+            const hintButton = document.createElement("button");
+            hintButton.className = "hint-button";
+            hintButton.type = "button";
+            hintButton.textContent = "Hinweis anzeigen";
+            hintButton.setAttribute("aria-expanded", "false");
+            hintButton.setAttribute("aria-controls", `hint-${qIndex}`);
+
+            const hintPanel = document.createElement("div");
+            hintPanel.className = "hint-panel";
+            hintPanel.id = `hint-${qIndex}`;
+            hintPanel.textContent = q.hint;
+
+            hintButton.onclick = () => {
+                const isOpen = hintPanel.style.display === "block";
+                hintPanel.style.display = isOpen ? "none" : "block";
+                hintButton.textContent = isOpen ? "Hinweis anzeigen" : "Hinweis ausblenden";
+                hintButton.setAttribute("aria-expanded", String(!isOpen));
+            };
+
+            hintRow.appendChild(hintButton);
+            hintRow.appendChild(hintPanel);
+            card.appendChild(hintRow);
+
+            const optionsContainer = document.createElement("div");
+            optionsContainer.className = "options";
+
+            q.options.forEach((option, optionIndex) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.textContent = `${letters[optionIndex]}) ${option}`;
+                button.onclick = () => handleAnswer(qIndex, optionIndex, button);
+                optionsContainer.appendChild(button);
+            });
+
+            const feedback = document.createElement("div");
+            feedback.className = "feedback";
+            feedback.id = `feedback-${qIndex}`;
+            feedback.setAttribute("aria-live", "polite");
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optionIndex, buttonElement) {
+        const question = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains("completed")) return;
+
+        if (optionIndex === question.correct) {
+            buttonElement.classList.add("correct");
+            card.classList.add("completed");
+            card.querySelectorAll(".options button").forEach(button => {
+                button.disabled = true;
+            });
+
+            feedback.className = "feedback correct-feedback";
+            feedback.innerHTML = `<strong>Richtig.</strong> ${question.feedback[optionIndex]}`;
+            feedback.style.display = "block";
+
+            correctCount += 1;
+            updateProgress();
+        } else {
+            buttonElement.classList.add("wrong");
+            buttonElement.disabled = true;
+
+            mistakeCount += 1;
+            document.getElementById("mistake-counter").textContent = mistakeCount;
+
+            feedback.className = "feedback wrong-feedback";
+            feedback.innerHTML = `<strong>Noch nicht.</strong> ${question.feedback[optionIndex]}`;
+            feedback.style.display = "block";
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        const progress = document.querySelector(".progress-container");
+        document.getElementById("progress-bar").style.width = `${percent}%`;
+        document.getElementById("progress-text").textContent = `${percent} %`;
+        progress.setAttribute("aria-valuenow", String(percent));
+
+        if (correctCount === questions.length) {
+            document.getElementById("final-mistakes").textContent = mistakeCount;
+            const result = document.getElementById("final-result");
+            result.style.display = "block";
+            result.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;" aria-hidden="true">
+    <div id="svg-random-forest">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 230" role="img" aria-label="Random Forest kombiniert Bootstrap-Daten und zufällige Features">
+            <defs>
+                <marker id="arrow-rf" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#58708a"/></marker>
+            </defs>
+            <rect x="22" y="72" width="155" height="82" rx="14" fill="#eaf3fb" stroke="#2563a6" stroke-width="3"/>
+            <text x="99" y="104" text-anchor="middle" font-size="18" font-family="sans-serif" fill="#26364a">Trainingsdaten</text>
+            <text x="99" y="130" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">Bootstrap-Ziehungen</text>
+            <line x1="178" y1="113" x2="260" y2="113" stroke="#58708a" stroke-width="3" marker-end="url(#arrow-rf)"/>
+            <rect x="270" y="25" width="165" height="62" rx="12" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <rect x="270" y="99" width="165" height="62" rx="12" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <rect x="270" y="173" width="165" height="42" rx="12" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <text x="352" y="51" text-anchor="middle" font-size="16" font-family="sans-serif" fill="#26364a">Baum 1</text>
+            <text x="352" y="74" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#667789">Feature-Teilmenge/Split</text>
+            <text x="352" y="125" text-anchor="middle" font-size="16" font-family="sans-serif" fill="#26364a">Baum 2</text>
+            <text x="352" y="148" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#667789">Feature-Teilmenge/Split</text>
+            <text x="352" y="199" text-anchor="middle" font-size="16" font-family="sans-serif" fill="#26364a">weitere Bäume</text>
+            <line x1="438" y1="56" x2="542" y2="98" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-rf)"/>
+            <line x1="438" y1="130" x2="542" y2="115" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-rf)"/>
+            <line x1="438" y1="194" x2="542" y2="133" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-rf)"/>
+            <rect x="552" y="72" width="220" height="82" rx="14" fill="#dff3e4" stroke="#218838" stroke-width="3"/>
+            <text x="662" y="105" text-anchor="middle" font-size="18" font-family="sans-serif" fill="#26364a">Aggregation</text>
+            <text x="662" y="132" text-anchor="middle" font-size="14" font-family="sans-serif" fill="#667789">Mehrheit / Mittelwert</text>
+        </svg>
+    </div>
+
+    <div id="svg-bagging-boosting">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 265" role="img" aria-label="Bagging parallel und Boosting sequenziell">
+            <defs>
+                <marker id="arrow-bb" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#58708a"/></marker>
+            </defs>
+            <text x="88" y="35" font-size="20" font-weight="700" font-family="sans-serif" fill="#26364a">Bagging</text>
+            <rect x="26" y="60" width="125" height="48" rx="10" fill="#eaf3fb" stroke="#2563a6" stroke-width="2.5"/>
+            <text x="88" y="90" text-anchor="middle" font-size="15" font-family="sans-serif">Baum 1</text>
+            <rect x="26" y="119" width="125" height="48" rx="10" fill="#eaf3fb" stroke="#2563a6" stroke-width="2.5"/>
+            <text x="88" y="149" text-anchor="middle" font-size="15" font-family="sans-serif">Baum 2</text>
+            <rect x="26" y="178" width="125" height="48" rx="10" fill="#eaf3fb" stroke="#2563a6" stroke-width="2.5"/>
+            <text x="88" y="208" text-anchor="middle" font-size="15" font-family="sans-serif">Baum 3</text>
+            <line x1="155" y1="84" x2="255" y2="132" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-bb)"/>
+            <line x1="155" y1="143" x2="255" y2="143" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-bb)"/>
+            <line x1="155" y1="202" x2="255" y2="154" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-bb)"/>
+            <rect x="265" y="111" width="125" height="64" rx="12" fill="#dff3e4" stroke="#218838" stroke-width="2.5"/>
+            <text x="327" y="139" text-anchor="middle" font-size="15" font-family="sans-serif">gemeinsame</text>
+            <text x="327" y="160" text-anchor="middle" font-size="15" font-family="sans-serif">Vorhersage</text>
+            <text x="505" y="35" font-size="20" font-weight="700" font-family="sans-serif" fill="#26364a">Boosting</text>
+            <rect x="430" y="91" width="95" height="55" rx="10" fill="#fff4d6" stroke="#d89a1d" stroke-width="2.5"/>
+            <text x="477" y="124" text-anchor="middle" font-size="15" font-family="sans-serif">Baum 1</text>
+            <line x1="527" y1="118" x2="566" y2="118" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-bb)"/>
+            <rect x="576" y="91" width="95" height="55" rx="10" fill="#fff4d6" stroke="#d89a1d" stroke-width="2.5"/>
+            <text x="623" y="124" text-anchor="middle" font-size="15" font-family="sans-serif">Baum 2</text>
+            <line x1="673" y1="118" x2="712" y2="118" stroke="#58708a" stroke-width="2.5" marker-end="url(#arrow-bb)"/>
+            <rect x="720" y="91" width="62" height="55" rx="10" fill="#fff4d6" stroke="#d89a1d" stroke-width="2.5"/>
+            <text x="751" y="124" text-anchor="middle" font-size="15" font-family="sans-serif">…</text>
+            <text x="606" y="181" text-anchor="middle" font-size="14" font-family="sans-serif" fill="#667789">Jeder Schritt nutzt den bisherigen Ensemblezustand.</text>
+        </svg>
+    </div>
+
+    <div id="svg-pruning">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" role="img" aria-label="Teilbaum wird beim Post-Pruning durch ein Blatt ersetzt">
+            <defs>
+                <marker id="arrow-pr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#58708a"/></marker>
+            </defs>
+            <text x="170" y="32" text-anchor="middle" font-size="19" font-weight="700" font-family="sans-serif" fill="#26364a">Vorher: Teilbaum</text>
+            <circle cx="170" cy="78" r="29" fill="#eaf3fb" stroke="#2563a6" stroke-width="3"/>
+            <line x1="153" y1="102" x2="92" y2="151" stroke="#58708a" stroke-width="3"/>
+            <line x1="187" y1="102" x2="248" y2="151" stroke="#58708a" stroke-width="3"/>
+            <circle cx="87" cy="173" r="24" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <circle cx="253" cy="173" r="24" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <line x1="75" y1="194" x2="45" y2="232" stroke="#58708a" stroke-width="3"/>
+            <line x1="99" y1="194" x2="129" y2="232" stroke="#58708a" stroke-width="3"/>
+            <line x1="241" y1="194" x2="211" y2="232" stroke="#58708a" stroke-width="3"/>
+            <line x1="265" y1="194" x2="295" y2="232" stroke="#58708a" stroke-width="3"/>
+            <rect x="26" y="231" width="38" height="30" rx="7" fill="#dff3e4" stroke="#218838" stroke-width="2"/>
+            <rect x="110" y="231" width="38" height="30" rx="7" fill="#dff3e4" stroke="#218838" stroke-width="2"/>
+            <rect x="192" y="231" width="38" height="30" rx="7" fill="#dff3e4" stroke="#218838" stroke-width="2"/>
+            <rect x="276" y="231" width="38" height="30" rx="7" fill="#dff3e4" stroke="#218838" stroke-width="2"/>
+            <line x1="340" y1="145" x2="480" y2="145" stroke="#58708a" stroke-width="4" marker-end="url(#arrow-pr)"/>
+            <text x="410" y="126" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">prunen</text>
+            <text x="630" y="32" text-anchor="middle" font-size="19" font-weight="700" font-family="sans-serif" fill="#26364a">Nachher: ein Blatt</text>
+            <rect x="550" y="92" width="160" height="106" rx="18" fill="#dff3e4" stroke="#218838" stroke-width="4"/>
+            <text x="630" y="138" text-anchor="middle" font-size="18" font-family="sans-serif" fill="#26364a">gemeinsame</text>
+            <text x="630" y="167" text-anchor="middle" font-size="18" font-family="sans-serif" fill="#26364a">Vorhersage</text>
+        </svg>
+    </div>
+
+    <div id="svg-data-roles">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" role="img" aria-label="Training lernt, Validierung wählt, Test bewertet">
+            <defs>
+                <marker id="arrow-dr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#58708a"/></marker>
+            </defs>
+            <rect x="30" y="62" width="190" height="95" rx="14" fill="#eaf3fb" stroke="#2563a6" stroke-width="3"/>
+            <text x="125" y="100" text-anchor="middle" font-size="20" font-weight="700" font-family="sans-serif">Training</text>
+            <text x="125" y="131" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">Parameter lernen</text>
+            <line x1="222" y1="109" x2="292" y2="109" stroke="#58708a" stroke-width="3" marker-end="url(#arrow-dr)"/>
+            <rect x="302" y="62" width="190" height="95" rx="14" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <text x="397" y="100" text-anchor="middle" font-size="20" font-weight="700" font-family="sans-serif">Validierung</text>
+            <text x="397" y="131" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">Einstellungen wählen</text>
+            <line x1="494" y1="109" x2="564" y2="109" stroke="#58708a" stroke-width="3" marker-end="url(#arrow-dr)"/>
+            <rect x="574" y="62" width="196" height="95" rx="14" fill="#dff3e4" stroke="#218838" stroke-width="3"/>
+            <text x="672" y="100" text-anchor="middle" font-size="20" font-weight="700" font-family="sans-serif">Test</text>
+            <text x="672" y="131" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">final bewerten</text>
+        </svg>
+    </div>
+
+    <div id="svg-kfold">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 265" role="img" aria-label="Fünf Durchläufe einer 5-fold Cross-Validation">
+            <text x="28" y="30" font-size="17" font-weight="700" font-family="sans-serif" fill="#26364a">5-fold Cross-Validation</text>
+            <g font-family="sans-serif" font-size="14" fill="#26364a">
+                <text x="28" y="76">Lauf 1</text><text x="28" y="116">Lauf 2</text><text x="28" y="156">Lauf 3</text><text x="28" y="196">Lauf 4</text><text x="28" y="236">Lauf 5</text>
+            </g>
+            <g stroke="#ffffff" stroke-width="3">
+                <rect x="100" y="52" width="125" height="31" fill="#d89a1d"/><rect x="225" y="52" width="125" height="31" fill="#7fb2df"/><rect x="350" y="52" width="125" height="31" fill="#7fb2df"/><rect x="475" y="52" width="125" height="31" fill="#7fb2df"/><rect x="600" y="52" width="125" height="31" fill="#7fb2df"/>
+                <rect x="100" y="92" width="125" height="31" fill="#7fb2df"/><rect x="225" y="92" width="125" height="31" fill="#d89a1d"/><rect x="350" y="92" width="125" height="31" fill="#7fb2df"/><rect x="475" y="92" width="125" height="31" fill="#7fb2df"/><rect x="600" y="92" width="125" height="31" fill="#7fb2df"/>
+                <rect x="100" y="132" width="125" height="31" fill="#7fb2df"/><rect x="225" y="132" width="125" height="31" fill="#7fb2df"/><rect x="350" y="132" width="125" height="31" fill="#d89a1d"/><rect x="475" y="132" width="125" height="31" fill="#7fb2df"/><rect x="600" y="132" width="125" height="31" fill="#7fb2df"/>
+                <rect x="100" y="172" width="125" height="31" fill="#7fb2df"/><rect x="225" y="172" width="125" height="31" fill="#7fb2df"/><rect x="350" y="172" width="125" height="31" fill="#7fb2df"/><rect x="475" y="172" width="125" height="31" fill="#d89a1d"/><rect x="600" y="172" width="125" height="31" fill="#7fb2df"/>
+                <rect x="100" y="212" width="125" height="31" fill="#7fb2df"/><rect x="225" y="212" width="125" height="31" fill="#7fb2df"/><rect x="350" y="212" width="125" height="31" fill="#7fb2df"/><rect x="475" y="212" width="125" height="31" fill="#7fb2df"/><rect x="600" y="212" width="125" height="31" fill="#d89a1d"/>
+            </g>
+            <text x="770" y="30" text-anchor="end" font-size="13" font-family="sans-serif" fill="#667789">Orange = Validierung</text>
+        </svg>
+    </div>
+
+    <div id="svg-gridsearch">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 235" role="img" aria-label="Vier mal drei Hyperparameterkombinationen und fünf Folds ergeben sechzig Trainingsläufe">
+            <rect x="38" y="54" width="160" height="116" rx="14" fill="#eaf3fb" stroke="#2563a6" stroke-width="3"/>
+            <text x="118" y="91" text-anchor="middle" font-size="18" font-weight="700" font-family="sans-serif">4 Tiefen</text>
+            <text x="118" y="124" text-anchor="middle" font-size="28" font-family="sans-serif">×</text>
+            <text x="118" y="153" text-anchor="middle" font-size="18" font-weight="700" font-family="sans-serif">3 Blattgrößen</text>
+            <text x="245" y="123" text-anchor="middle" font-size="34" font-family="sans-serif" fill="#58708a">=</text>
+            <rect x="286" y="54" width="160" height="116" rx="14" fill="#fff4d6" stroke="#d89a1d" stroke-width="3"/>
+            <text x="366" y="104" text-anchor="middle" font-size="27" font-weight="700" font-family="sans-serif">12</text>
+            <text x="366" y="138" text-anchor="middle" font-size="16" font-family="sans-serif">Kombinationen</text>
+            <text x="492" y="123" text-anchor="middle" font-size="34" font-family="sans-serif" fill="#58708a">× 5</text>
+            <rect x="556" y="54" width="206" height="116" rx="14" fill="#dff3e4" stroke="#218838" stroke-width="3"/>
+            <text x="659" y="104" text-anchor="middle" font-size="27" font-weight="700" font-family="sans-serif">60</text>
+            <text x="659" y="138" text-anchor="middle" font-size="16" font-family="sans-serif">Trainingsläufe</text>
+            <text x="400" y="210" text-anchor="middle" font-size="15" font-family="sans-serif" fill="#667789">12 Kombinationen × 5 Cross-Validation-Folds</text>
+        </svg>
+    </div>
+</div>
+
+</body>
+</html>
