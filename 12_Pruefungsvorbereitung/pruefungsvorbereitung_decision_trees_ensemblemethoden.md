@@ -307,10 +307,8 @@ Ein normaler Aufruf von `.fit()` nimmt die eingestellten Hyperparameter oder der
 | Cross-Validation durchführen | Modellbewertung | Nein | CV ausdrücklich aufrufen oder in ein Suchverfahren integrieren |
 | Mehrere Hyperparameterkombinationen testen | Hyperparameter-Suche | Nein | etwa Grid Search oder Random Search einrichten |
 | Beste getestete Konfiguration auswählen | Teil des Suchverfahrens | Nicht bei normalem `.fit()`; ja innerhalb eines eingerichteten Suchverfahrens | Bewertungsmetrik und Suche konfigurieren |
-| Finales Modell mit besten Hyperparametern neu trainieren | Refit | Nicht bei normalem `.fit()`; bei `GridSearchCV` standardmäßig ja | Suchobjekt mit `refit=True` verwenden oder manuell neu trainieren |
-| Bibliotheks-Defaults verwenden | Vorgabe, kein Tuning | Ja | nichts; die Defaults werden unverändert übernommen |
-| Early Stopping verwenden | datenabhängiges Stoppen innerhalb spezieller Verfahren | Nur wenn ausdrücklich unterstützt und aktiviert | Validierungslogik beziehungsweise Early Stopping konfigurieren |
-| Interne CV-Verfahren wie `LassoCV` oder `LogisticRegressionCV` verwenden | im Modell eingebettete Hyperparametersuche | Ja, weil eine spezielle CV-Klasse gewählt wurde | bewusst diese spezielle Modellklasse und ihren Suchraum wählen |
+
+
 
 Die wichtigste Regel lautet:
 
@@ -369,13 +367,7 @@ search.fit(X_train, y_train)
 
 Hier hat der Programmierer das Tuning angestoßen, indem er Modell, Suchraum und Zahl der Folds festgelegt hat. `GridSearchCV` übernimmt anschließend die Trainingsläufe, die Berechnung der Validierungswerte, die Auswahl der besten geprüften Kombination und standardmäßig den Refit auf den gesamten übergebenen Trainingsdaten.
 
-### Random Search
 
-Eine **Random Search** prüft nicht jede Kombination eines vollständigen Gitters, sondern zieht zufällige Konfigurationen aus einem vorgegebenen Suchraum. Das ist besonders hilfreich, wenn viele Hyperparameter oder viele mögliche Werte existieren.
-
-Sowohl Grid Search als auch Random Search benötigen eine Bewertungsregel, beispielsweise Accuracy, F1-Score oder einen Regressionsfehler. „Beste Hyperparameter“ bedeutet immer: beste geprüfte Konfiguration **gemäß der gewählten Metrik und Validierungsprozedur**.
-
----
 
 ## 11. Beispiel: Pruning-Stärke mit Cross-Validation auswählen
 
@@ -400,21 +392,6 @@ Dieses Beispiel zeigt zwei Ebenen:
 
 ---
 
-## 12. Sonderfälle: automatische Entscheidungen innerhalb spezieller Verfahren
-
-Die Regel „`.fit()` tuned keine Hyperparameter“ besitzt bewusst ausgewählte Ausnahmen.
-
-### Early Stopping
-
-Beim Boosting kann eine Validierungsleistung während des Trainings beobachtet werden. Verbessert sie sich über eine festgelegte Zahl von Schritten nicht mehr, wird das Hinzufügen weiterer Bäume gestoppt. Dadurch wird die effektive Anzahl der Boosting-Schritte datenabhängig bestimmt.
-
-Dies geschieht jedoch nur, wenn der konkrete Algorithmus Early Stopping unterstützt und es entsprechend konfiguriert wurde.
-
-### Modellklassen mit eingebauter Cross-Validation
-
-Spezielle Klassen wie `LassoCV` oder `LogisticRegressionCV` führen eine interne Hyperparametersuche durch. Auch hier passiert die Suche nicht deshalb, weil jeder `.fit()`-Aufruf grundsätzlich Hyperparameter optimiert, sondern weil ausdrücklich eine Modellklasse gewählt wurde, deren Trainingsverfahren Cross-Validation enthält.
-
----
 
 ## 13. Die Konzepte als zusammenhängendes System
 
@@ -491,15 +468,6 @@ Cross-Validation ist also kein Bestandteil des Decision Trees selbst. Sie liegt 
 
 5. **„Ein normaler `.fit()`-Aufruf probiert verschiedene Baumtiefen aus.“**  
    Nein. Er verwendet die gesetzte oder voreingestellte Tiefe und lernt innerhalb dieser Vorgabe die Modellparameter.
-
-6. **„Der Testdatensatz kann zur Auswahl der besten Hyperparameter verwendet werden.“**  
-   Dann wäre er kein unabhängiger Testdatensatz mehr. Die Auswahl gehört in die Trainings- und Validierungsphase.
-
-7. **„Post-Pruning sollte anhand des Trainingsfehlers entschieden werden.“**  
-   Der Trainingsfehler bevorzugt meist komplexe Bäume. Pruning-Stärken sollten mithilfe separater Validierungsdaten oder Cross-Validation beurteilt werden.
-
-8. **„Boosting-Bäume können wie Bagging-Bäume unabhängig trainiert werden.“**  
-   Nein. Beim Boosting hängt jeder neue Schritt vom bisherigen Ensemble ab.
 
 ---
 
