@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCA – interaktives Repetitorium</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        
+        /* Statusleiste */
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .mistakes { color: #dc3545; }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Quiz Container */
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* --- NEU: SVG Container Styling --- */
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 350px; /* Begrenzt die Höhe, damit man nicht zu viel scrollen muss */
+        }
+        /* ---------------------------------- */
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">PCA – Quiz zum Repetitorium</h1>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+    {
+        "text": "Welches Ziel verfolgt PCA bei den Eingabemerkmalen?",
+        "options": [
+            "Richtungen mit besonders hoher Streuung finden",
+            "Klassen mit besonders hoher Trefferquote finden",
+            "Ausreißer mit besonders hohem Abstand finden",
+            "Zielwerte mit besonders geringer Abweichung finden"
+        ],
+        "correct": 0,
+        "explanation": "PCA sucht Richtungen maximaler Streuung der Eingabedaten; sie verwendet dafür keine Zielvariable.",
+        "svgId": null
+    },
+    {
+        "text": "Welche Achse stellt in der Punktwolke am ehesten die erste Hauptkomponente dar?",
+        "options": [
+            "Die kurze Achse der Punktwolke",
+            "Die lange Achse der Punktwolke",
+            "Die horizontale Achse des Bildes",
+            "Die vertikale Achse des Bildes"
+        ],
+        "correct": 1,
+        "explanation": "Die erste Hauptkomponente verläuft entlang der Richtung mit der größten Streuung.",
+        "svgId": "svg-ellipse"
+    },
+    {
+        "text": "Wie lässt sich die Ellipsenidee auf viele Merkmale übertragen?",
+        "options": [
+            "Als Suche nach langen Abständen zwischen Klassen",
+            "Als Suche nach wichtigen Zielwerten im Raum",
+            "Als Suche nach Streurichtungen in vielen Dimensionen",
+            "Als Suche nach Ausreißern entlang jeder Koordinate"
+        ],
+        "correct": 2,
+        "explanation": "Auch bei mehr als drei Merkmalen sucht PCA Streurichtungen, nur lässt sich der Raum nicht mehr direkt zeichnen.",
+        "svgId": null
+    },
+    {
+        "text": "Was geschieht bei der Zentrierung vor der PCA?",
+        "options": [
+            "Alle Merkmale erhalten danach die gleiche Spannweite",
+            "Alle Beobachtungen erhalten danach die gleiche Varianz",
+            "Jedes Merkmal wird um seinen Mittelwert verschoben",
+            "Jedes Merkmal wird um seinen Maximalwert verschoben"
+        ],
+        "correct": 2,
+        "explanation": "Zentrierung zieht für jedes Merkmal seinen Mittelwert ab; die Suche nach Hauptachsen erfolgt um den Datenmittelpunkt.",
+        "svgId": null
+    },
+    {
+        "text": "Wie entsteht der Wert einer Hauptkomponente für eine Beobachtung?",
+        "options": [
+            "Durch Auswahl genau eines ursprünglichen Merkmals",
+            "Durch Addition aller vorhandenen beobachteten Zielklassen",
+            "Durch Projektion auf eine gelernte Hauptachse",
+            "Durch Sortierung aller Merkmale nach Größe"
+        ],
+        "correct": 2,
+        "explanation": "Eine Hauptkomponente ist eine gewichtete Linearkombination zentrierter Merkmale; der Komponentenwert ist die Projektion auf diese Richtung.",
+        "svgId": null
+    },
+    {
+        "text": "In welcher Beziehung stehen verschiedene Hauptkomponentenrichtungen?",
+        "options": [
+            "Sie stehen stets parallel zueinander",
+            "Sie stehen stets senkrecht zueinander",
+            "Sie zeigen stets auf Klassenmittelpunkte",
+            "Sie zeigen stets auf Merkmale"
+        ],
+        "correct": 1,
+        "explanation": "Die Richtungen sind paarweise orthogonal. Auf den Trainingsdaten sind die Komponentenwerte dadurch unkorreliert.",
+        "svgId": null
+    },
+    {
+        "text": "Was kennzeichnet die zweite Hauptkomponente?",
+        "options": [
+            "Sie erfasst zusätzliche Streuung senkrecht zur ersten",
+            "Sie wiederholt dieselbe Streuung parallel zur ersten",
+            "Sie bestimmt Zielklassen unabhängig von der ersten",
+            "Sie entfernt Ausreißer vollständig aus der ersten"
+        ],
+        "correct": 0,
+        "explanation": "HK2 maximiert die noch erfassbare Varianz unter der Bedingung, orthogonal auf HK1 zu stehen.",
+        "svgId": null
+    },
+    {
+        "text": "HK1 erklärt 46 %, HK2 27 % und HK3 14 %. Wie viel erklären die ersten drei gemeinsam?",
+        "options": [
+            "Insgesamt 60 % der Varianz",
+            "Insgesamt 73 % der Varianz",
+            "Insgesamt 87 % der Varianz",
+            "Insgesamt 91 % der Varianz"
+        ],
+        "correct": 2,
+        "explanation": "Die kumulierte erklärte Varianz beträgt 46 % + 27 % + 14 % = 87 %.",
+        "svgId": null
+    },
+    {
+        "text": "Was zeigt ein typischer Scree-Plot?",
+        "options": [
+            "Die erklärte Varianz für jede Komponente",
+            "Die gemessene Accuracy für jede Komponente",
+            "Die Anzahl der Merkmale je Klasse",
+            "Die Abstände der Daten je Klasse"
+        ],
+        "correct": 0,
+        "explanation": "Ein Scree-Plot zeigt die erklärte Varianz je Hauptkomponente; die kumulierte Varianz wird bei Bedarf zusätzlich dargestellt.",
+        "svgId": "svg-scree"
+    },
+    {
+        "text": "Wofür steht eine kumulierte erklärte Varianz von 85 %?",
+        "options": [
+            "85 % der Zielwerte sind korrekt",
+            "85 % der Eingabestreuung sind erfasst",
+            "85 % der Vorhersagen sind korrekt",
+            "85 % der Ausreißer sind entfernt"
+        ],
+        "correct": 1,
+        "explanation": "Der Wert bezieht sich auf die Streuung der vorverarbeiteten Eingaben, nicht auf die Trefferquote eines Modells.",
+        "svgId": null
+    },
+    {
+        "text": "Was folgt aus hoher erklärter Varianz für die Accuracy?",
+        "options": [
+            "Sie garantiert eine hohe Accuracy",
+            "Sie bestätigt eine unveränderte Accuracy",
+            "Sie garantiert keine hohe Accuracy",
+            "Sie halbiert die hohe Accuracy"
+        ],
+        "correct": 2,
+        "explanation": "PCA berücksichtigt keine Zielvariable. Auch eine wenig streuende Richtung kann für eine Vorhersage entscheidend sein.",
+        "svgId": null
+    },
+    {
+        "text": "Warum werden Merkmale vor PCA häufig standardisiert?",
+        "options": [
+            "Damit große Zahlenbereiche die PCA dominieren",
+            "Damit verschiedene Skalen vergleichbar stark eingehen",
+            "Damit alle Zielklassen gleich häufig auftreten",
+            "Damit fehlende Daten automatisch ergänzt werden"
+        ],
+        "correct": 1,
+        "explanation": "Standardisierung verhindert, dass ein Merkmal allein wegen seiner Einheit oder Skala die Varianz dominiert.",
+        "svgId": null
+    },
+    {
+        "text": "Was macht ein StandardScaler mit einem numerischen Merkmal?",
+        "options": [
+            "Er zieht den Mittelwert ab und teilt durch die Standardabweichung",
+            "Er zieht den Minimalwert ab und teilt durch die Spannweite",
+            "Er ersetzt den Mittelwert durch null und entfernt alle Ausreißer",
+            "Er ordnet die Werte nach Größe und vergibt neue Ränge"
+        ],
+        "correct": 0,
+        "explanation": "Ein StandardScaler zentriert anhand des Trainingsmittelwerts und skaliert anhand der Trainingsstandardabweichung.",
+        "svgId": null
+    },
+    {
+        "text": "Welche Aussage zur Skalierung vor PCA trifft zu?",
+        "options": [
+            "Sie ist immer eine mathematische Pflicht",
+            "Sie ist oft eine sinnvolle Entscheidung",
+            "Sie ersetzt immer die fachliche Bewertung",
+            "Sie entfernt grundsätzlich sämtliche extremen Werte"
+        ],
+        "correct": 1,
+        "explanation": "Bei ungleichen Skalen ist sie meist sinnvoll; bei bereits sinnvoll vergleichbaren Skalen ist sie keine mathematische Pflicht.",
+        "svgId": null
+    },
+    {
+        "text": "Was kann bei einer Reduktion auf wenige Komponenten passieren?",
+        "options": [
+            "Es gehen Teile der Information verloren",
+            "Es bleiben alle Abstände exakt erhalten",
+            "Es werden alle Ausreißer sicher entfernt",
+            "Es bleiben alle Originalmerkmale direkt sichtbar"
+        ],
+        "correct": 0,
+        "explanation": "Nicht beibehaltene Komponenten enthalten verworfene Varianz; dabei können auch für die Aufgabe wichtige Informationen verloren gehen.",
+        "svgId": null
+    },
+    {
+        "text": "Was ist bei einer zweidimensionalen PCA-Darstellung zu beachten?",
+        "options": [
+            "Alle ursprünglichen Abstände bleiben dabei exakt erhalten",
+            "Alle fachlichen Zusammenhänge sind dabei sofort erkennbar",
+            "Nur ein Ausschnitt der Eingabestreuung bleibt sichtbar",
+            "Nur die Zielvariable bestimmt die neue Lage"
+        ],
+        "correct": 2,
+        "explanation": "Eine Darstellung mit zwei Komponenten zeigt nur deren Anteil an der Eingabestreuung; Muster und Abstände können sich anders zeigen.",
+        "svgId": null
+    },
+    {
+        "text": "Warum sinkt oft die Interpretierbarkeit nach PCA?",
+        "options": [
+            "Komponenten vermischen häufig mehrere ursprüngliche Merkmale",
+            "Komponenten entfernen automatisch sämtliche vorhandenen Zielvariablen",
+            "Komponenten verbergen grundsätzlich alle vorhandenen Modellmetriken",
+            "Komponenten ersetzen stets alle ursprünglichen Beobachtungen"
+        ],
+        "correct": 0,
+        "explanation": "Eine Komponente kombiniert Ausgangsmerkmale. Ihre Gewichte bleiben untersuchbar, die neue Achse ist aber oft schwerer fachlich zu deuten.",
+        "svgId": null
+    },
+    {
+        "text": "Welche Schwierigkeit besteht bei stark abweichenden Beobachtungen?",
+        "options": [
+            "Ausreißer können die PCA-Achsen merklich beeinflussen",
+            "Ausreißer erhöhen die Vorhersagegüte immer deutlich",
+            "Ausreißer verändern nur die Zielvariable sichtbar",
+            "Ausreißer werden durch PCA grundsätzlich ignoriert"
+        ],
+        "correct": 0,
+        "explanation": "PCA reagiert auf große Abweichungen, weil diese die Varianz und damit die Hauptachsen beeinflussen können.",
+        "svgId": null
+    },
+    {
+        "text": "Wie werden Skalierer und PCA in einer k-fachen Kreuzvalidierung angepasst?",
+        "options": [
+            "Einmal vorab auf allen Daten",
+            "Je Fold nur auf Trainingsdaten",
+            "Je Fold nur auf Validierungsdaten",
+            "Einmal abschließend auf allen Testdaten"
+        ],
+        "correct": 1,
+        "explanation": "Beide Schritte werden in jedem Fold ausschließlich auf dessen Trainingsanteil angepasst; sonst entsteht Data Leakage.",
+        "svgId": null
+    },
+    {
+        "text": "Was geschieht mit dem Validierungsfold nach dem Anpassen der PCA?",
+        "options": [
+            "Er wird nur mit gelernten Schritten transformiert",
+            "Er wird zur Neuberechnung aller Achsen verwendet",
+            "Er wird mit eigener Skalierung neu angepasst",
+            "Er wird zusammen mit seinen Zielwerten standardisiert"
+        ],
+        "correct": 0,
+        "explanation": "Der Validierungsfold erhält genau die am Trainingsfold gelernte Skalierung und PCA-Projektion; kein Schritt wird daran neu angepasst.",
+        "svgId": null
+    },
+    {
+        "text": "Welche Reihenfolge ist für die Kreuzvalidierung einer Vorhersageaufgabe sinnvoll?",
+        "options": [
+            "PCA vor Skalierung, danach Zielwerte auswählen",
+            "Skalierung und PCA vor Datenaufteilung anpassen",
+            "Skalierung, PCA und Modell gemeinsam kreuzvalidieren",
+            "Modell trainieren, danach Skalierung getrennt anpassen"
+        ],
+        "correct": 2,
+        "explanation": "Die gesamte Pipeline aus Skalierer, PCA und Modell wird je Fold neu trainiert; die Validierung bleibt bis zur Bewertung außen vor.",
+        "svgId": null
+    },
+    {
+        "text": "Wie wird die Zahl der Komponenten für ein Vorhersagemodell beurteilt?",
+        "options": [
+            "Nur anhand des längsten Merkmalsnamens wählen",
+            "Nur anhand einer festen Prozentgrenze wählen",
+            "Anhand von Varianz und Modellleistung wählen",
+            "Anhand der Testdaten die Komponenten optimieren"
+        ],
+        "correct": 2,
+        "explanation": "Erklärte Varianz zeigt den Informationsanteil; eine geeignete Validierung prüft zusätzlich die Modellleistung. Eine unabhängige Testmenge bleibt für die abschließende Prüfung zurückgehalten.",
+        "svgId": null
+    }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            // --- NEU: SVG Injektion ---
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    // Kopiert den HTML/SVG-Code aus dem versteckten Container
+                    svgContainer.innerHTML = svgSource.innerHTML; 
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+            // --------------------------
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return; 
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed'); 
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.textContent = `Richtig! ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true; 
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.textContent = `Leider falsch. Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+    <div id="svg-ellipse">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 240" role="img" aria-label="Längliche Punktwolke mit Achsen A, B und C">
+            <line x1="35" y1="207" x2="495" y2="207" stroke="#cbd5e1" stroke-width="2"/>
+            <line x1="35" y1="207" x2="35" y2="14" stroke="#cbd5e1" stroke-width="2"/>
+            <ellipse cx="255" cy="115" rx="187" ry="37" transform="rotate(-24 255 115)" fill="#e9f3ff" stroke="#94a3b8" stroke-width="2"/>
+            <g fill="#568ab6"><circle cx="88" cy="175" r="5"/><circle cx="126" cy="151" r="5"/><circle cx="150" cy="176" r="5"/><circle cx="176" cy="140" r="5"/><circle cx="194" cy="136" r="5"/><circle cx="216" cy="149" r="5"/><circle cx="228" cy="117" r="5"/><circle cx="250" cy="106" r="5"/><circle cx="269" cy="123" r="5"/><circle cx="283" cy="95" r="5"/><circle cx="310" cy="90" r="5"/><circle cx="327" cy="82" r="5"/><circle cx="348" cy="95" r="5"/><circle cx="370" cy="64" r="5"/><circle cx="400" cy="55" r="5"/></g>
+            <line x1="75" y1="198" x2="440" y2="29" stroke="#2e6fbd" stroke-width="3"/>
+            <line x1="215" y1="27" x2="294" y2="209" stroke="#b35d4c" stroke-width="3"/>
+            <line x1="36" y1="116" x2="475" y2="116" stroke="#718096" stroke-width="2" stroke-dasharray="6 5"/>
+            <text x="446" y="34" font-size="18" fill="#2e6fbd">A</text><text x="205" y="22" font-size="18" fill="#b35d4c">B</text><text x="480" y="112" font-size="18" fill="#4b5563">C</text>
+        </svg>
+    </div>
+    <div id="svg-scree">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 240" role="img" aria-label="Scree-Plot mit fallenden Varianzanteilen pro Komponente">
+            <line x1="65" y1="201" x2="475" y2="201" stroke="#4b5563" stroke-width="2"/><line x1="65" y1="201" x2="65" y2="20" stroke="#4b5563" stroke-width="2"/>
+            <polyline points="100,37 177,103 254,148 331,170 408,182" fill="none" stroke="#2e6fbd" stroke-width="3"/>
+            <g fill="#2e6fbd"><circle cx="100" cy="37" r="5"/><circle cx="177" cy="103" r="5"/><circle cx="254" cy="148" r="5"/><circle cx="331" cy="170" r="5"/><circle cx="408" cy="182" r="5"/></g>
+            <g fill="#334155" font-size="15" font-family="sans-serif"><text x="95" y="222">1</text><text x="172" y="222">2</text><text x="249" y="222">3</text><text x="326" y="222">4</text><text x="403" y="222">5</text><text x="151" y="239">Hauptkomponente</text><text x="75" y="17">Erklärte Varianz je Komponente</text></g>
+        </svg>
+    </div>
+</div>
+
+</body>
+</html>
