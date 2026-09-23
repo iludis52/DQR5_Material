@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prüfungsaufgabe: Qualitätsprognose in der Bäckerei</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    body {
+      font-family: Arial, "Segoe UI", sans-serif;
+      margin: 2rem auto;
+      max-width: 950px;
+      line-height: 1.55;
+      color: #111;
+      background: #fff;
+      padding: 0 1rem;
+    }
+
+    h1 {
+      border-bottom: 2px solid #333;
+      padding-bottom: 0.35rem;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      margin-top: 1.7rem;
+      margin-bottom: 0.7rem;
+    }
+
+    section {
+      margin-bottom: 2.8rem;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0 1.5rem;
+    }
+
+    th,
+    td {
+      border: 1px solid #444;
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f3f3f3;
+    }
+
+    .points {
+      white-space: nowrap;
+      font-weight: bold;
+    }
+
+    figure {
+      margin: 1.25rem 0;
+    }
+
+    figcaption {
+      margin-top: 0.6rem;
+      font-style: italic;
+    }
+
+    svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+
+    code {
+      background: #f6f6f6;
+      padding: 0.08rem 0.3rem;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      font-size: 0.95em;
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        max-width: none;
+      }
+
+      section {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+
+    <!-- =================================================== -->
+    <!-- BLOCK A — PRÜFUNGSAUFGABE                           -->
+    <!-- =================================================== -->
+    <section id="block-a" aria-label="Block A Prüfungsaufgabe">
+      <h1>Block A — Prüfungsaufgabe</h1>
+
+      <p>
+        <strong>Titel:</strong> Qualitätsprognose in der Bäckerei mit skalierter PCA und binärem Klassifikationsnetz<br>
+        <strong>Bearbeitungszeit:</strong> 25 Minuten<br>
+        <strong>Punkte:</strong> 25 Punkte
+      </p>
+
+      <h2>Szenario</h2>
+      <p>
+        Die Bäckerei „Krume &amp; Kruste“ möchte je Backcharge voraussagen,
+        ob die Charge die interne Qualitätsprüfung besteht.
+        Dafür liegen fünf numerische Sensormesswerte pro Charge vor.
+        Vor dem Training eines einfachen Feedforward-Netzes werden die Daten
+        aufbereitet und dimensionsreduziert.
+        Das Netz soll mit einer verborgenen Schicht und einem Ausgangsneuron arbeiten.
+      </p>
+
+      <h2>Datenbasis</h2>
+      <ul>
+        <li><strong>Datensatz:</strong> 1.000 Backchargen</li>
+        <li>
+          <strong>Features:</strong>
+          <ul>
+            <li><code>Teigtemperatur</code> (FLOAT, 20–30 °C)</li>
+            <li><code>Ofenfeuchte</code> (FLOAT, 0–100 %)</li>
+            <li><code>Krustenbraeunung</code> (FLOAT, 0–100 Index)</li>
+            <li><code>Backzeit</code> (FLOAT, 10–30 min)</li>
+            <li><code>Laibgewicht</code> (FLOAT, 500–1000 g)</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Target:</strong>
+          <code>Qualitaet_ok</code> (BOOLEAN, 0 = nicht bestanden, 1 = bestanden)
+        </li>
+        <li><strong>Klassenverteilung:</strong> 800 positive (1), 200 negative (0) Chargen</li>
+      </ul>
+
+      <h2>Verfahrensparameter</h2>
+      <ul>
+        <li><strong>Train-/Test-Split:</strong> 70 % / 30 %</li>
+        <li><strong>Skalierung:</strong> Min-Max auf <code>[0, 1]</code></li>
+        <li><strong>PCA-Schwelle:</strong> mindestens 85 % kumulierte erklärte Varianz</li>
+        <li>
+          <strong>Netzarchitektur:</strong>
+          eine verborgene Schicht mit 4 Neuronen, Ausgangsschicht mit 1 Neuron
+        </li>
+        <li><strong>Bias-Terme</strong> werden bei der Parameterzählung explizit mitgezählt.</li>
+      </ul>
+
+      <h2>Teilaufgaben</h2>
+
+      <p>
+        <strong>1.1</strong>
+        Benennen Sie zwei zwingend erforderliche Schritte der Datenvorverarbeitung,
+        die in diesem Szenario vor dem Training des neuronalen Netzes durchgeführt
+        werden müssen, um die Sensordaten für das Modell nutzbar zu machen.
+        <span class="points">[2 Punkte]</span>
+      </p>
+
+      <p>
+        <strong>1.2</strong>
+        Ordnen Sie die folgenden vier Prozessschritte in die fachlich korrekte,
+        chronologische Reihenfolge, um Data Leakage zu vermeiden.
+        <span class="points">[3 Punkte]</span>
+      </p>
+      <ul>
+        <li>A: Training des neuronalen Netzes</li>
+        <li>B: Aufteilung der Daten in Trainings- und Testdaten (Split)</li>
+        <li>C: Durchführung der PCA auf den skalierten Daten</li>
+        <li>D: Fitten des Min-Max-Skalierers und Transformation der Daten</li>
+      </ul>
+
+      <p>
+        <strong>1.3</strong>
+        Berechnen Sie den Min-Max-skalierten Wert für eine Teigtemperatur von 26 °C.
+        Zeigen Sie Ihren Rechenweg.
+        <span class="points">[3 Punkte]</span>
+      </p>
+
+      <p>
+        <strong>1.4</strong>
+        Bestimmen Sie anhand der Tabelle 1 im Anhang die Anzahl der PCA-Hauptkomponenten,
+        die benötigt werden, um mindestens 85 % der Varianz zu erklären.
+        Geben Sie an, wie viele Eingangsneuronen das neuronale Netz nach dieser
+        Dimensionsreduktion benötigt.
+        <span class="points">[4 Punkte]</span>
+      </p>
+
+      <p>
+        <strong>1.5</strong>
+        Berechnen Sie die Gesamtanzahl der lernbaren Parameter (Gewichte und Bias)
+        des beschriebenen Feedforward-Netzes.
+        Zeigen Sie Ihren Rechenweg für jede Schicht.
+        Nutzen Sie zur Veranschaulichung die Abbildung 1 im Anhang.
+        <span class="points">[5 Punkte]</span>
+      </p>
+
+      <p>
+        <strong>1.6</strong>
+        Entscheiden Sie sich für eine passende Aktivierungsfunktion für die Ausgangsschicht
+        und eine passende Verlustfunktion für das Training.
+        Begründen Sie Ihre Wahl anhand der Zielvariable und der Netzarchitektur.
+        <span class="points">[8 Punkte]</span>
+      </p>
+    </section>
+
+    <!-- =================================================== -->
+    <!-- BLOCK B — ANHANG                                    -->
+    <!-- =================================================== -->
+    <section id="block-b" aria-label="Block B Anhang">
+      <h1>Block B — Anhang</h1>
+
+      <h2>Tabelle 1: Erklärte Varianzanteile der PCA-Komponenten</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Komponente</th>
+            <th>Erklärte Varianz (einzeln)</th>
+            <th>Kumulierte erklärte Varianz</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PC1</td>
+            <td>45 %</td>
+            <td>45 %</td>
+          </tr>
+          <tr>
+            <td>PC2</td>
+            <td>25 %</td>
+            <td>70 %</td>
+          </tr>
+          <tr>
+            <td>PC3</td>
+            <td>15 %</td>
+            <td>85 %</td>
+          </tr>
+          <tr>
+            <td>PC4</td>
+            <td>10 %</td>
+            <td>95 %</td>
+          </tr>
+          <tr>
+            <td>PC5</td>
+            <td>5 %</td>
+            <td>100 %</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Abbildung 1: Netzarchitektur</h2>
+      <figure>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 330" role="img"
+             aria-labelledby="abb1-title abb1-desc">
+          <title id="abb1-title">Netzarchitektur</title>
+          <desc id="abb1-desc">
+            Schematisches Feedforward-Netz mit einer Eingangsschicht für PCA-Komponenten,
+            einer verborgenen Schicht mit vier Neuronen und einer Ausgangsschicht
+            mit einem Neuron.
+          </desc>
+
+          <style>
+            .svg-box {
+              fill: #f8f8f8;
+              stroke: #1f1f1f;
+              stroke-width: 2;
+            }
+
+            .svg-node {
+              fill: #e9e9e9;
+              stroke: #1f1f1f;
+              stroke-width: 2;
+            }
+
+            .svg-edge {
+              stroke: #5a5a5a;
+              stroke-width: 1.6;
+            }
+
+            .svg-text {
+              font-family: Arial, sans-serif;
+              font-size: 16px;
+              fill: #111;
+            }
+
+            .svg-small {
+              font-family: Arial, sans-serif;
+              font-size: 13px;
+              fill: #222;
+            }
+          </style>
+
+          <defs>
+            <marker id="svg-arrow" markerWidth="10" markerHeight="10"
+                    refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0,0 L8,3 L0,6" fill="none" stroke="#5a5a5a" stroke-width="1.6" />
+            </marker>
+          </defs>
+
+          <!-- Layer-Beschriftungen -->
+          <text x="430" y="26" text-anchor="middle" class="svg-text">
+            Verborgene Schicht (4 Neuronen)
+          </text>
+          <text x="660" y="90" text-anchor="middle" class="svg-text">
+            Ausgang (1 Neuron)
+          </text>
+          <text x="115" y="250" text-anchor="middle" class="svg-text">
+            Eingang: PCA-Komponenten
+          </text>
+
+          <!-- Eingang als abstrakte Box, ohne Anzahl der Eingänge vorwegzunehmen -->
+          <rect x="20" y="115" width="190" height="100" rx="14" class="svg-box" />
+          <text x="115" y="153" text-anchor="middle" class="svg-small">
+            Anzahl der Eingänge
+          </text>
+          <text x="115" y="173" text-anchor="middle" class="svg-small">
+            gemäß Aufgabe 1.4
+          </text>
+
+          <!-- Kanten: Eingang zu Hidden -->
+          <g class="svg-edge">
+            <line x1="210" y1="165" x2="402" y2="65" marker-end="url(#svg-arrow)" />
+            <line x1="210" y1="165" x2="402" y2="130" marker-end="url(#svg-arrow)" />
+            <line x1="210" y1="165" x2="402" y2="195" marker-end="url(#svg-arrow)" />
+            <line x1="210" y1="165" x2="402" y2="260" marker-end="url(#svg-arrow)" />
+
+            <!-- Kanten: Hidden zu Output -->
+            <line x1="458" y1="65" x2="628" y2="158" marker-end="url(#svg-arrow)" />
+            <line x1="458" y1="130" x2="628" y2="158" marker-end="url(#svg-arrow)" />
+            <line x1="458" y1="195" x2="628" y2="158" marker-end="url(#svg-arrow)" />
+            <line x1="458" y1="260" x2="628" y2="158" marker-end="url(#svg-arrow)" />
+          </g>
+
+          <!-- Hidden Layer -->
+          <circle cx="430" cy="65" r="24" class="svg-node" />
+          <text x="430" y="71" text-anchor="middle" class="svg-small">h₁</text>
+
+          <circle cx="430" cy="130" r="24" class="svg-node" />
+          <text x="430" y="136" text-anchor="middle" class="svg-small">h₂</text>
+
+          <circle cx="430" cy="195" r="24" class="svg-node" />
+          <text x="430" y="201" text-anchor="middle" class="svg-small">h₃</text>
+
+          <circle cx="430" cy="260" r="24" class="svg-node" />
+          <text x="430" y="266" text-anchor="middle" class="svg-small">h₄</text>
+
+          <!-- Output Layer -->
+          <circle cx="660" cy="160" r="26" class="svg-node" />
+          <text x="660" y="166" text-anchor="middle" class="svg-small">ŷ</text
