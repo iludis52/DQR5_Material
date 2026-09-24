@@ -287,6 +287,29 @@ textarea.editor:focus { outline: 2px solid var(--akzent, #0969DA); outline-offse
 .glossar-meldung .werkbank p { margin: 0 0 10px; }
 .glossar-meldung .werkbank .knopf { font-size: 13px; }
 
+/* -- Diagramm-Lupe: Mermaid-Diagramm bildschirmfüllend, zoom- und schiebbar -- */
+#arbeitsflaeche .mermaid > svg, #glossar-inhalt .mermaid > svg { cursor: zoom-in; }
+#diagramm-flaeche {
+  width: 96vw; height: 92vh; max-width: none; max-height: none;
+  padding: 0; border: 1px solid #b9c3cf; border-radius: 8px;
+  background: var(--dok-bg, #fff); color: var(--dok-fg, #1f2933);
+}
+#diagramm-flaeche[open] { display: flex; flex-direction: column; }
+#diagramm-kopf {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  padding: 10px 16px; background: var(--chrome-bg-2); color: #1f2933;
+  border-bottom: 1px solid var(--chrome-linie, #d6dbe1);
+}
+#diagramm-kopf h2 { margin: 0 auto 0 0; font-size: 16px; }
+#diagramm-kopf .hilfe { font-size: 11.5px; color: #5a6b7b; }
+#diagramm-wert { font-size: 12px; color: #5a6b7b; min-width: 44px; font-variant-numeric: tabular-nums; }
+#diagramm-inhalt {
+  flex: 1; min-height: 0; overflow: auto; display: flex;
+  padding: 20px; cursor: grab; user-select: none; touch-action: none;
+}
+#diagramm-inhalt.zieht { cursor: grabbing; }
+#diagramm-inhalt > svg { flex: none; margin: auto; display: block; max-width: none; }
+
 @media print {
   .leiste, .seitenleiste, .status, .start { display: none !important; }
   textarea.editor { display: none !important; }
@@ -301,7 +324,12 @@ textarea.editor:focus { outline: 2px solid var(--akzent, #0969DA); outline-offse
    Stile (Themes) — steuern ausschließlich das Dokument, nicht die App.
    Dieser Block wird beim HTML-Export mitgesichert.
    ========================================================================== */
-:root { --zoom: 1; }
+:root {
+  --zoom: 1;
+  --dok-violett: #7e22ce;        /* Frontmatter und Seitenumbrüche */
+  --mermaid-massstab: 1;         /* Diagrammgröße relativ zur Mermaid-Eigengröße */
+  --mermaid-mindest: .8;         /* stärker wird nicht verkleinert — dann wird gescrollt */
+}
 
 /* -- Handout /blau: die Word-Vorlage als Bildschirm-Entsprechung ---------- */
 html[data-thema="handout-blau"] {
@@ -352,6 +380,8 @@ html[data-thema="beamer"] {
   --dok-tab-kopf: #1b2733;
   --dok-schatten: none;
   --dok-radius: 6px;
+  --dok-violett: #d8a5ff;
+  --mermaid-massstab: 1.35;
 }
 /* -- Vollbreite: randlos, nutzt die ganze Fensterbreite ------------------- */
 html[data-thema="voll"] {
@@ -530,9 +560,23 @@ html[data-thema="beamer"] .hljs-type, html[data-thema="beamer"] .hljs-name { col
 html[data-thema="beamer"] .bild-fehlt { background: #2a1a1a; border-color: #7a4040; color: #ff9b9b; }
 
 /* -- Mermaid -------------------------------------------------------------- */
-.mermaid-huelle { margin: 1.3em 0; text-align: center; break-inside: avoid; }
-.mermaid { display: inline-block; max-width: 100%; }
-.mermaid svg { max-width: 100%; height: auto; }
+/* Diagramme erscheinen in Mermaid-Eigengröße (mal Zoom und Stil-Maßstab),
+   passen sich schmaleren Blättern an, werden dabei aber höchstens auf
+   --mermaid-mindest verkleinert. Breitere Diagramme scrollen seitlich —
+   wie breite Tabellen —, statt unlesbar klein zu werden.
+   --mm-b (Eigenbreite aus der viewBox) setzt das Skript je Diagramm. */
+.mermaid-huelle {
+  margin: 1.3em 0; text-align: center; break-inside: avoid;
+  overflow-x: auto; overflow-y: hidden;
+}
+.mermaid { display: block; }
+.mermaid > svg {
+  --mm-soll: calc(var(--mm-b, 600px) * var(--zoom, 1) * var(--mermaid-massstab, 1));
+  display: block; margin: 0 auto;
+  width: min(100%, var(--mm-soll));
+  min-width: calc(var(--mm-soll) * var(--mermaid-mindest, .8));
+  max-width: none; height: auto;
+}
 .mermaid-fehler {
   text-align: left; font-family: var(--dok-code-schrift); font-size: .8em;
   border: 1px dashed #d98b8b; background: #fdf3f3; color: #a83232;
@@ -580,6 +624,25 @@ html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-imp
 }
 .dok-kopf .titel { font-weight: 700; color: var(--dok-fg); font-size: 1.06em; }
 
+/* -- Frontmatter-Felder (z. B. name/description von Skills) --------------- */
+.dok-frontmatter {
+  margin: 0 0 1.5em; color: var(--dok-violett); font-style: italic;
+  font-size: .92em; line-height: 1.5;
+}
+.dok-frontmatter .fm-feld { margin: .2em 0; white-space: pre-line; }
+.dok-frontmatter .fm-schluessel { font-weight: 700; }
+
+/* -- Seitenumbruch-Marken aus digitalisierten Büchern: <!-- Seitenumbruch --> -- */
+.seitenumbruch {
+  display: flex; align-items: center; gap: .8em; margin: 1.4em 0;
+  color: var(--dok-violett); font-style: italic; font-size: .85em;
+  break-inside: avoid;
+}
+.seitenumbruch::before, .seitenumbruch::after {
+  content: ""; flex: 1; border-top: 1px dashed currentColor; opacity: .55;
+}
+.seitenumbruch-inline { color: var(--dok-violett); font-style: italic; font-size: .85em; }
+
 /* -- Fußnoten ------------------------------------------------------------- */
 .dokument .footnotes {
   margin-top: 2.4em; padding-top: .9em;
@@ -601,6 +664,9 @@ html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-imp
   .dokument { color: #000; font-size: 11pt; }
   .dokument a { color: #000; border-bottom: none; }
   .tabelle-huelle { overflow: visible; box-shadow: none; }
+  .mermaid-huelle { overflow: visible; }
+  .mermaid > svg { min-width: 0; }
+  .dok-frontmatter, .seitenumbruch, .seitenumbruch-inline { color: #6b21a8; }
   .dokument pre, .dokument table, .dokument figure,
   .callout, .mermaid-huelle { break-inside: avoid; }
   .dokument h1, .dokument h2, .dokument h3 { break-after: avoid; }
@@ -696,7 +762,10 @@ html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-imp
         <li>Formeln mit <code>$…$</code> und <code>$$…$$</code></li>
         <li>Hinweisboxen: <code>&gt; [!TIPP]</code> oder <code>:::warnung Titel … :::</code><br>
             Typen: hinweis, konzept, warnung, tipp, faustregel, prompt, tool, merke</li>
-        <li>YAML-Frontmatter mit <code>titel:</code> und <code>autor:</code> für die Kopfzeile</li>
+        <li>YAML-Frontmatter mit <code>titel:</code> und <code>autor:</code> für die Kopfzeile;
+            weitere Felder (z. B. <code>name:</code>, <code>description:</code> von Skills) erscheinen violett-kursiv</li>
+        <li>Seitenumbruch-Marken <code>&lt;!-- Seitenumbruch --&gt;</code> werden sichtbar markiert</li>
+        <li>Mermaid-Diagramm anklicken öffnet die vergrößerte Ansicht</li>
       </ul>
     </div>
 
@@ -764,6 +833,21 @@ html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-imp
     <button class="knopf" id="glossar-schliessen">Schließen</button>
   </div>
   <div id="glossar-inhalt" class="dokument"></div>
+</dialog>
+
+<dialog id="diagramm-flaeche" aria-label="Diagramm vergrößert">
+  <div id="diagramm-kopf">
+    <h2>Diagramm</h2>
+    <span class="hilfe">Ziehen verschiebt · Strg+Mausrad zoomt</span>
+    <div class="zoomfeld">
+      <button class="knopf" id="diagramm-kleiner" title="Verkleinern (−)">−</button>
+      <button class="knopf" id="diagramm-einpassen" title="Ins Fenster einpassen (0)">einpassen</button>
+      <button class="knopf" id="diagramm-groesser" title="Vergrößern (+)">+</button>
+    </div>
+    <span id="diagramm-wert"></span>
+    <button class="knopf" id="diagramm-schliessen">Schließen</button>
+  </div>
+  <div id="diagramm-inhalt"></div>
 </dialog>
 
 <script>
@@ -867,6 +951,21 @@ function parserAufbauen() {
     return `<pre data-zeile-von="${token.map ? token.map[0] : -1}">${marke}<code${klasse}>${rumpf}</code></pre>\n`;
   };
 
+  /* Seitenumbruch-Marken digitalisierter Bücher (<!-- Seitenumbruch -->)
+     sichtbar machen; alle übrigen HTML-Kommentare bleiben unsichtbar. */
+  md.renderer.rules.html_block = function (tokens, idx) {
+    const token = tokens[idx];
+    const treffer = token.content.trim().match(SEITENUMBRUCH);
+    if (!treffer) return token.content;
+    return `<div class="seitenumbruch" role="separator" data-zeile-von="${
+      token.map ? token.map[0] : -1}"><span>${seitenumbruchText(treffer)}</span></div>\n`;
+  };
+  md.renderer.rules.html_inline = function (tokens, idx) {
+    const treffer = tokens[idx].content.trim().match(SEITENUMBRUCH);
+    return treffer ? `<span class="seitenumbruch-inline">⟨${seitenumbruchText(treffer)}⟩</span>`
+                   : tokens[idx].content;
+  };
+
   // V11-Vorarbeit: je Blockelement die Quellzeile als data-zeile-von setzen (Muster Beleg A5)
   md.core.ruler.push("zeilenMarkieren", staat => {
     const BLOCKARTEN = new Set([
@@ -903,6 +1002,11 @@ function parserAufbauen() {
   });
 }
 
+const SEITENUMBRUCH = /^<!--\s*(seitenumbruch|pagebreak|page break)\b\s*:?\s*([\s\S]*?)\s*-->$/i;
+function seitenumbruchText(treffer) {
+  return "Seitenumbruch" + (treffer[2] ? " · " + escHtml(treffer[2]) : "");
+}
+
 function escHtml(s) {
   return String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -910,38 +1014,71 @@ function escHtml(s) {
 
 function frontmatterTrennen(text) {
   const treffer = text.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!treffer) return { kopf: {}, rumpf: text };
+  if (!treffer) return { kopf: {}, rumpf: text, felder: [], versatz: 0 };
   const kopf = {};
   treffer[1].split(/\r?\n/).forEach(zeile => {
     const t = zeile.match(/^([A-Za-zäöüß_][\w äöüÄÖÜß-]*)\s*:\s*(.*)$/);
     if (t) kopf[t[1].trim().toLowerCase()] = t[2].trim().replace(/^["']|["']$/g, "");
   });
-  return { kopf, rumpf: text.slice(treffer[0].length) };
+  return {
+    kopf,
+    rumpf: text.slice(treffer[0].length),
+    felder: frontmatterFelder(treffer[1]),
+    versatz: (treffer[0].match(/\n/g) || []).length   // Zeilen des Blocks: Quellzeilen → Dateizeilen
+  };
 }
 
-function containerUmschreiben(text) {
+/* Schlichte YAML-Lesart für die Anzeige: Schlüssel am Zeilenanfang beginnt
+   ein Feld, eingerückte Folgezeilen gehören dazu. „>" faltet zu einer Zeile,
+   „|" und Listenpunkte behalten ihre Zeilenumbrüche. */
+function frontmatterFelder(block) {
+  const felder = [];
+  let aktuell = null;
+  block.split(/\r?\n/).forEach(zeile => {
+    if (/^\s*#/.test(zeile)) return;
+    const t = zeile.match(/^([A-Za-zäöüÄÖÜß_][\w äöüÄÖÜß.-]*?)\s*:(?:\s+(.*)|\s*)$/);
+    if (t) {
+      let wert = (t[2] || "").trim();
+      const art = /^[>|][+-]?$/.test(wert) ? wert[0] : null;
+      if (art) wert = "";
+      aktuell = { schluessel: t[1].trim(), wert: wert.replace(/^(["'])([\s\S]*)\1$/, "$2"), art };
+      felder.push(aktuell);
+    } else if (aktuell && zeile.trim()) {
+      const teil = zeile.trim();
+      const trenner = aktuell.art === "|" || /^-\s/.test(teil) ? "\n" : " ";
+      aktuell.wert = aktuell.wert ? aktuell.wert + trenner + teil : teil;
+    }
+  });
+  return felder;
+}
+
+/* zeilenKarte (optional) nimmt je ausgegebener Zeile die Nummer der
+   Eingabezeile auf — die Umschreibung fügt Zeilen ein. */
+function containerUmschreiben(text, zeilenKarte) {
   const zeilen = text.split(/\r?\n/);
   const raus = [];
+  const karte = zeilenKarte || [];
+  const ausgeben = (nr, ...neu) => neu.forEach(z => { raus.push(z); karte.push(nr); });
   let inCode = false, offen = 0;
 
-  for (const zeile of zeilen) {
-    if (/^\s{0,3}(```|~~~)/.test(zeile)) { inCode = !inCode; raus.push(zeile); continue; }
-    if (inCode) { raus.push(zeile); continue; }
+  zeilen.forEach((zeile, nr) => {
+    if (/^\s{0,3}(```|~~~)/.test(zeile)) { inCode = !inCode; ausgeben(nr, zeile); return; }
+    if (inCode) { ausgeben(nr, zeile); return; }
 
     if (/^:::+\s*$/.test(zeile)) {
-      if (offen > 0) { offen--; raus.push("", "</div>", ""); continue; }
-      raus.push(zeile); continue;
+      if (offen > 0) { offen--; ausgeben(nr, "", "</div>", ""); return; }
+      ausgeben(nr, zeile); return;
     }
     const auf = zeile.match(/^:::+\s*([A-Za-zäöüß-]+)\s*(.*)$/);
     if (auf) {
       offen++;
-      raus.push("", `<div class="callout callout-${auf[1].toLowerCase()}">`,
+      ausgeben(nr, "", `<div class="callout callout-${auf[1].toLowerCase()}">`,
         auf[2].trim() ? `<p class="callout-titel">${escHtml(auf[2].trim())}</p>` : "", "");
-      continue;
+      return;
     }
-    raus.push(zeile);
-  }
-  while (offen-- > 0) raus.push("", "</div>", "");
+    ausgeben(nr, zeile);
+  });
+  while (offen-- > 0) ausgeben(zeilen.length - 1, "", "</div>", "");
   return raus.join("\n");
 }
 
@@ -1189,11 +1326,19 @@ async function dateiAnzeigen(pfadKlein, scrollHalten = false) {
 
 async function rendern(quelltext, eintrag) {
   zuletztGerendert = quelltext;   // Bestandsvergleich: unveränderten Bestand nicht neu aufbauen
-  const { kopf, rumpf } = frontmatterTrennen(quelltext);
+  const { kopf, rumpf, felder, versatz } = frontmatterTrennen(quelltext);
   const ziel = document.getElementById("dokument");
+  const mitKopfzeile = !!(kopf.titel || kopf.title);
+  const zeilenKarte = [];
 
-  ziel.innerHTML = (kopf.titel || kopf.title ? kopfzeileBauen(kopf) : "") +
-                   md.render(containerUmschreiben(rumpf));
+  ziel.innerHTML = md.render(containerUmschreiben(rumpf, zeilenKarte));
+  // Quellzeilen auf Zeilen der Datei zurückführen (Frontmatter, eingefügte Zeilen)
+  ziel.querySelectorAll("[data-zeile-von]").forEach(el => {
+    const n = Number(el.dataset.zeileVon);
+    if (n >= 0) el.dataset.zeileVon = String((zeilenKarte[n] ?? n) + versatz);
+  });
+  ziel.insertAdjacentHTML("afterbegin",
+    (mitKopfzeile ? kopfzeileBauen(kopf) : "") + frontmatterBauen(felder, mitKopfzeile));
 
   document.getElementById("start").hidden = true;
   document.getElementById("blatt").hidden = false;
@@ -1217,6 +1362,18 @@ function kopfzeileBauen(kopf) {
     .filter(Boolean).join(" · ");
   return `<div class="dok-kopf"><span class="titel">${escHtml(titel)}</span>` +
          `<span>${escHtml(rechts)}</span></div>`;
+}
+
+/* Frontmatter-Felder sichtbar machen (violett-kursiv) — ohne die Felder,
+   die bereits die Kopfzeile trägt. */
+const KOPFZEILEN_FELDER = new Set(["titel", "title", "autor", "author", "datum", "date", "kurs", "version"]);
+function frontmatterBauen(felder, mitKopfzeile) {
+  const zeigen = felder.filter(f =>
+    !(mitKopfzeile && KOPFZEILEN_FELDER.has(f.schluessel.toLowerCase())));
+  if (!zeigen.length) return "";
+  return '<div class="dok-frontmatter" data-zeile-von="0">' +
+    zeigen.map(f => `<div class="fm-feld"><span class="fm-schluessel">${escHtml(f.schluessel)}:</span> ${
+      escHtml(f.wert)}</div>`).join("") + "</div>";
 }
 
 function aufgabenlistenKennzeichnen(wurzel) {
@@ -1441,6 +1598,111 @@ async function mermaidRendern(wurzel) {
       }
     });
   }
+  mermaidBemassen(knoten);
+}
+
+/* Mermaid begrenzt jedes SVG per max-width und lässt es sonst frei
+   schrumpfen — breite Diagramme wurden dadurch unlesbar klein. Die Größe
+   übernimmt stattdessen das Dokument-CSS anhand der Eigenbreite (--mm-b). */
+function mermaidBemassen(knoten) {
+  knoten.forEach(k => {
+    const svg = k.querySelector(":scope > svg");
+    const vb = svg && svg.viewBox && svg.viewBox.baseVal;
+    if (!vb || !vb.width || !vb.height) return;
+    svg.style.removeProperty("max-width");
+    svg.removeAttribute("height");
+    svg.style.setProperty("--mm-b", vb.width.toFixed(1) + "px");
+    svg.style.aspectRatio = `${vb.width} / ${vb.height}`;
+  });
+}
+
+/* -- Diagramm-Lupe ------------------------------------------------------- */
+const lupe = { svg: null, breite: 0, hoehe: 0, massstab: 1 };
+
+function diagrammOeffnen(svg) {
+  const vb = svg.viewBox && svg.viewBox.baseVal;
+  if (!vb || !vb.width || !vb.height) return;
+  const kopie = svg.cloneNode(true);
+  kopie.removeAttribute("width");
+  kopie.removeAttribute("height");
+  kopie.style.cssText = "";
+  document.getElementById("diagramm-inhalt").replaceChildren(kopie);
+  const faktor = parseFloat(getComputedStyle(svg).getPropertyValue("--mermaid-massstab")) || 1;
+  Object.assign(lupe, { svg: kopie, breite: vb.width * faktor, hoehe: vb.height * faktor });
+  document.getElementById("diagramm-flaeche").showModal();
+  diagrammEinpassen();
+}
+
+function diagrammMassstabSetzen(wert) {
+  lupe.massstab = Math.min(8, Math.max(0.1, wert));
+  lupe.svg.style.width  = lupe.breite * lupe.massstab + "px";
+  lupe.svg.style.height = lupe.hoehe  * lupe.massstab + "px";
+  document.getElementById("diagramm-wert").textContent = Math.round(lupe.massstab * 100) + " %";
+}
+
+function diagrammEinpassen() {
+  const flaeche = document.getElementById("diagramm-inhalt");
+  diagrammMassstabSetzen(Math.min((flaeche.clientWidth - 44) / lupe.breite,
+                                  (flaeche.clientHeight - 44) / lupe.hoehe));
+}
+
+/* Zoomen um einen Bildschirmpunkt — die Stelle darunter bleibt stehen. */
+function diagrammZoomen(faktor, x, y) {
+  const flaeche = document.getElementById("diagramm-inhalt");
+  const rahmen = flaeche.getBoundingClientRect();
+  if (x === undefined) { x = rahmen.left + flaeche.clientWidth / 2; y = rahmen.top + flaeche.clientHeight / 2; }
+  const vorher = lupe.svg.getBoundingClientRect();
+  const anteilX = (x - vorher.left) / vorher.width;
+  const anteilY = (y - vorher.top) / vorher.height;
+  diagrammMassstabSetzen(lupe.massstab * faktor);
+  const nachher = lupe.svg.getBoundingClientRect();
+  flaeche.scrollLeft += nachher.left + anteilX * nachher.width - x;
+  flaeche.scrollTop  += nachher.top  + anteilY * nachher.height - y;
+}
+
+function diagrammLupeVerdrahten() {
+  const flaeche = document.getElementById("diagramm-inhalt");
+  const dialog = document.getElementById("diagramm-flaeche");
+  const klick = ev => {
+    if (ev.target.closest("a")) return;                    // Verweise im Diagramm bleiben Verweise
+    const svg = ev.target.closest(".mermaid > svg");
+    if (svg) diagrammOeffnen(svg);
+  };
+  document.getElementById("dokument").addEventListener("click", klick);
+  document.getElementById("glossar-inhalt").addEventListener("click", klick);
+
+  document.getElementById("diagramm-groesser").addEventListener("click", () => diagrammZoomen(1.25));
+  document.getElementById("diagramm-kleiner").addEventListener("click", () => diagrammZoomen(0.8));
+  document.getElementById("diagramm-einpassen").addEventListener("click", diagrammEinpassen);
+  document.getElementById("diagramm-schliessen").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => { flaeche.replaceChildren(); lupe.svg = null; });
+  dialog.addEventListener("keydown", ev => {
+    if (ev.key === "+" || ev.key === "=") { ev.preventDefault(); diagrammZoomen(1.25); }
+    if (ev.key === "-") { ev.preventDefault(); diagrammZoomen(0.8); }
+    if (ev.key === "0") { ev.preventDefault(); diagrammEinpassen(); }
+  });
+  // Strg+Mausrad bzw. Trackpad-Spreizen zoomt, Mausrad allein scrollt
+  flaeche.addEventListener("wheel", ev => {
+    if (!lupe.svg || !(ev.ctrlKey || ev.metaKey)) return;
+    ev.preventDefault();
+    diagrammZoomen(Math.exp(-ev.deltaY * 0.0025), ev.clientX, ev.clientY);
+  }, { passive: false });
+
+  let zug = null;                                          // Verschieben durch Ziehen
+  flaeche.addEventListener("pointerdown", ev => {
+    if (ev.button !== 0) return;
+    zug = { x: ev.clientX, y: ev.clientY, links: flaeche.scrollLeft, oben: flaeche.scrollTop };
+    flaeche.setPointerCapture(ev.pointerId);
+    flaeche.classList.add("zieht");
+  });
+  flaeche.addEventListener("pointermove", ev => {
+    if (!zug) return;
+    flaeche.scrollLeft = zug.links - (ev.clientX - zug.x);
+    flaeche.scrollTop  = zug.oben  - (ev.clientY - zug.y);
+  });
+  const loslassen = () => { zug = null; flaeche.classList.remove("zieht"); };
+  flaeche.addEventListener("pointerup", loslassen);
+  flaeche.addEventListener("pointercancel", loslassen);
 }
 
 let beobachter = null;
@@ -1765,6 +2027,7 @@ document.getElementById("wahl-stil").addEventListener("change", e => stilSetzen(
 document.getElementById("wahl-breite").addEventListener("input", e => breiteSetzen(parseInt(e.target.value, 10)));
 document.getElementById("btn-breite-auto").addEventListener("click", () => breiteSetzen(null));
 document.getElementById("opt-auto").addEventListener("change", e => autoPruefungSetzen(e.target.checked));
+diagrammLupeVerdrahten();
 
 document.getElementById("eingabe-ordner").addEventListener("change", e => {
   if (e.target.files.length) ordnerAusEingabe(e.target.files);
@@ -2128,9 +2391,98 @@ function zeilenFolgen(quelle) {
 
 /* Scrollereignisse laufen dicht — je Einzelbild genügt ein Nachziehen. */
 function zeilenFolgenGedrosselt() {
+  if (scrollFuehrer !== "editor") return;                  // vom Mitlaufen ausgelöst: kein Echo
   if (folgeBild) return;
   folgeBild = requestAnimationFrame(() => { folgeBild = null; zeilenFolgen("scroll"); });
 }
+
+/* -- Umgekehrte Richtung: die Ansicht führt, der Editor läuft mit ---------
+   Geführt wird von der Seite, die zuletzt bedient wurde (Rad, Zeiger,
+   Tastatur). Das programmatische Mitlaufen der anderen Seite erzeugt zwar
+   ebenfalls Scrollereignisse, löst aber so keine Rückkopplung aus. */
+let scrollFuehrer = "editor";
+["pointerdown", "wheel", "touchstart", "keydown"].forEach(art =>
+  document.addEventListener(art, ev => {
+    scrollFuehrer = ev.target instanceof Element && ev.target.closest("#editor") ? "editor" : "vorschau";
+  }, { capture: true, passive: true }));
+
+/* Pixellage jeder Editorzeile — gemessen an einem unsichtbaren Spiegel mit
+   gleicher Schrift und Breite, weil lange Zeilen im Textfeld umbrechen.
+   Zwischengespeichert, bis sich Text oder Breite ändern. */
+let spiegelMass = { text: null, breite: 0, oben: [] };
+function editorZeilenOben(editor) {
+  const stil = getComputedStyle(editor);
+  const breite = editor.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight);
+  if (spiegelMass.text === editor.value && spiegelMass.breite === breite) return spiegelMass.oben;
+
+  const spiegel = document.createElement("div");
+  spiegel.setAttribute("aria-hidden", "true");
+  ["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing",
+   "wordSpacing", "tabSize", "textTransform"].forEach(p => { spiegel.style[p] = stil[p]; });
+  Object.assign(spiegel.style, {
+    position: "fixed", left: "0", top: "0", visibility: "hidden", pointerEvents: "none",
+    boxSizing: "content-box", width: breite + "px", padding: "0", border: "0",
+    whiteSpace: "pre-wrap", overflowWrap: "break-word", wordBreak: stil.wordBreak
+  });
+  const teile = document.createDocumentFragment();
+  editor.value.split("\n").forEach(zeile => {
+    const z = document.createElement("div");
+    z.textContent = zeile || "​";                     // Leerzeile behält ihre Höhe
+    teile.appendChild(z);
+  });
+  spiegel.appendChild(teile);
+  document.body.appendChild(spiegel);
+  const oben = [...spiegel.children].map(z => z.offsetTop);
+  oben.push(spiegel.scrollHeight);                         // Ende der letzten Zeile
+  spiegel.remove();
+  spiegelMass = { text: editor.value, breite, oben };
+  return oben;
+}
+
+function vorschauFolgen() {
+  const editor = document.getElementById("editor");
+  if (!editor || !zustand.editorOffen || scrollFuehrer !== "vorschau") return;
+  const flaeche = document.getElementById("arbeitsflaeche");
+
+  // Ränder: Anfang an Anfang, Ende an Ende
+  if (flaeche.scrollTop <= 1) { editor.scrollTop = 0; return; }
+  if (flaeche.scrollTop >= flaeche.scrollHeight - flaeche.clientHeight - 2) {
+    editor.scrollTop = editor.scrollHeight; return;
+  }
+
+  // Oberkante des sichtbaren Bereichs, gleicher Versatz wie zuElementScrollen
+  const bezug = flaeche.getBoundingClientRect().top + 15;
+  const marken = [...document.querySelectorAll("#dokument [data-zeile-von]")]
+    .filter(el => Number(el.dataset.zeileVon) >= 0);
+  let vor = null, nach = null;
+  for (const el of marken) {
+    const oben = el.getBoundingClientRect().top;
+    if (oben <= bezug) vor = { el, oben };
+    else if (vor && Number(el.dataset.zeileVon) > Number(vor.el.dataset.zeileVon)) { nach = { el, oben }; break; }
+  }
+  if (!vor) { editor.scrollTop = 0; return; }
+
+  // Zwischen zwei Marken anteilig interpolieren — gleitendes Mitlaufen
+  const zeileVor = Number(vor.el.dataset.zeileVon);
+  let zeile = zeileVor;
+  if (nach) {
+    const anteil = Math.min(1, Math.max(0, (bezug - vor.oben) / (nach.oben - vor.oben || 1)));
+    zeile = zeileVor + anteil * (Number(nach.el.dataset.zeileVon) - zeileVor);
+  }
+
+  const oben = editorZeilenOben(editor);
+  const ganz = Math.min(Math.floor(zeile), oben.length - 2);
+  if (ganz < 0) return;
+  const y = oben[ganz] + (zeile - ganz) * (oben[ganz + 1] - oben[ganz]);
+  editor.scrollTop = y;                                    // Zeile oben, Innenabstand bleibt als Luft
+}
+
+let vorschauBild = null;
+function vorschauFolgenGedrosselt() {
+  if (scrollFuehrer !== "vorschau" || !zustand.editorOffen || vorschauBild) return;
+  vorschauBild = requestAnimationFrame(() => { vorschauBild = null; vorschauFolgen(); });
+}
+document.getElementById("arbeitsflaeche").addEventListener("scroll", vorschauFolgenGedrosselt, { passive: true });
 
 /* -- Speichern: Download-Kopie unter dem Namen der geladenen Datei (V3, V10) -- */
 async function dateiKopieHerunterladen(text, name) {
