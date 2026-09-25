@@ -928,6 +928,17 @@ function parserAufbauen() {
   md = window.markdownit({ html: true, linkify: true, typographer: false, breaks: false });
   if (window.markdownitFootnote) md.use(window.markdownitFootnote);
 
+  /* Formeln schützen: markdown-it würde sonst im Formelinhalt Escapes auflösen
+     (\, → ,  \\ → \  \( → ( ) und * oder _ als Hervorhebung deuten.
+     Die Regeln erfassen die Formel samt Begrenzern als eigenes Token; gesetzt
+     wird sie danach in matheRendern(). */
+  md.inline.ruler.before("escape", "matheInline", matheInline);
+  md.block.ruler.before("paragraph", "matheBlock", matheBlock,
+                        { alt: ["paragraph", "reference", "blockquote", "list"] });
+  md.renderer.rules.mathe_inline = (tokens, idx) => matheHuelle(tokens[idx], "span");
+  md.renderer.rules.mathe_block  = (tokens, idx) => matheHuelle(tokens[idx], "div") + "\n";
+  md.renderer.rules.dollar_frei  = () => '<span class="dollar">$</span>';
+
   md.renderer.rules.fence = function (tokens, idx) {
     const token = tokens[idx];
     const sprache = (token.info || "").trim().split(/\s+/)[0].toLowerCase();
@@ -1538,20 +1549,127 @@ function verweiseVerdrahten(wurzel, eintrag) {
   });
 }
 
+/* --------------------------------------------------------------------------
+   Formeln
+   Inline:  $…$   \(…\)   $$…$$ im Fließtext
+   Block:   $$ … $$  und  \[ … \]  (Begrenzer am Zeilenanfang, auch mehrzeilig)
+   $…$ gilt nur, wenn nach dem öffnenden und vor dem schließenden $ kein
+   Leerzeichen steht und hinter dem schließenden $ keine Ziffer folgt —
+   „kostet 5 $ und 10 $" bleibt so Text. \$ ergibt immer ein Dollarzeichen.
+   -------------------------------------------------------------------------- */
+function matheToken(staat, typ, tex, roh, anzeige) {
+  const t = staat.push(typ, "", 0);
+  t.content = tex;          // an KaTeX
+  t.markup = roh;           // Quelltext samt Begrenzern (Anzeige ohne KaTeX)
+  t.info = anzeige;         // "inline" | "block"
+  return t;
+}
+
+function matheInline(staat, stumm) {
+  const src = staat.src, pos = staat.pos;
+  const z = src[pos];
+  if (z !== "$" && z !== "\\") return false;
+
+  if (z === "\\") {
+    const n = src[pos + 1];
+    if (n === "$") {                               // \$ → Dollarzeichen ohne Formel
+      if (!stumm) staat.push("dollar_frei", "", 0);
+      staat.pos += 2;
+      return true;
+    }
+    if (n !== "(" && n !== "[") return false;
+    const zu = n === "(" ? "\\)" : "\\]";
+    const ende = src.indexOf(zu, pos + 2);
+    if (ende < 0) return false;
+    if (!stumm) matheToken(staat, "mathe_inline", src.slice(pos + 2, ende),
+                           src.slice(pos, ende + 2), n === "(" ? "inline" : "block");
+    staat.pos = ende + 2;
+    return true;
+  }
+
+  if (src[pos + 1] === "$") {                      // $$…$$ im Fließtext
+    const ende = src.indexOf("$$", pos + 2);
+    if (ende < 0) return false;
+    if (!stumm) matheToken(staat, "mathe_inline", src.slice(pos + 2, ende),
+                           src.slice(pos, ende + 2), "block");
+    staat.pos = ende + 2;
+    return true;
+  }
+
+  if (pos > 0 && src[pos - 1] === "\\") return false;
+  if (/\s/.test(src[pos + 1] || " ")) return false;
+  let ende = pos + 1;
+  while ((ende = src.indexOf("$", ende)) >= 0) {
+    if (src[ende - 1] === "\\") { ende++; continue; }     // \$ innerhalb der Formel
+    if (/\s/.test(src[ende - 1]) || /\d/.test(src[ende + 1] || "")) return false;
+    break;
+  }
+  if (ende < 0 || ende === pos + 1) return false;
+  if (!stumm) matheToken(staat, "mathe_inline", src.slice(pos + 1, ende),
+                         src.slice(pos, ende + 1), "inline");
+  staat.pos = ende + 1;
+  return true;
+}
+
+function matheBlock(staat, anfang, schluss, stumm) {
+  let pos = staat.bMarks[anfang] + staat.tShift[anfang];
+  let max = staat.eMarks[anfang];
+  if (staat.sCount[anfang] - staat.blkIndent >= 4) return false;
+  const zeile = staat.src.slice(pos, max);
+  let auf, zu;
+  if (zeile.startsWith("$$")) { auf = "$$"; zu = "$$"; }
+  else if (zeile.startsWith("\\[")) { auf = "\\["; zu = "\\]"; }
+  else return false;
+
+  const rest = zeile.slice(auf.length);
+  const rt = rest.trimEnd();
+  let tex, naechste = anfang;
+  const einzeilig = rt.endsWith(zu);
+  if (einzeilig) {
+    tex = rt.slice(0, -zu.length);
+  } else {
+    if (rest.trim() !== "" && zu === "$$" && rest.includes("$$")) return false;
+    const teile = [rest];
+    let gefunden = false;
+    for (naechste = anfang + 1; naechste < schluss; naechste++) {
+      pos = staat.bMarks[naechste] + staat.tShift[naechste];
+      max = staat.eMarks[naechste];
+      if (pos < max && staat.sCount[naechste] < staat.blkIndent) break;   // Container zu Ende
+      const z = staat.src.slice(staat.bMarks[naechste] + Math.min(staat.blkIndent, staat.tShift[naechste]), max);
+      const tz = z.trimEnd();
+      if (tz.endsWith(zu)) { teile.push(tz.slice(0, -zu.length)); gefunden = true; break; }
+      teile.push(z);
+    }
+    if (!gefunden) return false;
+    tex = teile.join("\n");
+  }
+  if (stumm) return true;
+
+  const letzte = einzeilig ? anfang : naechste;
+  const roh = staat.getLines(anfang, letzte + 1, staat.blkIndent, false).replace(/\n$/, "");
+  const t = matheToken(staat, "mathe_block", tex.trim(), roh.trim(), "block");
+  t.map = [anfang, letzte + 1];
+  t.block = true;
+  staat.line = letzte + 1;
+  return true;
+}
+
+function matheHuelle(token, tag) {
+  const zeile = token.map ? ` data-zeile-von="${token.map[0]}"` : "";
+  return `<${tag} class="mathe mathe-${token.info}"${zeile} data-tex="${escHtml(token.content)}">` +
+         `${escHtml(token.markup)}</${tag}>`;
+}
+
 function matheRendern(wurzel) {
-  if (!window.renderMathInElement) return;
-  try {
-    window.renderMathInElement(wurzel, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "\\[", right: "\\]", display: true },
-        { left: "$", right: "$", display: false },
-        { left: "\\(", right: "\\)", display: false }
-      ],
-      ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
-      throwOnError: false
-    });
-  } catch (e) { /* Formelsatz ist optional */ }
+  if (!window.katex) return;                       // ohne KaTeX bleibt der Quelltext stehen
+  wurzel.querySelectorAll(".mathe[data-tex]").forEach(el => {
+    try {
+      window.katex.render(el.dataset.tex, el, {
+        displayMode: el.classList.contains("mathe-block"),
+        throwOnError: false
+      });
+    } catch (e) { /* Formelsatz ist optional */ }
+  });
 }
 
 let mermaidBereit = false;
