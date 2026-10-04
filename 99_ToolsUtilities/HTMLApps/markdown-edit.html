@@ -18,6 +18,7 @@
       vendor/katex.min.js
       vendor/katex-auto-render.min.js
       vendor/katex/katex.min.css   (+ Unterordner "fonts")
+      vendor/o200k_base.js         (gpt-tokenizer@3.4.0/dist — Token-Zähler)
 
   Zwei getrennte Stylesheets:
     #css-app       — nur die Bedienoberfläche
@@ -140,6 +141,13 @@ body.ohne-seitenleiste .seitenleiste { display: none; }
 .abschnitt { display: flex; flex-direction: column; min-height: 0; }
 .abschnitt.dateien { flex: 1 1 45%; border-bottom: 1px solid var(--chrome-linie); }
 .abschnitt.gliederung { flex: 1 1 55%; }
+.abschnitt.tokens { flex: none; border-bottom: 1px solid var(--chrome-linie); }
+.token-werte { padding: 0 14px 11px; font-variant-numeric: tabular-nums; }
+.token-haupt { font-size: 13px; color: #26313c; }
+.token-haupt b { font-size: 17px; font-weight: 700; color: #1f2933; }
+.token-haupt span { color: #7b8794; font-size: 11.5px; }
+.token-neben { font-size: 12px; color: #52606d; margin-top: 3px; cursor: default; }
+.token-haupt[title], .token-neben[title] { cursor: help; }
 .abschnitt > h2 {
   font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
   color: #64748b; margin: 0; padding: 11px 14px 7px;
@@ -726,6 +734,20 @@ html[data-thema="beamer"] .callout-merke, html[data-thema="beamer"] .callout-imp
 </header>
 
 <aside class="seitenleiste">
+  <section class="abschnitt tokens" aria-live="polite">
+    <h2>Tokens <em id="token-art"></em></h2>
+    <div class="token-werte">
+      <div class="token-haupt" title="Exakt mit dem OpenAI-Tokenizer o200k_base (GPT-4o, GPT-5)">
+        <b id="token-o200k">–</b> <span>o200k · GPT-4o/5</span>
+      </div>
+      <div class="token-neben" title="Claude-Tokenizer ist nicht öffentlich. Spanne aus Messungen gegenüber o200k (Claude ab 4.7): Englisch 1,59 ×, Code 1,70 ×, Deutsch 2,01 × — Quelle: ellamind, Tokenization Tax Report 2026. Deutscher Fließtext liegt am oberen Ende.">
+        Claude ≈ <span id="token-claude">–</span>
+      </div>
+      <div class="token-neben">
+        <span id="token-zeichen">–</span> Zeichen · <span id="token-woerter">–</span> Wörter
+      </div>
+    </div>
+  </section>
   <section class="abschnitt dateien">
     <h2>Dateien <em id="datei-zahl"></em></h2>
     <div class="inhalt" id="datei-liste">
@@ -876,7 +898,12 @@ const BIBLIOTHEKEN = [
     lokal: "./vendor/katex.min.js", vorhanden: () => !!window.katex },
   { schluessel: "katexAuto", name: "KaTeX-Autorender", still: true, nach: "katex",
     cdn: "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-    lokal: "./vendor/katex-auto-render.min.js", vorhanden: () => !!window.renderMathInElement }
+    lokal: "./vendor/katex-auto-render.min.js", vorhanden: () => !!window.renderMathInElement },
+  /* ~2 MB (Vokabular) — wird erst nach dem Start nachgeladen, damit die
+     Anzeige nicht wartet. Ab Version 4 entfällt der UMD-Build, daher 3.4.0. */
+  { schluessel: "tokenizer", name: "Tokenizer", spaet: true,
+    cdn: "https://cdn.jsdelivr.net/npm/gpt-tokenizer@3.4.0/dist/o200k_base.js",
+    lokal: "./vendor/o200k_base.js", vorhanden: () => !!window.GPTTokenizer_o200k_base }
 ];
 
 const herkunft = {};
@@ -903,7 +930,7 @@ async function bibliothekLaden(eintrag) {
 }
 
 async function alleBibliothekenLaden() {
-  await Promise.all(BIBLIOTHEKEN.filter(b => !b.nach).map(bibliothekLaden));
+  await Promise.all(BIBLIOTHEKEN.filter(b => !b.nach && !b.spaet).map(bibliothekLaden));
   for (const b of BIBLIOTHEKEN.filter(b => b.nach)) {
     if (herkunft[b.nach]) await bibliothekLaden(b);
   }
@@ -913,6 +940,7 @@ async function alleBibliothekenLaden() {
 function statusBibliothekenZeigen() {
   const teile = BIBLIOTHEKEN.filter(b => !b.still).map(b => {
     const q = herkunft[b.schluessel];
+    if (q === undefined) return `${b.name} <span class="weg">lädt …</span>`;   // spät geladen
     const klasse = q === "CDN" ? "ok" : q === "lokal" ? "weg" : "fehl";
     return `${b.name} <span class="${klasse}">${q || "fehlt"}</span>`;
   });
@@ -1070,11 +1098,19 @@ function containerUmschreiben(text, zeilenKarte) {
   const raus = [];
   const karte = zeilenKarte || [];
   const ausgeben = (nr, ...neu) => neu.forEach(z => { raus.push(z); karte.push(nr); });
-  let inCode = false, offen = 0;
+  let zaun = null, offen = 0;   // zaun: offener Codezaun { zeichen, laenge }
 
   zeilen.forEach((zeile, nr) => {
-    if (/^\s{0,3}(```|~~~)/.test(zeile)) { inCode = !inCode; ausgeben(nr, zeile); return; }
-    if (inCode) { ausgeben(nr, zeile); return; }
+    // CommonMark: Ein Zaun schließt nur mit demselben Zeichen, mindestens
+    // gleicher Länge und ohne Info-Text. Früher schaltete jede Zaunzeile um —
+    // ```` um ``` herum brachte die Erkennung aus dem Tritt.
+    const z = zeile.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+    if (z) {
+      if (!zaun) zaun = { zeichen: z[1][0], laenge: z[1].length };
+      else if (z[1][0] === zaun.zeichen && z[1].length >= zaun.laenge && !z[2].trim()) zaun = null;
+      ausgeben(nr, zeile); return;
+    }
+    if (zaun) { ausgeben(nr, zeile); return; }
 
     if (/^:::+\s*$/.test(zeile)) {
       if (offen > 0) { offen--; ausgeben(nr, "", "</div>", ""); return; }
@@ -1084,7 +1120,8 @@ function containerUmschreiben(text, zeilenKarte) {
     if (auf) {
       offen++;
       ausgeben(nr, "", `<div class="callout callout-${auf[1].toLowerCase()}">`,
-        auf[2].trim() ? `<p class="callout-titel">${escHtml(auf[2].trim())}</p>` : "", "");
+        // Titel inline gesetzt wie in der >-[!TYP]-Schreibweise (**fett**, `Code`, $x$)
+        auf[2].trim() ? `<p class="callout-titel">${md.renderInline(auf[2].trim())}</p>` : "", "");
       return;
     }
     ausgeben(nr, zeile);
@@ -1105,19 +1142,23 @@ function blockzitateUmwandeln(wurzel) {
     const erst = zitat.firstElementChild;
     if (!erst || erst.tagName !== "P") return;
     // Der Titel endet am Zeilenumbruch — je nach Einstellung als <br> oder als
-    // rohes \n. Ohne den \n-Fall blieb eine mehrzeilige Box unerkannt.
-    const treffer = erst.innerHTML.match(/^\s*\[!([A-Za-zäöüß]+)\]\s*([^\n<]*)(<br\s*\/?>|\n|$)/i);
+    // rohes \n. Er darf Inline-Auszeichnung enthalten (**fett**, `Code`, $x$);
+    // früher brach das erste „<" im Titel die Erkennung der ganzen Box ab.
+    const treffer = erst.innerHTML.match(/^\s*\[!([A-Za-zäöüß]+)\]/i);
     if (!treffer) return;
 
     const typ = treffer[1].toLowerCase();
-    const eigenerTitel = treffer[2].trim();
-    erst.innerHTML = erst.innerHTML.slice(treffer[0].length).replace(/^\s*/, "");
+    let rest = erst.innerHTML.slice(treffer[0].length);
+    const umbruch = rest.search(/<br\s*\/?>|\n/);
+    const titelHtml = (umbruch < 0 ? rest : rest.slice(0, umbruch)).trim();
+    erst.innerHTML = umbruch < 0 ? "" : rest.slice(umbruch).replace(/^(<br\s*\/?>|\n)\s*/, "");
 
     const box = document.createElement("div");
     box.className = "callout callout-" + typ;
     const kopf = document.createElement("p");
     kopf.className = "callout-titel";
-    kopf.textContent = eigenerTitel || BOX_TITEL[typ] || treffer[1];
+    if (titelHtml) kopf.innerHTML = titelHtml;
+    else kopf.textContent = BOX_TITEL[typ] || treffer[1];
     box.appendChild(kopf);
     while (zitat.firstChild) box.appendChild(zitat.firstChild);
     if (erst.textContent.trim() === "" && !erst.querySelector("img")) erst.remove();
@@ -1337,6 +1378,7 @@ async function dateiAnzeigen(pfadKlein, scrollHalten = false) {
 
 async function rendern(quelltext, eintrag) {
   zuletztGerendert = quelltext;   // Bestandsvergleich: unveränderten Bestand nicht neu aufbauen
+  tokenZaehlen(quelltext);
   const { kopf, rumpf, felder, versatz } = frontmatterTrennen(quelltext);
   const ziel = document.getElementById("dokument");
   const mitKopfzeile = !!(kopf.titel || kopf.title);
@@ -1365,6 +1407,63 @@ async function rendern(quelltext, eintrag) {
   await mermaidRendern(ziel);
   gliederungZeichnen(ziel);
   tabellenSchattenPruefen();
+}
+
+/* --------------------------------------------------------------------------
+   Token-Zähler (Seitenleiste)
+   Gezählt wird der Rohtext der Datei samt Frontmatter — so, wie er einem
+   Sprachmodell übergeben würde.
+   - o200k_base (GPT-4o/GPT-5) exakt über gpt-tokenizer; Steuertokens wie
+     <|endoftext|> zählen als gewöhnlicher Text.
+   - Claude: Tokenizer nicht öffentlich, daher Spanne aus Faktoren gegenüber
+     o200k. Quelle: ellamind, „Tokenization Tax Report 2026" (07.09.2026),
+     gemessen über Anthropics Token-Zähl-API, Claude ab 4.7: Englisch 1,59 ×,
+     Code 1,70 ×, Deutsch 2,01 ×.
+   - Ohne Tokenizer-Bibliothek: Schätzung ≈ Zeichen / 4.
+   -------------------------------------------------------------------------- */
+const CLAUDE_FAKTOR = { von: 1.59, bis: 2.01 };
+let tokenText = null, tokenTimer = null;
+
+function zahlDe(n) { return Math.round(n).toLocaleString("de-DE"); }
+
+function tokenZaehlen(text) {
+  tokenText = text;
+  if (tokenTimer) clearTimeout(tokenTimer);
+  // nachlaufend und abgekoppelt: große Dateien (~100 kB ≈ 80 ms) bremsen
+  // weder das Rendern noch das Tippen im Editor
+  tokenTimer = setTimeout(tokenAnzeigen, 60);
+}
+
+function tokenAnzeigen() {
+  tokenTimer = null;
+  if (tokenText === null) return;
+  const text = tokenText;
+  const tok = window.GPTTokenizer_o200k_base;
+  let o200k, exakt = false;
+  if (tok) {
+    try {
+      o200k = tok.countTokens(text, { disallowedSpecial: new Set() });
+      exakt = true;
+    } catch (e) { /* Schätzung */ }
+  }
+  if (!exakt) o200k = Math.ceil(text.length / 4);
+
+  const zeichen = Array.from(text).length;
+  const woerter = (text.match(/\S+/g) || []).length;
+  const ca = exakt ? "" : "≈ ";
+  document.getElementById("token-o200k").textContent = ca + zahlDe(o200k);
+  document.getElementById("token-claude").textContent =
+    zahlDe(o200k * CLAUDE_FAKTOR.von) + " – " + zahlDe(o200k * CLAUDE_FAKTOR.bis);
+  document.getElementById("token-zeichen").textContent = zahlDe(zeichen);
+  document.getElementById("token-woerter").textContent = zahlDe(woerter);
+  document.getElementById("token-art").textContent =
+    exakt ? "exakt" : herkunft.tokenizer === undefined ? "Schätzung · Tokenizer lädt" : "Schätzung";
+}
+
+async function tokenizerLaden() {
+  await bibliothekLaden(BIBLIOTHEKEN.find(b => b.schluessel === "tokenizer"));
+  statusBibliothekenZeigen();
+  if (tokenText !== null) tokenAnzeigen();
 }
 
 function kopfzeileBauen(kopf) {
@@ -1429,6 +1528,11 @@ function abbildungenAufbereiten(wurzel) {
   let nummer = 0;
   wurzel.querySelectorAll("p > img:only-child").forEach(bild => {
     const absatz = bild.parentElement;
+    // :only-child übersieht Textknoten — „Siehe ![i](i.png) oben" träfe sonst
+    // ebenfalls zu, und der umgebende Text ginge beim Ersetzen verloren.
+    const alleinImAbsatz = [...absatz.childNodes].every(k =>
+      k === bild || (k.nodeType === Node.TEXT_NODE && !k.textContent.trim()));
+    if (!alleinImAbsatz) return;
     const beschriftung = (bild.getAttribute("title") || bild.getAttribute("alt") || "").trim();
     const abb = document.createElement("figure");
     abb.appendChild(bild);
@@ -2671,6 +2775,7 @@ async function speichernKopie() {
   }
   parserAufbauen();
   knoepfeAktualisieren();
+  tokenizerLaden();                       // bewusst ohne await — läuft im Hintergrund
   if (window.mermaid) mermaidVorbereiten();
 
   if (erinnern("auto") === "1") {
