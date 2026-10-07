@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Übersicht: k-Means &amp; Distanzberechnung</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        padding: 24px;
+        color: #2c3e50;
+    }
+    .sheet {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        padding: 30px 36px 24px;
+    }
+    h1 {
+        text-align: center;
+        margin: 0 0 4px;
+        font-size: 1.6rem;
+        color: #2c3e50;
+    }
+    .subtitle {
+        text-align: center;
+        color: #7f8c8d;
+        margin: 0 0 22px;
+        font-size: 0.95rem;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+    .box {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 14px 18px;
+        background: #fbfcfe;
+    }
+    .box.full { grid-column: 1 / -1; }
+    .box h2 {
+        font-size: 1.02rem;
+        color: #2c3e50;
+        margin: 0 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #3498db;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .box h2 .num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #3498db;
+        color: white;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    ol, ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+    li { margin-bottom: 4px; }
+    p { font-size: 0.88rem; line-height: 1.5; margin: 4px 0; }
+    .formula {
+        background: #eef6fc;
+        border: 1px solid #cfe6f5;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        font-size: 0.95rem;
+        text-align: center;
+        font-family: 'Cambria Math', 'Times New Roman', serif;
+    }
+    .formula .label {
+        display: block;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 0.75rem;
+        color: #7f8c8d;
+        margin-bottom: 3px;
+        text-align: left;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 6px;
+    }
+    th, td {
+        border: 1px solid #e0e0e0;
+        padding: 5px 8px;
+        text-align: left;
+    }
+    th { background: #eef6fc; color: #2c3e50; }
+    .tag {
+        display: inline-block;
+        background: #eef6fc;
+        color: #1c6ea4;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-right: 4px;
+    }
+    .note {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        font-style: italic;
+        margin-top: 6px;
+    }
+    .pitfall {
+        border-left: 3px solid #dc3545;
+        padding-left: 10px;
+        margin-bottom: 6px;
+        font-size: 0.86rem;
+    }
+    @media print {
+        body { background: white; padding: 0; }
+        .sheet { box-shadow: none; border-radius: 0; padding: 12px 18px; }
+        .box { break-inside: avoid; }
+    }
+    @media (max-width: 700px) {
+        .grid { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+<div class="sheet">
+    <h1>k-Means-Clustering &amp; Distanzberechnung</h1>
+    <p class="subtitle">Übersichtsblatt zur Wiederholung</p>
+
+    <div class="grid">
+
+        <div class="box">
+            <h2><span class="num">1</span>Ablauf des Algorithmus</h2>
+            <ol>
+                <li><strong>Initialisierung:</strong> k Startzentroide festlegen (zufällig oder z.&nbsp;B. k-means++).</li>
+                <li><strong>Zuordnung:</strong> Jeden Datenpunkt dem nächstgelegenen Zentroiden zuordnen (kleinste Distanz).</li>
+                <li><strong>Aktualisierung:</strong> Jeden Zentroiden neu als Mittelwert (arithmetisches Mittel) aller ihm zugeordneten Punkte berechnen.</li>
+                <li><strong>Wiederholen</strong> von Schritt 2–3, bis sich die Zuordnung nicht mehr ändert (Konvergenz) oder eine max. Iterationszahl erreicht ist.</li>
+            </ol>
+            <p class="note">k-Means ist ein iteratives, unüberwachtes Verfahren – es benötigt keine Zielvariable.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">2</span>Distanzmetriken</h2>
+            <div class="formula">
+                <span class="label">Euklidische Distanz (2D)</span>
+                d(x, y) = √[ (x₁−y₁)² + (x₂−y₂)² ]
+            </div>
+            <div class="formula">
+                <span class="label">Quadrierte euklidische Distanz</span>
+                d²(x, y) = (x₁−y₁)² + (x₂−y₂)²
+            </div>
+            <div class="formula">
+                <span class="label">Manhattan-Distanz</span>
+                d(x, y) = |x₁−y₁| + |x₂−y₂|
+            </div>
+            <p class="note">k-Means verwendet für die Zuordnung meist die <em>quadrierte</em> euklidische Distanz – die Wurzel ist monoton, das Ranking bleibt gleich, spart aber Rechenaufwand.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">3</span>Warum standardisieren?</h2>
+            <p>Ohne Skalierung dominiert das Merkmal mit dem größten Wertebereich die Distanzberechnung.</p>
+            <div class="formula">
+                <span class="label">z-Score-Standardisierung</span>
+                z = (x − μ) / σ
+            </div>
+            <p style="font-size:0.8rem;">μ: Mittelwert, σ: Standardabweichung des Merkmals</p>
+            <p class="note">z-Score wird der Min-Max-Normierung meist vorgezogen, da er robuster gegenüber Ausreißern ist und nicht von einem festen Minimum/Maximum abhängt.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">4</span>Wahl von k</h2>
+            <p><span class="tag">Elbow-Methode</span> WCSS (Within-Cluster-Sum-of-Squares, Summe der quadrierten Distanzen zum jeweiligen Zentroiden) für verschiedene k plotten. Der „Ellbogen&rdquo; (Knick, ab dem sich die Kurve deutlich abflacht) markiert ein sinnvolles k.</p>
+            <p><span class="tag">Silhouettenkoeffizient</span> Misst, wie gut ein Punkt zu seinem eigenen Cluster passt im Vergleich zum nächstgelegenen anderen Cluster (Wertebereich −1 bis 1, höher = bessere Trennung).</p>
+        </div>
+
+        <div class="box full">
+            <h2><span class="num">5</span>Rechenbeispiel: eine k-Means-Iteration (k=2)</h2>
+            <table>
+                <tr><th>Schritt</th><th>Was wird berechnet?</th><th>Beispiel</th></tr>
+                <tr><td>Distanz zu jedem Zentroiden</td><td>d²(Punkt, Z<sub>j</sub>) für alle j = 1…k</td><td>d²(P, Z1) = (x<sub>P</sub>−x<sub>Z1</sub>)² + (y<sub>P</sub>−y<sub>Z1</sub>)²</td></tr>
+                <tr><td>Zuordnung</td><td>Punkt → Zentroid mit minimaler Distanz</td><td>d²(P,Z1)=1 &lt; d²(P,Z2)=61 → Cluster 1</td></tr>
+                <tr><td>Neuer Zentroid</td><td>Mittelwert aller x- bzw. y-Koordinaten des Clusters</td><td>Z1<sub>neu</sub> = ( x̄ , ȳ ) über alle zugeordneten Punkte</td></tr>
+            </table>
+            <p class="note">Merke: Das Verfahren wird erst nach mehreren Iterationen stabil – ein einzelner Zuordnungsschritt reicht i.&nbsp;d.&nbsp;R. nicht aus.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">6</span>Eigenschaften &amp; Grenzen</h2>
+            <ul>
+                <li>Anzahl der Cluster k muss vorab festgelegt werden.</li>
+                <li>Ergebnis hängt von der zufälligen Startinitialisierung ab (Lösung: mehrere Durchläufe, k-means++).</li>
+                <li>Nimmt implizit etwa kugelförmige, ähnlich große Cluster an.</li>
+                <li>Empfindlich gegenüber Ausreißern (Zentroid = Mittelwert).</li>
+                <li>Nur für numerische, sinnvoll skalierbare Merkmale geeignet.</li>
+            </ul>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">7</span>Typische Fallstricke</h2>
+            <div class="pitfall">Distanzen ohne vorherige Standardisierung berechnen → ein Merkmal dominiert.</div>
+            <div class="pitfall">Wurzel bei der quadrierten Distanz „vergessen wegzulassen&rdquo; bzw. sie fälschlich für nötig halten, um Cluster zuzuordnen.</div>
+            <div class="pitfall">k-Means mit überwachtem Lernen (z.&nbsp;B. k-NN) verwechseln – k-Means hat keine Zielvariable.</div>
+            <div class="pitfall">Nur einen Iterationsschritt rechnen und das Ergebnis bereits als final betrachten.</div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

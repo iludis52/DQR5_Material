@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz: CNN &amp; Bildklassifikation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .status-bar {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .mistakes { color: #dc3545; }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .quiz-container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .quiz-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 { text-align: center; color: #2c3e50; margin-top: 40px; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-top: -10px; margin-bottom: 10px; font-size: 1rem; }
+        .question-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .question-text {
+            font-size: 1.15rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+        .question-svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .question-svg-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 420px;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        button:hover:not([disabled]) {
+            background-color: #f0f8ff;
+            border-color: #3498db;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        button.correct {
+            background-color: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724;
+        }
+        button.wrong {
+            background-color: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24;
+            text-decoration: line-through;
+        }
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .feedback.correct-feedback {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback.wrong-feedback {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .final-result {
+            display: none;
+            text-align: center;
+            background: #e8f4fd;
+            border: 2px solid #3498db;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-bar">
+    <div class="status-info">
+        <span>Fortschritt: <span id="progress-text">0%</span></span>
+        <span class="mistakes">Fehler: <span id="mistake-counter">0</span></span>
+    </div>
+    <div class="progress-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+</div>
+
+<h1 id="quiz-main-title">CNN &amp; Bildklassifikation</h1>
+<p class="subtitle">Wiederholungsquiz &ndash; Beispiel &bdquo;Reifegrad-Erkennung&ldquo; bei Obst</p>
+
+<div class="quiz-container" id="quiz-container"></div>
+
+<div class="quiz-container">
+    <div class="final-result" id="final-result">
+        <h2>Quiz abgeschlossen!</h2>
+        <p>Du hast alle Fragen beantwortet. Insgesamt hast du <strong id="final-mistakes">0</strong> Fehler gemacht.</p>
+        <button onclick="location.reload()" style="background: #3498db; color: white; border: none; text-align: center; margin-top: 15px; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem;">Quiz neustarten</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        {
+                "text": "Welche Rolle spielt eine Faltungsschicht (Convolutional Layer) in einem CNN?",
+                "options": [
+                        "Sie reduziert die Bildgröße, indem benachbarte Pixel zu einem einzigen Ausgabewert zusammengefasst werden.",
+                        "Sie wendet lernbare Filter lokal auf das Bild an und extrahiert Merkmale wie Kanten oder Texturen.",
+                        "Sie sortiert die Pixel eines Bildes nach ihrer Helligkeit, um es vor der Weiterverarbeitung zu normieren.",
+                        "Sie wandelt das zweidimensionale Bild in einen eindimensionalen Vektor für die Dense-Schicht um dabei."
+                ],
+                "correct": 1,
+                "explanation": "Faltungsschichten schieben lernbare, kleine Filter (Kernel) über das Bild und erzeugen so Feature Maps, die lokale Muster wie Kanten oder Texturen hervorheben."
+        },
+        {
+                "text": "Welche Rolle spielt eine MaxPooling-Schicht in einem CNN?",
+                "options": [
+                        "Sie multipliziert jede Aktivierung mit einem lernbaren Gewicht und addiert anschließend einen Bias-Wert.",
+                        "Sie berechnet für jeden Pixel den Mittelwert aller Kanäle und fasst das Bild so in Graustufen zusammen.",
+                        "Sie fasst benachbarte Aktivierungen durch Auswahl des Maximalwerts zusammen und reduziert so Höhe und Breite.",
+                        "Sie verbindet jedes Neuron der vorherigen Schicht vollständig mit jedem Neuron der Folgeschicht."
+                ],
+                "correct": 2,
+                "explanation": "MaxPooling verkleinert die Feature Maps, indem es aus kleinen Nachbarschaften jeweils den größten Wert übernimmt – das reduziert Rechenaufwand und macht die Darstellung robuster gegen kleine Verschiebungen. Lernbare Parameter besitzt die Schicht dabei nicht."
+        },
+        {
+                "text": "Ein CNN zur Reifegrad-Erkennung von Früchten erhält Farbbilder der Größe 40×40×3 (Höhe×Breite×Kanäle) als Eingang. Conv1 hat 16 Filter, Kernelgröße 3×3, Stride 1, kein Padding. Berechnen Sie Höhe, Breite und Kanalzahl der Ausgabe nach Conv1.",
+                "svgId": "svg-cnn-arch",
+                "options": [
+                        "38 × 38 × 16",
+                        "38 × 38 × 3",
+                        "40 × 40 × 16",
+                        "37 × 37 × 16"
+                ],
+                "correct": 0,
+                "explanation": "Höhe/Breite: (40−3)/1+1 = 38. Die Kanalzahl der Ausgabe entspricht der Filteranzahl von Conv1, also 16. Ergebnis: 38×38×16."
+        },
+        {
+                "text": "Auf die Ausgabe von Conv1 (38×38×16) folgt Pool1 mit MaxPooling, Fenstergröße 2×2, Stride 2, kein Padding. Berechnen Sie Höhe, Breite und Kanalzahl der Ausgabe nach Pool1.",
+                "svgId": "svg-cnn-arch",
+                "options": [
+                        "19 × 19 × 8",
+                        "18 × 18 × 16",
+                        "20 × 20 × 16",
+                        "19 × 19 × 16"
+                ],
+                "correct": 3,
+                "explanation": "Höhe/Breite: (38−2)/2+1 = 19. MaxPooling verändert die Kanalzahl nicht, sie bleibt bei 16. Ergebnis: 19×19×16."
+        },
+        {
+                "text": "Berechnen Sie die Anzahl lernbarer Parameter von Conv1 (16 Filter, Kernel 3×3, Eingang mit 3 Kanälen) inklusive Bias.",
+                "svgId": "svg-cnn-arch",
+                "options": [
+                        "144",
+                        "150",
+                        "448",
+                        "432"
+                ],
+                "correct": 2,
+                "explanation": "Parameter = k_h · k_w · C_in · C_out + C_out = 3·3·3·16 + 16 = 432 + 16 = 448. Wichtig: C_in = 3, da der Eingang ein Farbbild mit drei Kanälen ist."
+        },
+        {
+                "text": "Nach Flatten liegen 19×19×16 = 5.776 Werte vor. Die Dense-Schicht hat 3 Ausgabeneuronen (unreif / reif / überreif). Berechnen Sie die Anzahl lernbarer Parameter der Dense-Schicht inklusive Bias.",
+                "svgId": "svg-cnn-arch",
+                "options": [
+                        "5.779",
+                        "17.331",
+                        "17.334",
+                        "17.328"
+                ],
+                "correct": 1,
+                "explanation": "Parameter = n_in · n_out + n_out = 5.776 · 3 + 3 = 17.328 + 3 = 17.331."
+        },
+        {
+                "text": "Welche Schicht des Netzes trägt die meisten Parameter, und warum?",
+                "options": [
+                        "Beide Schichten besitzen exakt gleich viele Parameter, da sie auf denselben Eingabedaten arbeiten.",
+                        "Die Faltungsschicht, da sie für jedes einzelne Pixel des Eingabebilds einen eigenen Parametersatz benötigt.",
+                        "Die Pooling-Schicht, da sie zusätzlich zu den Gewichten noch eigene Schwellenwerte lernen muss.",
+                        "Die Dense-Schicht, da hier jedes der 5.776 Flatten-Neuronen mit jedem Ausgabeneuron verbunden ist."
+                ],
+                "correct": 3,
+                "explanation": "Dense-Schichten sind vollverbunden: jedes Eingabeneuron ist mit jedem Ausgabeneuron verbunden. Bei großen Flatten-Vektoren übersteigt das die Parameterzahl lokal verbundener Faltungsschichten meist deutlich."
+        },
+        {
+                "text": "Abbildung 2 zeigt Trainings- und Validierungsfehler für unterschiedliche Filterzahlen in Conv1. Welche Filterzahl ist am besten geeignet, wenn man sowohl den Validierungsfehler als auch den Abstand zwischen Trainings- und Validierungskurve berücksichtigt?",
+                "svgId": "svg-filter-curve",
+                "options": [
+                        "16 Filter",
+                        "64 Filter",
+                        "32 Filter",
+                        "4 Filter"
+                ],
+                "correct": 0,
+                "explanation": "Bei 16 Filtern ist der Validierungsfehler am niedrigsten und der Abstand zur Trainingskurve noch klein. Ab 32 Filtern steigt der Validierungsfehler wieder, während der Trainingsfehler weiter sinkt – ein klares Overfitting-Signal."
+        },
+        {
+                "text": "Angenommen man würde in Conv1 statt Stride 1 einen Stride von 2 verwenden (Kernel weiterhin 3×3, 16 Filter, Eingang 40×40×3, kein Padding). Berechnen Sie Höhe, Breite und Kanalzahl der Ausgabe nach Conv1 (Ergebnis ggf. abrunden).",
+                "options": [
+                        "18 × 18 × 16",
+                        "20 × 20 × 16",
+                        "19 × 19 × 16",
+                        "19,5 × 19,5 × 16"
+                ],
+                "correct": 2,
+                "explanation": "Höhe/Breite: (40−3)/2+1 = 18,5+1 → zuerst abrunden (18), dann +1 = 19. Die Kanalzahl bleibt bei 16 Filtern. Ergebnis: 19×19×16."
+        },
+        {
+                "text": "Hätte das Netz statt drei nur zwei Ausgabeneuronen (z. B. nur reif/unreif statt drei Reifestufen), wie viele lernbare Parameter hätte die Dense-Schicht bei weiterhin 5.776 Flatten-Werten, inklusive Bias?",
+                "svgId": "svg-cnn-arch",
+                "options": [
+                        "11.552",
+                        "5.778",
+                        "17.331",
+                        "11.554"
+                ],
+                "correct": 3,
+                "explanation": "Parameter = n_in · n_out + n_out = 5.776 · 2 + 2 = 11.552 + 2 = 11.554. Die Antwort 17.331 wäre die alte Parameterzahl mit drei statt zwei Ausgabeneuronen."
+        },
+        {
+                "text": "Von jeder physischen Frucht wurden mehrere Fotos aus verschiedenen Blickwinkeln gemacht (im Mittel fünf Fotos je Frucht). Die Aufteilung in Trainings-, Validierungs- und Testdaten erfolgte rein zufällig auf Bildebene. Warum ist das problematisch, und was wäre die geeignete Gegenmaßnahme?",
+                "options": [
+                        "Das ist unproblematisch, da jedes Foto ein eigenständiger, vollständig unabhängiger Datenpunkt ist.",
+                        "Fotos derselben Frucht ähneln sich stark und landen oft in mehreren Mengen; besser ist eine Aufteilung auf Fruchtebene.",
+                        "Problematisch ist nur die Gesamtzahl der Fotos; eine Aufteilung auf Fruchtebene ändert daran gar nichts.",
+                        "Die Aufteilung führt zu einem zu kleinen Trainingsdatensatz, Abhilfe schafft nur das Sammeln weiterer Früchte."
+                ],
+                "correct": 1,
+                "explanation": "Da mehrere Fotos derselben Frucht sich stark ähneln, können sie über Train-, Validierungs- und Testmenge verteilt landen – das Modell 'erkennt' dann teils dieselbe Frucht wieder, statt wirklich zu generalisieren. Eine Aufteilung auf Fruchtebene (alle Fotos einer Frucht in derselben Menge) verhindert dieses Datenleck."
+        },
+        {
+                "text": "Warum wird bei der Parameterberechnung ausdrücklich betont, dass der Bias 'überall mitzählt'?",
+                "options": [
+                        "Jede Faltungs- und Dense-Schicht besitzt neben den Gewichten einen Bias pro Ausgabeeinheit, der leicht vergessen wird.",
+                        "Der Bias existiert ausschließlich in der allerletzten Schicht eines Netzes und ist dort zwingend vorgeschrieben.",
+                        "Ohne einen zusätzlichen Bias-Term wäre die Aktivierungsfunktion ReLU rein rechnerisch gar nicht anwendbar.",
+                        "Ausschließlich die MaxPooling-Schichten besitzen einen eigenen Bias, alle anderen Schichten dagegen nicht."
+                ],
+                "correct": 0,
+                "explanation": "Sowohl Faltungs- als auch Dense-Schichten besitzen pro Ausgabeeinheit (Filter bzw. Neuron) einen eigenen Bias-Parameter zusätzlich zu den Gewichten. Er wird bei der Parameterzählung häufig übersehen, trägt aber zur Gesamtzahl bei."
+        }
+];
+
+    let correctCount = 0;
+    let mistakeCount = 0;
+
+    function initQuiz() {
+        const container = document.getElementById('quiz-container');
+
+        questions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.id = `question-card-${qIndex}`;
+
+            const title = document.createElement('div');
+            title.className = 'question-title';
+            title.textContent = `Frage ${qIndex + 1} von ${questions.length}`;
+
+            const text = document.createElement('div');
+            text.className = 'question-text';
+            text.textContent = q.text;
+
+            card.appendChild(title);
+            card.appendChild(text);
+
+            if (q.svgId) {
+                const svgSource = document.getElementById(q.svgId);
+                if (svgSource) {
+                    const svgContainer = document.createElement('div');
+                    svgContainer.className = 'question-svg-container';
+                    svgContainer.innerHTML = svgSource.innerHTML;
+                    card.appendChild(svgContainer);
+                } else {
+                    console.warn(`SVG mit ID '${q.svgId}' nicht gefunden.`);
+                }
+            }
+
+            const optionsContainer = document.createElement('div');
+            optionsContainer.className = 'options';
+
+            q.options.forEach((opt, optIndex) => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(qIndex, optIndex, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            const feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = `feedback-${qIndex}`;
+
+            card.appendChild(optionsContainer);
+            card.appendChild(feedback);
+            container.appendChild(card);
+        });
+    }
+
+    function handleAnswer(qIndex, optIndex, btnElement) {
+        const q = questions[qIndex];
+        const card = document.getElementById(`question-card-${qIndex}`);
+        const feedback = document.getElementById(`feedback-${qIndex}`);
+
+        if (card.classList.contains('completed')) return;
+
+        if (optIndex === q.correct) {
+            btnElement.classList.add('correct');
+            card.classList.add('completed');
+
+            const allBtns = card.querySelectorAll('button');
+            allBtns.forEach(b => b.disabled = true);
+
+            feedback.className = 'feedback correct-feedback';
+            feedback.innerHTML = `<strong>Richtig!</strong> ${q.explanation}`;
+            feedback.style.display = 'block';
+
+            correctCount++;
+            updateProgress();
+        } else {
+            btnElement.classList.add('wrong');
+            btnElement.disabled = true;
+
+            mistakeCount++;
+            document.getElementById('mistake-counter').textContent = mistakeCount;
+
+            feedback.className = 'feedback wrong-feedback';
+            feedback.innerHTML = `<strong>Leider falsch.</strong> Versuche es noch einmal!`;
+            feedback.style.display = 'block';
+        }
+    }
+
+    function updateProgress() {
+        const percent = Math.round((correctCount / questions.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = percent + '%';
+
+        if (correctCount === questions.length) {
+            document.getElementById('final-mistakes').textContent = mistakeCount;
+            document.getElementById('final-result').style.display = 'block';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", initQuiz);
+</script>
+
+<div id="svg-assets" style="display: none;">
+
+    <div id="svg-cnn-arch">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 320" font-family="Segoe UI, Verdana, sans-serif">
+<rect x="0" y="0" width="900" height="320" fill="#ffffff"/>
+<rect x="25.0" y="85.0" width="150" height="130" rx="10" fill="#eef6fc" stroke="#3498db" stroke-width="2.5"/>
+<text x="100.0" y="115.0" font-size="19" fill="#2c3e50" text-anchor="middle" font-weight="700">Eingang</text>
+<text x="100.0" y="145.0" font-size="14" fill="#555" text-anchor="middle">40 × 40 × 3</text>
+<line x1="180.0" y1="150.0" x2="192.0" y2="150.0" stroke="#7f8c8d" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="200.0" y="85.0" width="150" height="130" rx="10" fill="#eef6fc" stroke="#3498db" stroke-width="2.5"/>
+<text x="275.0" y="115.0" font-size="19" fill="#2c3e50" text-anchor="middle" font-weight="700">Conv1</text>
+<text x="275.0" y="145.0" font-size="14" fill="#555" text-anchor="middle">16 Filter, 3×3</text>
+<text x="275.0" y="167.0" font-size="14" fill="#555" text-anchor="middle">Stride 1, kein Padding</text>
+<line x1="355.0" y1="150.0" x2="367.0" y2="150.0" stroke="#7f8c8d" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="375.0" y="85.0" width="150" height="130" rx="10" fill="#eef6fc" stroke="#3498db" stroke-width="2.5"/>
+<text x="450.0" y="115.0" font-size="19" fill="#2c3e50" text-anchor="middle" font-weight="700">Pool1</text>
+<text x="450.0" y="145.0" font-size="14" fill="#555" text-anchor="middle">MaxPooling 2×2</text>
+<text x="450.0" y="167.0" font-size="14" fill="#555" text-anchor="middle">Stride 2</text>
+<line x1="530.0" y1="150.0" x2="542.0" y2="150.0" stroke="#7f8c8d" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="550.0" y="85.0" width="150" height="130" rx="10" fill="#eef6fc" stroke="#3498db" stroke-width="2.5"/>
+<text x="625.0" y="115.0" font-size="19" fill="#2c3e50" text-anchor="middle" font-weight="700">Flatten</text>
+<text x="625.0" y="145.0" font-size="14" fill="#555" text-anchor="middle">Vektorisierung</text>
+<line x1="705.0" y1="150.0" x2="717.0" y2="150.0" stroke="#7f8c8d" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="725.0" y="85.0" width="150" height="130" rx="10" fill="#fdf1e6" stroke="#e67e22" stroke-width="2.5"/>
+<text x="800.0" y="115.0" font-size="19" fill="#2c3e50" text-anchor="middle" font-weight="700">Dense</text>
+<text x="800.0" y="145.0" font-size="14" fill="#555" text-anchor="middle">3 Neuronen</text>
+<text x="800.0" y="167.0" font-size="14" fill="#555" text-anchor="middle">(unreif/reif/überreif)</text>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L0,6 L9,3 z" fill="#7f8c8d" />
+</marker>
+</defs>
+</svg>
+    </div>
+
+    <div id="svg-filter-curve">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" font-family="Segoe UI, Verdana, sans-serif">
+<rect x="0" y="0" width="720" height="480" fill="#ffffff"/>
+<line x1="80.0" y1="420.0" x2="680.0" y2="420.0" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="425.0" font-size="14" fill="#555" text-anchor="end">0</text>
+<line x1="80.0" y1="356.7" x2="680.0" y2="356.7" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="361.7" font-size="14" fill="#555" text-anchor="end">5</text>
+<line x1="80.0" y1="293.3" x2="680.0" y2="293.3" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="298.3" font-size="14" fill="#555" text-anchor="end">10</text>
+<line x1="80.0" y1="230.0" x2="680.0" y2="230.0" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="235.0" font-size="14" fill="#555" text-anchor="end">15</text>
+<line x1="80.0" y1="166.7" x2="680.0" y2="166.7" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="171.7" font-size="14" fill="#555" text-anchor="end">20</text>
+<line x1="80.0" y1="103.3" x2="680.0" y2="103.3" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="108.3" font-size="14" fill="#555" text-anchor="end">25</text>
+<line x1="80.0" y1="40.0" x2="680.0" y2="40.0" stroke="#eee" stroke-width="1"/>
+<text x="70.0" y="45.0" font-size="14" fill="#555" text-anchor="end">30</text>
+<line x1="80.0" y1="420.0" x2="680.0" y2="420.0" stroke="#333" stroke-width="3"/>
+<line x1="80.0" y1="420.0" x2="80.0" y2="40.0" stroke="#333" stroke-width="3"/>
+<text x="80.0" y="444.0" font-size="15" fill="#555" text-anchor="middle">4</text>
+<text x="230.0" y="444.0" font-size="15" fill="#555" text-anchor="middle">8</text>
+<text x="380.0" y="444.0" font-size="15" fill="#555" text-anchor="middle">16</text>
+<text x="530.0" y="444.0" font-size="15" fill="#555" text-anchor="middle">32</text>
+<text x="680.0" y="444.0" font-size="15" fill="#555" text-anchor="middle">64</text>
+<text x="380.0" y="465" font-size="17" fill="#2c3e50" text-anchor="middle" font-weight="600">Anzahl Filter in Conv1</text>
+<text x="22" y="230.0" font-size="17" fill="#2c3e50" text-anchor="middle" font-weight="600" transform="rotate(-90 22 230.0)">Fehler (%)</text>
+<polyline points="80.0,116.0 230.0,217.3 380.0,306.0 530.0,369.3 680.0,394.7" fill="none" stroke="#3498db" stroke-width="4" stroke-linejoin="round"/>
+<polyline points="80.0,90.7 230.0,204.7 380.0,293.3 530.0,280.7 680.0,230.0" fill="none" stroke="#e67e22" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="80.0" cy="116.0" r="6" fill="#3498db" stroke="#1c6ea4" stroke-width="2"/>
+<circle cx="230.0" cy="217.3" r="6" fill="#3498db" stroke="#1c6ea4" stroke-width="2"/>
+<circle cx="380.0" cy="306.0" r="6" fill="#3498db" stroke="#1c6ea4" stroke-width="2"/>
+<circle cx="530.0" cy="369.3" r="6" fill="#3498db" stroke="#1c6ea4" stroke-width="2"/>
+<circle cx="680.0" cy="394.7" r="6" fill="#3498db" stroke="#1c6ea4" stroke-width="2"/>
+<circle cx="80.0" cy="90.7" r="6" fill="#e67e22" stroke="#a85c1a" stroke-width="2"/>
+<circle cx="230.0" cy="204.7" r="6" fill="#e67e22" stroke="#a85c1a" stroke-width="2"/>
+<circle cx="380.0" cy="293.3" r="6" fill="#e67e22" stroke="#a85c1a" stroke-width="2"/>
+<circle cx="530.0" cy="280.7" r="6" fill="#e67e22" stroke="#a85c1a" stroke-width="2"/>
+<circle cx="680.0" cy="230.0" r="6" fill="#e67e22" stroke="#a85c1a" stroke-width="2"/>
+<line x1="490" y1="45" x2="520" y2="45" stroke="#3498db" stroke-width="4"/>
+<text x="528" y="50" font-size="14" fill="#2c3e50">Trainingsfehler</text>
+<line x1="490" y1="69" x2="520" y2="69" stroke="#e67e22" stroke-width="4"/>
+<text x="528" y="74" font-size="14" fill="#2c3e50">Validierungsfehler</text>
+</svg>
+    </div>
+
+</div>
+
+</body>
+</html>

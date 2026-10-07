@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Übersicht: CNN &amp; Bildklassifikation</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f4f9;
+        margin: 0;
+        padding: 24px;
+        color: #2c3e50;
+    }
+    .sheet {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        padding: 30px 36px 24px;
+    }
+    h1 {
+        text-align: center;
+        margin: 0 0 4px;
+        font-size: 1.6rem;
+        color: #2c3e50;
+    }
+    .subtitle {
+        text-align: center;
+        color: #7f8c8d;
+        margin: 0 0 22px;
+        font-size: 0.95rem;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+    .box {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 14px 18px;
+        background: #fbfcfe;
+    }
+    .box.full { grid-column: 1 / -1; }
+    .box h2 {
+        font-size: 1.02rem;
+        color: #2c3e50;
+        margin: 0 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #3498db;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .box h2 .num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #3498db;
+        color: white;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    ol, ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+    li { margin-bottom: 4px; }
+    p { font-size: 0.88rem; line-height: 1.5; margin: 4px 0; }
+    .formula {
+        background: #eef6fc;
+        border: 1px solid #cfe6f5;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        font-size: 0.95rem;
+        text-align: center;
+        font-family: 'Cambria Math', 'Times New Roman', serif;
+    }
+    .formula .label {
+        display: block;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        font-size: 0.75rem;
+        color: #7f8c8d;
+        margin-bottom: 3px;
+        text-align: left;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 6px;
+    }
+    th, td {
+        border: 1px solid #e0e0e0;
+        padding: 5px 8px;
+        text-align: left;
+    }
+    th { background: #eef6fc; color: #2c3e50; }
+    .tag {
+        display: inline-block;
+        background: #eef6fc;
+        color: #1c6ea4;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-right: 4px;
+    }
+    .note {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        font-style: italic;
+        margin-top: 6px;
+    }
+    .pitfall {
+        border-left: 3px solid #dc3545;
+        padding-left: 10px;
+        margin-bottom: 6px;
+        font-size: 0.86rem;
+    }
+    @media print {
+        body { background: white; padding: 0; }
+        .sheet { box-shadow: none; border-radius: 0; padding: 12px 18px; }
+        .box { break-inside: avoid; }
+    }
+    @media (max-width: 700px) {
+        .grid { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+<div class="sheet">
+    <h1>CNN &amp; Bildklassifikation</h1>
+    <p class="subtitle">Übersichtsblatt zur Wiederholung</p>
+
+    <div class="grid">
+
+        <div class="box">
+            <h2><span class="num">1</span>Aufbau &amp; Rolle der Schichten</h2>
+            <ul>
+                <li><strong>Faltungsschicht (Conv):</strong> lernbare Filter tasten das Bild lokal ab und erzeugen Feature Maps (Kanten, Texturen, Muster).</li>
+                <li><strong>MaxPooling:</strong> verkleinert Höhe/Breite durch Auswahl des Maximalwerts je Nachbarschaft – keine lernbaren Parameter.</li>
+                <li><strong>Flatten:</strong> wandelt die letzte Feature-Map in einen eindimensionalen Vektor um.</li>
+                <li><strong>Dense (vollverbunden):</strong> jedes Eingabeneuron mit jedem Ausgabeneuron verbunden, liefert die Klassenentscheidung.</li>
+            </ul>
+            <p class="note">Bias zählt bei Conv- und Dense-Schichten immer zusätzlich zu den Gewichten mit.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">2</span>Formeln</h2>
+            <div class="formula">
+                <span class="label">Ausgabegröße je Achse (kein Padding)</span>
+                neue Größe = (alte Größe − Kernelgröße) ÷ Stride + 1
+            </div>
+            <div class="formula">
+                <span class="label">Parameter Faltungsschicht</span>
+                k_h · k_w · C_in · C_out + C_out
+            </div>
+            <div class="formula">
+                <span class="label">Parameter Dense-Schicht</span>
+                n_in · n_out + n_out
+            </div>
+            <p class="note">Nicht ganzzahlige Ergebnisse werden abgerundet. C_in/C_out bzw. n_in/n_out = Kanäle bzw. Neuronen vor/nach der Schicht.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">3</span>Trainings-, Validierungs-, Testdaten</h2>
+            <p><span class="tag">Training</span> Daten, auf denen die Gewichte gelernt werden.</p>
+            <p><span class="tag">Validierung</span> steuert Entscheidungen <em>während</em> der Entwicklung (Hyperparameter wie Filterzahl, Abbruchzeitpunkt) – wird wiederholt genutzt.</p>
+            <p><span class="tag">Test</span> wird erst am Ende einmalig verwendet, um die Leistung unabhängig und unverzerrt zu schätzen.</p>
+            <p class="note">Werden Testdaten schon während der Entwicklung zur Auswahl genutzt, verlieren sie ihre Aussagekraft.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">4</span>Overfitting erkennen</h2>
+            <p>Trainings- und Validierungsfehler über eine Hyperparameter-Kurve (z. B. Filterzahl, Epochen) vergleichen:</p>
+            <ul>
+                <li>Beide Kurven fallen gemeinsam → Modell lernt noch sinnvoll (Underfitting-Bereich).</li>
+                <li>Trainingsfehler sinkt weiter, Validierungsfehler steigt wieder → Overfitting.</li>
+                <li>Gesucht: Punkt mit niedrigem Validierungsfehler <em>und</em> noch kleinem Abstand zwischen beiden Kurven.</li>
+            </ul>
+        </div>
+
+        <div class="box full">
+            <h2><span class="num">5</span>Rechenbeispiel: eine Schicht komplett durchrechnen</h2>
+            <table>
+                <tr><th>Schritt</th><th>Was wird berechnet?</th><th>Beispiel (Eingang 40×40×3, Conv 16 Filter, 3×3, Stride 1)</th></tr>
+                <tr><td>Ausgabegröße</td><td>(alte Größe − Kernel) ÷ Stride + 1</td><td>(40−3)/1+1 = 38 → Ausgabe 38×38×16 (Kanäle = Filterzahl)</td></tr>
+                <tr><td>Parameter Conv</td><td>k_h·k_w·C_in·C_out + C_out</td><td>3·3·3·16 + 16 = 432 + 16 = 448</td></tr>
+                <tr><td>Parameter Dense</td><td>n_in·n_out + n_out</td><td>bei 5.776 Flatten-Werten und 3 Ausgabeneuronen: 5.776·3+3 = 17.331</td></tr>
+            </table>
+            <p class="note">Merke: C_in der ersten Faltungsschicht entspricht der Kanalzahl des Eingabebilds (1 = Graustufen, 3 = RGB) – ein häufiger Rechenfehler.</p>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">6</span>Eigenschaften &amp; Grenzen</h2>
+            <ul>
+                <li>Dense-Schichten tragen bei großen Flatten-Vektoren meist die meisten Parameter, nicht die Faltungsschichten.</li>
+                <li>MaxPooling hat keine lernbaren Parameter, reduziert aber Rechenaufwand und Overfitting-Risiko.</li>
+                <li>Mehr Filter/Parameter = mehr Kapazität, aber auch höheres Overfitting-Risiko.</li>
+                <li>CNNs benötigen viele, möglichst unabhängige Trainingsbeispiele.</li>
+            </ul>
+        </div>
+
+        <div class="box">
+            <h2><span class="num">7</span>Typische Fallstricke</h2>
+            <div class="pitfall">Bias bei der Parameterberechnung vergessen (Conv <em>und</em> Dense betroffen).</div>
+            <div class="pitfall">C_in der ersten Schicht fälschlich als 1 annehmen, obwohl der Eingang mehrere Kanäle (z. B. RGB) hat.</div>
+            <div class="pitfall">Mehrere Aufnahmen desselben physischen Objekts rein zufällig auf Train/Val/Test aufteilen → Datenleck. Abhilfe: Aufteilung auf Objektebene (z. B. GroupKFold).</div>
+            <div class="pitfall">Testdaten schon während der Entwicklung zur Modellauswahl heranziehen.</div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>
