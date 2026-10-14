@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>RL-Quiz: Wissenstest</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        #quiz-container { background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 700px; padding: 30px; }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 25px; font-size: 28px; }
+        .question-block { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .question-block h2 { color: #34495e; margin-top: 0; font-size: 20px; }
+        .question-block p { margin-bottom: 15px; font-size: 16px; line-height: 1.5; }
+        .options-list { list-style: none; padding: 0; margin-top: 15px; }
+        .options-list li { margin-bottom: 10px; }
+        .options-list label { display: block; background: #ecf0f1; padding: 12px 15px; border-radius: 6px; cursor: pointer; transition: background 0.2s ease; }
+        .options-list label:hover { background: #dfe6e9; }
+        .options-list input[type="radio"] { margin-right: 10px; }
+
+        .feedback { margin-top: 15px; padding: 10px 15px; border-radius: 6px; font-size: 15px; line-height: 1.4; }
+        .feedback.correct { background: #e6ffe6; color: #28a745; border: 1px solid #28a745; }
+        .feedback.incorrect { background: #ffe6e6; color: #dc3545; border: 1px solid #dc3545; }
+        .explanation { margin-top: 10px; font-style: italic; color: #555; font-size: 14px; }
+
+        .submit-btn { display: block; width: 100%; padding: 15px 20px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; transition: background 0.3s ease; margin-top: 30px; }
+        .submit-btn:hover { background: #218838; }
+        .submit-btn:disabled { background: #cccccc; cursor: not-allowed; }
+
+        #score-display { text-align: center; margin-top: 25px; font-size: 22px; color: #2c3e50; font-weight: bold; }
+        .restart-btn { display: block; width: 100%; padding: 15px 20px; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; transition: background 0.3s ease; margin-top: 20px; }
+        .restart-btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <h1>RL-Quiz: Dein Wissen über lernende Mäuse</h1>
+
+    <div id="questions-area">
+        </div>
+
+    <button class="submit-btn" onclick="submitQuiz()">Quiz beenden & Auswertung</button>
+    <div id="score-display" style="display:none;"></div>
+    <button class="restart-btn" onclick="startQuiz()" style="display:none;">Quiz neustarten</button>
+
+    <script>
+        const questions = [
+            // Mittelstufe
+            {
+                level: 'Mittelstufe',
+                question: 'Was lernt die Maus hauptsächlich, um den Käse zu finden?',
+                options: [
+                    'Sie merkt sich den genauen Weg, den sie einmal gelaufen ist.',
+                    'Sie merkt sich für jedes Feld, welche Richtung zum Käse führt.',
+                    'Sie merkt sich, wo die Wände sind und wo nicht.',
+                    'Sie weiß von Anfang an, wo der Käse ist.'
+                ],
+                correctAnswer: 1,
+                explanation: 'Die Maus lernt eine "Policy-Map" (Pfeil-Karte). Für jedes Feld speichert sie die beste nächste Aktion, nicht den gesamten Pfad.'
+            },
+            {
+                level: 'Mittelstufe',
+                question: 'Was passiert, wenn der "Trainings-Tiefe"-Slider (Bellman-Horizont) sehr niedrig ist?',
+                options: [
+                    'Die Maus läuft sehr schnell zum Käse.',
+                    'Die Maus bewegt sich in der Nähe des Käses zielgerichtet, weiter weg aber zufällig.',
+                    'Die Maus findet den Käse überhaupt nicht.',
+                    'Die Maus kennt den gesamten Weg sofort.'
+                ],
+                correctAnswer: 1,
+                explanation: 'Ein niedriger Horizont bedeutet, das Wissen hat sich nur kurz vom Käse aus verbreitet. Felder weiter weg haben noch keinen Wert gelernt.'
+            },
+            // Oberstufe
+            {
+                level: 'Oberstufe',
+                question: 'Was ist der Hauptunterschied zwischen "Exploration" und "Exploitation" in Reinforcement Learning?',
+                options: [
+                    'Exploration ist zielgerichtetes Laufen, Exploitation ist zufälliges Umherirren.',
+                    'Exploration bedeutet, neue Wege zu entdecken, Exploitation bedeutet, bewährte Wege zu nutzen.',
+                    'Exploration ist das Sammeln von Belohnungen, Exploitation ist das Vermeiden von Strafen.',
+                    'Es gibt keinen Unterschied, die Begriffe sind austauschbar.'
+                ],
+                correctAnswer: 1,
+                explanation: 'Exploration ist das Entdecken neuer Möglichkeiten, auch wenn sie nicht optimal sind. Exploitation ist das Ausnutzen des bereits Gelernten, um den Reward zu maximieren.'
+            },
+            {
+                level: 'Oberstufe',
+                question: 'Welche Auswirkung hat ein sehr niedrig eingestelltes Gamma (&gamma;) in der Bellman-Gleichung?',
+                options: [
+                    'Zukünftige Belohnungen werden stark aufgewertet.',
+                    'Die Maus wird sehr weitsichtig und plant lange Wege.',
+                    'Die Maus bewertet nur sofortige Belohnungen hoch und wird kurzsichtig.',
+                    'Es hat keine Auswirkung auf das Lernverhalten.'
+                ],
+                correctAnswer: 2,
+                explanation: 'Ein niedriges Gamma bedeutet, dass zukünftige Belohnungen stark "abgezinst" werden. Die Maus wird "kurzsichtig" und bevorzugt schnelle Wege, auch wenn ein längerer Weg langfristig besser wäre.'
+            },
+            {
+                level: 'Oberstufe',
+                question: 'Warum ist es vorteilhaft, eine Policy-Map anstatt eines starren Pfades zu lernen?',
+                options: [
+                    'Eine Policy-Map spart Speicherplatz im Computer.',
+                    'Die Policy-Map ist einfacher zu programmieren.',
+                    'Der Agent kann auf unerwartete Störungen reagieren, da er an jedem Punkt weiß, was zu tun ist.',
+                    'Die Policy-Map ist nur eine visuelle Darstellung ohne praktische Vorteile.'
+                ],
+                correctAnswer: 2,
+                explanation: 'Wenn ein Agent von seinem geplanten Pfad abweicht (z.B. durch eine externe Störung), kann er mit einer Policy-Map sofort am neuen Ort die beste Aktion ableiten.'
+            }
+        ];
+
+        let userAnswers = {};
+        let score = 0;
+
+        function startQuiz() {
+            const questionsArea = document.getElementById('questions-area');
+            questionsArea.innerHTML = ''; // Vorherige Fragen löschen
+
+            questions.forEach((q, index) => {
+                const block = document.createElement('div');
+                block.className = 'question-block';
+                block.innerHTML = `
+                    <h2>${q.level} - Frage ${index + 1}</h2>
+                    <p>${q.question}</p>
+                    <ul class="options-list">
+                        ${q.options.map((option, i) => `
+                            <li>
+                                <label>
+                                    <input type="radio" name="question${index}" value="${i}" onchange="recordAnswer(${index}, ${i})">
+                                    ${option}
+                                </label>
+                            </li>
+                        `).join('')}
+                    </ul>
+                    <div id="feedback${index}" class="feedback" style="display:none;"></div>
+                    <div id="explanation${index}" class="explanation" style="display:none;">${q.explanation}</div>
+                `;
+                questionsArea.appendChild(block);
+            });
+
+            userAnswers = {};
+            score = 0;
+            document.querySelector('.submit-btn').style.display = 'block';
+            document.getElementById('score-display').style.display = 'none';
+            document.querySelector('.restart-btn').style.display = 'none';
+        }
+
+        function recordAnswer(questionIndex, selectedOptionIndex) {
+            userAnswers[questionIndex] = selectedOptionIndex;
+        }
+
+        function submitQuiz() {
+            score = 0;
+            questions.forEach((q, index) => {
+                const feedbackDiv = document.getElementById(`feedback${index}`);
+                const explanationDiv = document.getElementById(`explanation${index}`);
+                const selectedOption = userAnswers[index];
+
+                feedbackDiv.style.display = 'block';
+                explanationDiv.style.display = 'block';
+
+                if (selectedOption !== undefined && selectedOption === q.correctAnswer) {
+                    score++;
+                    feedbackDiv.className = 'feedback correct';
+                    feedbackDiv.textContent = 'Richtig!';
+                } else {
+                    feedbackDiv.className = 'feedback incorrect';
+                    feedbackDiv.textContent = 'Falsch!';
+                    if (selectedOption === undefined) {
+                        feedbackDiv.textContent = 'Nicht beantwortet!';
+                    }
+                }
+            });
+
+            const scoreDisplay = document.getElementById('score-display');
+            scoreDisplay.textContent = `Du hast ${score} von ${questions.length} Fragen richtig beantwortet!`;
+            scoreDisplay.style.display = 'block';
+            document.querySelector('.submit-btn').style.display = 'none';
+            document.querySelector('.restart-btn').style.display = 'block';
+        }
+
+        // Quiz starten, wenn die Seite geladen ist
+        window.onload = startQuiz;
+    </script>
+</div>
+
+</body>
+</html>

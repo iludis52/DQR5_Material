@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>KI-Labor Reinforcement (LISA)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 10px; margin: 0; }
+        #app-container { width: 1250px; background: white; border-radius: 12px; display: grid; grid-template-areas: "header header" "sidebar main" "footer footer"; grid-template-columns: 480px 1fr; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        header { grid-area: header; background: #2c3e50; color: white; padding: 15px; border-radius: 12px 12px 0 0; }
+        #sidebar { grid-area: sidebar; padding: 25px; background: #f8f9fa; border-right: 1px solid #dee2e6; overflow-y: auto; }
+        #main-display { grid-area: main; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        footer { grid-area: footer; padding: 15px; background: #2c3e50; color: #ecf0f1; font-size: 13px; border-radius: 0 0 12px 12px; }
+        
+        .math-box { background: #282c34; color: #61afef; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; margin-top: 10px; border-left: 5px solid #e06c75; line-height: 1.4; }
+        .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-size: 12px; color: #abb2bf; }
+        .param-item { background: #3e4451; padding: 5px; border-radius: 3px; }
+
+        .q-table { border-collapse: collapse; width: 180px; height: 180px; table-layout: fixed; border: 2px solid #2c3e50; }
+        .q-table td { border: 1px solid #dfe6e9; text-align: center; background: #fff; font-weight: bold; font-size: 12px; }
+        
+        .interpretation { background: #e1f5fe; padding: 12px; border-radius: 5px; font-size: 13px; color: #01579b; margin-top: 15px; border-left: 4px solid #0288d1; line-height: 1.4; }
+        .slider-desc { font-size: 12px; color: #666; margin-bottom: 5px; line-height: 1.3; }
+        input[type="range"] { width: 100%; margin: 5px 0 15px 0; }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <header><h1 style="margin:0; font-size: 22px;">KI-Labor: Die hungrige Maus mit der Bellmann-Gleichung 🐭→🧀</h1></header>
+
+    <aside id="sidebar">
+        <div class="control-group">
+            <label><b>1. Käse-Geruch (Bellman-Horizont)</b></label>
+            <div class="slider-desc">Wie weit reicht der Käsegeruch? Je weiter der Slider desto weiter reicht er.</div>
+            <input type="range" id="progress" min="0" max="100" value="35">
+        </div>
+
+        <div class="control-group">
+            <label><b>2. Erinnerungsvermögen (Diskontierung))</b></label>
+            <div class="slider-desc">Wie gut lernt die Maus? Je weiter der Slider desto weiter denkt sie voraus.</div>
+            <input type="range" id="gamma" min="50" max="99" value="90">
+        </div>
+
+        <div class="control-group" style="margin-top:15px;">
+            <label><b>3. Lerngeschwindigkeit (Bellmann-Iterationen)</b></label>
+            <div class="slider-desc">Wie schnell verbreitet sich der Käsegeruch? Je weiter der Slider desto schneller.</div>
+            <input type="range" id="speed" min="0" max="10" value="3">
+            <div style="font-size:12px; color:#888; margin-top:-8px;">
+                Iterationen: <span id="iter-count" style="font-weight:bold; color:#2c3e50;">0</span>
+                <button id="reset-btn" style="margin-left:10px; padding:3px 10px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">↺ Reset</button>
+            </div>
+        </div>
+
+        <div class="control-group" style="margin-top:20px">
+            <label><b>4. Ansicht</b></label><br>
+            <input type="radio" name="view" value="mouse" id="v1" checked> Animation
+            <input type="radio" name="view" value="policy" id="v2"> Policy (Pfeile)
+            <input type="radio" name="view" value="values" id="v3"> Heatmap
+        </div>
+
+        <div class="control-group" style="margin-top:20px">
+            <label><b>5. Welt-Editor & Value-Map</b></label>
+            <div style="display:flex; gap:15px; align-items:flex-start; margin-top:8px;">
+                <div>
+                    <div id="editor-canvas"></div>
+                    <p style="font-size:11px; color:#666; margin-top:5px;">Ziehe 🧀 oder Blöcke zum Verändern der Welt.</p>
+                </div>
+                <div>
+                    <div style="font-size:11px; font-weight:bold; margin-bottom:5px; text-align:center;">VALUE-MAP V(s)</div>
+                    <table class="q-table" id="qTableBody"></table>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main id="main-display">
+        <div id="grid-canvas"></div>
+    </main>
+
+    <footer>
+        <b>Reinforcement Learning Dashboard:</b> Visualisierung der Bellman-Gleichung. Der Graph zeigt den gleitenden Durchschnitt der Erfolgsrate über die Zeit.
+    </footer>
+</div>
+
+<script>
+let gridSize = 5; let miniSize = 125; let editorSize = 200;
+let trainingProgress = 0.35; let gamma = 0.9; let viewMode = 'mouse';
+let target = {x: 4, y: 4}; let traps = [{x: 1, y: 1}, {x: 3, y: 2}, {x: 1, y: 3}];
+let agents = []; let draggingElement = null;
+let V = [];
+let iterationCount = 0;
+let speedLevel = 3;
+
+function setup() {
+    createCanvas(4 * (miniSize + 10), 4 * (miniSize + 10)).parent('grid-canvas');
+    initAgents();
+    initV();
+    
+    // Editor Setup
+    new p5((s) => {
+        let cs = editorSize / gridSize;
+        s.setup = () => s.createCanvas(editorSize, editorSize).parent('editor-canvas');
+        s.draw = () => {
+            s.background(240);
+            for(let x=0; x<gridSize; x++) {
+                for(let y=0; y<gridSize; y++) {
+                    s.fill(255); s.stroke(200); s.rect(x*cs, y*cs, cs, cs);
+                    if(x === target.x && y === target.y) s.textSize(24), s.textAlign(s.CENTER, s.CENTER), s.text("🧀", x*cs+cs/2, y*cs+cs/2+4);
+                    traps.forEach(t => { if(x===t.x && y===t.y) { s.fill(0); s.rect(x*cs, y*cs, cs, cs); }});
+                }
+            }
+        };
+        s.mousePressed = () => {
+            let mx = Math.floor(s.mouseX/cs), my = Math.floor(s.mouseY/cs);
+            if(mx===target.x && my===target.y) draggingElement = 'target';
+            else { let i = traps.findIndex(t => t.x===mx && t.y===my); if(i!==-1) draggingElement = i; }
+        };
+        s.mouseDragged = () => {
+            let mx = Math.floor(s.mouseX/cs), my = Math.floor(s.mouseY/cs);
+            if(mx>=0 && mx<gridSize && my>=0 && my<gridSize) {
+                if(draggingElement==='target' && !traps.some(t => t.x===mx && t.y===my)) target = {x:mx, y:my};
+                else if(typeof draggingElement==='number') traps[draggingElement] = {x:mx, y:my};
+            }
+        };
+        s.mouseReleased = () => { draggingElement = null; initV(); initAgents();};
+    });
+
+    document.getElementById('progress').addEventListener('input', (e) => {
+        trainingProgress = e.target.value / 100;
+        let maxHorizon = Math.round(lerp(0, 8, trainingProgress));
+        initV();
+        for (let i = 0; i < maxHorizon; i++) bellmanUpdate();
+    });
+    document.getElementById('gamma').addEventListener('input', (e) => {
+        gamma = e.target.value / 100;
+    });
+    document.querySelectorAll('input[name="view"]').forEach(r => {
+        r.addEventListener('change', (e) => { viewMode = e.target.value; });
+    });
+    document.getElementById('speed').addEventListener('input', (e) => {
+        speedLevel = parseInt(e.target.value);
+    });
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initV();
+        initAgents();
+    });
+    frameRate(20);
+}
+
+function initAgents() {
+    agents = [];
+    let free = [];
+    for(let y=0; y<gridSize; y++) for(let x=0; x<gridSize; x++) {
+        if(!traps.some(t => t.x===x && t.y===y) && !(x===target.x && y===target.y)) free.push({x,y});
+    }
+    for(let i=0; i<16; i++) {
+        let p = free[i % free.length] || {x:0, y:0};
+        agents.push({x:p.x, y:p.y, startX:p.x, startY:p.y, wait:0});
+    }
+}
+// Gibt zurück: { iterPerFrame, framesBetween }
+// framesBetween > 1 bedeutet: nur jede N-te Frame eine Iteration
+function getSpeedConfig(level) {
+    const map = [
+        { iterPerFrame: 0,  framesBetween: 1  }, // 0: pausiert
+        { iterPerFrame: 1,  framesBetween: 40 }, // 1: ~0.5 iter/s
+        { iterPerFrame: 1,  framesBetween: 20 }, // 2: ~1 iter/s
+        { iterPerFrame: 1,  framesBetween: 10 }, // 3: ~2 iter/s
+        { iterPerFrame: 1,  framesBetween: 4  }, // 4: ~5 iter/s
+        { iterPerFrame: 1,  framesBetween: 2  }, // 5: ~10 iter/s
+        { iterPerFrame: 1,  framesBetween: 1  }, // 6: ~20 iter/s
+        { iterPerFrame: 2,  framesBetween: 1  }, // 7: ~40 iter/s
+        { iterPerFrame: 5,  framesBetween: 1  }, // 8: ~100 iter/s
+        { iterPerFrame: 10, framesBetween: 1  }, // 9: ~200 iter/s
+        { iterPerFrame: 25, framesBetween: 1  }, // 10: sofort
+    ];
+    return map[level];
+}
+function initV() {
+    V = new Array(gridSize * gridSize).fill(0);
+    V[target.y * gridSize + target.x] = 20;
+    traps.forEach(t => { V[t.y * gridSize + t.x] = -15; });
+    iterationCount = 0;
+}
+
+function bellmanUpdate() {
+    let dx = [0, 1, 0, -1], dy = [-1, 0, 1, 0];
+    let V_new = [...V];
+    for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+            if (x === target.x && y === target.y) continue;
+            if (traps.some(t => t.x === x && t.y === y)) continue;
+            let qVals = [];
+            for (let a = 0; a < 4; a++) {
+                let nx = x + dx[a], ny = y + dy[a];
+                if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) {
+                    qVals.push(-2); // Wand-Penalty
+                } else {
+                    qVals.push(gamma * V[ny * gridSize + nx]);
+                }
+            }
+            V_new[y * gridSize + x] = Math.max(...qVals);
+        }
+    }
+    V = V_new;
+    iterationCount++;
+}
+function getQValues(x, y) {
+    if (traps.some(t => t.x === x && t.y === y)) return null;
+    if (x === target.x && y === target.y) return [20, 20, 20, 20];
+    let dx = [0, 1, 0, -1], dy = [-1, 0, 1, 0];
+    let q = [];
+    for (let a = 0; a < 4; a++) {
+        let nx = x + dx[a], ny = y + dy[a];
+        if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) {
+            q.push(-2);
+        } else {
+            q.push(V[ny * gridSize + nx]);
+        }
+    }
+    return q;
+}
+
+function draw() {
+    let maxHorizon = Math.round(lerp(0, 8, trainingProgress));
+    const sc = getSpeedConfig(speedLevel);
+    if (sc.iterPerFrame > 0 && frameCount % sc.framesBetween === 0) {
+        if (iterationCount < maxHorizon) bellmanUpdate();
+    }
+    document.getElementById('iter-count').textContent = iterationCount;
+    background(255);
+    updateQTableUI();
+    for (let i = 0; i < agents.length; i++) drawMiniMaze((i%4)*135, Math.floor(i/4)*135, i);
+}
+
+function drawMiniMaze(ox, oy, idx) {
+    push(); translate(ox, oy);
+    let cs = miniSize / gridSize; let a = agents[idx];
+    for (let x = 0; x < gridSize; x++) for (let y = 0; y < gridSize; y++) {
+        let q = getQValues(x, y);
+        let isTrap = traps.some(t => t.x===x && t.y===y);
+        
+        if (viewMode === 'values') {
+            let v = isTrap ? -15 : V[y * gridSize + x];
+            colorMode(HSB);
+            fill(map(v, -15, 20, 210, 50), Math.abs(v) > 0.5 ? 80 : 0, 95);
+            colorMode(RGB);
+        }else { fill(isTrap ? 40 : 255); }
+        
+        stroke(235); rect(x*cs, y*cs, cs, cs);
+        if(x === target.x && y === target.y) { 
+                // Hintergrund dezent lassen oder weiß füllen
+                fill(255); 
+                rect(x * cs, y * cs, cs, cs); 
+                
+                // Käse-Emoji zeichnen
+                textSize(cs * 0.8);
+                textAlign(CENTER, CENTER);
+                text("🧀", x * cs + cs / 2, y * cs + cs / 2 + 4); 
+            }
+        
+        if (viewMode === 'policy' && q && !(x===target.x && y===target.y)) {
+            let best = q.indexOf(Math.max(...q));
+            if (Math.max(...q) > 0.5) drawArrow(x*cs+cs/2, y*cs+cs/2, best, cs*0.6);
+        }
+        if(x===a.startX && y===a.startY) { stroke(255,0,0); strokeWeight(1.5); line(x*cs+12,y*cs+12,(x+1)*cs-12,(y+1)*cs-12); line((x+1)*cs-12,y*cs+12,x*cs+12,(y+1)*cs-12); }
+    }
+    if (viewMode === 'mouse') {
+        let a = agents[idx];
+        
+        // Emoji-Einstellungen
+        textSize(cs * 0.8); // Skaliert das Emoji passend zur Feldgröße
+        textAlign(CENTER, CENTER);
+        
+        // Zeichne das Maus-Emoji zentriert im Feld
+        text("🐭", a.x * cs + cs / 2, a.y * cs + cs / 2 + 2); 
+        
+        // Logik für Zielerreichung und Bewegung
+        if (a.x === target.x && a.y === target.y) {
+            a.wait++;
+            if(a.wait > 10) { 
+                a.x = a.startX; 
+                a.y = a.startY; 
+                a.wait = 0; 
+            }
+        } else if (frameCount % 6 === 0) {
+            let q = getQValues(a.x, a.y, trainingProgress);
+            if(q) {
+                let mv = q.indexOf(Math.max(...q));
+                    let nx = a.x, ny = a.y;
+                    if(mv===0) ny--;
+                    if(mv===1) nx++;
+                    if(mv===2) ny++;
+                    if(mv===3) nx--;
+                    // Bewegung nur ausführen, wenn Zielfeld keine Falle ist
+                    if(!traps.some(t => t.x===nx && t.y===ny)) { a.x = nx; a.y = ny; }
+            }
+        }
+    }
+    pop();
+}
+
+function drawArrow(cx, cy, dir, len) {
+    push(); translate(cx, cy); rotate([-HALF_PI, 0, HALF_PI, PI][dir]);
+    stroke(52, 152, 219); strokeWeight(2.5); line(-len/2, 0, len/2, 0); line(len/2, 0, len/2-4, -4); line(len/2, 0, len/2-4, 4);
+    pop();
+}
+
+function updateQTableUI() {
+    let html = "";
+    for (let y = 0; y < gridSize; y++) {
+        html += "<tr>";
+        for (let x = 0; x < gridSize; x++) {
+            let isTrap = traps.some(t => t.x === x && t.y === y);
+            let isTarget = x === target.x && y === target.y;
+            let val, bg, co;
+            if (isTrap) {
+                val = "---"; bg = "#2d3436"; co = "#fff";
+            } else if (isTarget) {
+                val = "20"; bg = "#ffeaa7"; co = "#2d3436";
+            } else {
+                let v = V[y * gridSize + x];
+                val = Math.abs(v) < 0.5 ? "0" : v.toFixed(1);
+                co = Math.abs(v) < 0.5 ? "#ccc" : "#2d3436";
+                bg = "#fff";
+            }
+            html += `<td style="background:${bg}; color:${co}">${val}</td>`;
+        }
+        html += "</tr>";
+    }
+    document.getElementById('qTableBody').innerHTML = html;
+}
+</script>
+</body>
+</html>
